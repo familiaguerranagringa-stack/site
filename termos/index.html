@@ -19,11 +19,15 @@
     }
     html{scroll-behavior:smooth}
     body{font-family:"Inter",sans-serif;background:var(--bg);color:var(--white);min-height:100vh;display:flex;flex-direction:column}
+
+    /* ── TOP BAR ── */
     .topbar{background:#0d0d0d;border-bottom:1px solid var(--border);padding:.9rem 2rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;position:sticky;top:0;z-index:50}
     .topbar-brand{font-family:"Cinzel",serif;font-size:.85rem;letter-spacing:.15em;color:var(--gold)}
     .topbar-nav{display:flex;align-items:center;gap:.75rem}
     .btn-back{font-size:.65rem;letter-spacing:.1em;text-transform:uppercase;background:transparent;border:1px solid var(--border);color:var(--muted);padding:5px 14px;border-radius:4px;cursor:pointer;font-family:"Inter",sans-serif;text-decoration:none;transition:all .2s}
     .btn-back:hover{color:var(--gold);border-color:var(--gold)}
+
+    /* ── STEPPER ── */
     .stepper-wrap{padding:2rem 2rem 0;max-width:860px;margin:0 auto;width:100%}
     .stepper{display:flex;align-items:center;gap:0;margin-bottom:2.5rem}
     .step-item{display:flex;flex-direction:column;align-items:center;flex:1;position:relative}
@@ -34,16 +38,23 @@
     .step-item.done .step-num{border-color:var(--gold);background:var(--gold);color:#fff}
     .step-label{font-size:.58rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-top:.4rem;text-align:center}
     .step-item.active .step-label{color:var(--gold)}
+
+    /* ── MAIN ── */
     .main{flex:1;padding:0 2rem 3rem;max-width:860px;margin:0 auto;width:100%}
     .section-title{font-family:"Cinzel",serif;font-size:1.2rem;font-weight:600;color:var(--white);margin-bottom:.35rem}
     .section-sub{font-size:.8rem;color:var(--muted);margin-bottom:1.75rem;line-height:1.6}
+
+    /* ── FORM ── */
     .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+    .form-grid.full{grid-template-columns:1fr}
     .field{display:flex;flex-direction:column;gap:.45rem}
     .field label{font-size:.65rem;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);font-weight:500}
     .field input,.field select{background:#161616;border:1px solid var(--border);color:var(--white);padding:.75rem 1rem;border-radius:6px;font-size:.92rem;font-family:"Inter",sans-serif;outline:none;transition:border .2s;width:100%}
     .field input:focus,.field select:focus{border-color:var(--gold)}
     .field input::placeholder{color:rgba(245,240,232,.25)}
     .field select option{background:#161616;color:var(--white)}
+
+    /* ── TERMS LIST ── */
     .terms-grid{display:grid;gap:.75rem}
     .term-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:1.1rem 1.25rem;display:flex;align-items:flex-start;gap:1rem;cursor:pointer;transition:all .2s}
     .term-card:hover:not(.mandatory){border-color:rgba(201,146,42,.4);background:var(--card-h)}
@@ -59,6 +70,8 @@
     .term-badge{font-size:.52rem;letter-spacing:.1em;text-transform:uppercase;padding:2px 7px;border-radius:3px;display:inline-block;margin-top:.4rem}
     .badge-mandatory{background:rgba(201,146,42,.12);color:var(--gold);border:1px solid rgba(201,146,42,.3)}
     .badge-optional{background:rgba(245,240,232,.06);color:var(--muted);border:1px solid rgba(245,240,232,.1)}
+
+    /* ── REVIEW ── */
     .review-block{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:1.5rem;margin-bottom:1.25rem}
     .review-block h3{font-family:"Cinzel",serif;font-size:.82rem;letter-spacing:.1em;color:var(--gold);margin-bottom:1rem;text-transform:uppercase}
     .review-grid{display:grid;grid-template-columns:1fr 1fr;gap:.6rem .5rem}
@@ -68,6 +81,8 @@
     .terms-selected-list{display:flex;flex-direction:column;gap:.5rem}
     .term-selected-row{display:flex;align-items:center;gap:.6rem;font-size:.82rem;color:var(--white)}
     .term-selected-row::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--gold);flex-shrink:0}
+
+    /* ── BUTTONS ── */
     .btn-row{display:flex;gap:.75rem;margin-top:1.75rem;justify-content:flex-end}
     .btn-primary{background:var(--gold);color:#fff;border:none;padding:.9rem 2rem;border-radius:6px;font-size:.78rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;font-family:"Inter",sans-serif;transition:background .2s}
     .btn-primary:hover:not(:disabled){background:#e0a830}
@@ -75,6 +90,8 @@
     .btn-secondary{background:transparent;border:1px solid var(--border);color:var(--muted);padding:.9rem 1.5rem;border-radius:6px;font-size:.78rem;cursor:pointer;font-family:"Inter",sans-serif;transition:all .2s}
     .btn-secondary:hover{color:var(--white);border-color:var(--gold)}
     #btn-whatsapp:hover{background:#1ebe5d}
+
+    /* ── LOADING / SUCCESS ── */
     .overlay{position:fixed;inset:0;background:rgba(8,8,8,.88);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:100;padding:2rem;opacity:0;pointer-events:none;transition:opacity .3s}
     .overlay.show{opacity:1;pointer-events:all}
     .overlay-card{background:#141414;border:1px solid var(--border);border-radius:12px;padding:2.5rem;width:100%;max-width:440px;text-align:center}
@@ -90,10 +107,12 @@
     .overlay-step::before{content:'';width:8px;height:8px;border-radius:50%;background:var(--border);flex-shrink:0}
     .overlay-step.done::before{background:var(--green)}
     .overlay-step.active::before{background:var(--gold)}
-    .overlay-link{display:inline-block;margin-top:.5rem;color:var(--gold);font-size:.82rem;text-decoration:none;border-bottom:1px solid rgba(201,146,42,.3);padding-bottom:1px}
+    .overlay-link{display:inline-block;margin-top:1.25rem;color:var(--gold);font-size:.82rem;text-decoration:none;border-bottom:1px solid rgba(201,146,42,.3);padding-bottom:1px}
     .overlay-link:hover{border-color:var(--gold)}
+
     .msg-error{background:rgba(224,85,85,.1);border:1px solid rgba(224,85,85,.3);border-radius:6px;padding:.9rem 1.1rem;font-size:.8rem;color:var(--red);margin-top:1rem;display:none;line-height:1.55}
     .msg-error.show{display:block}
+
     footer{border-top:1px solid var(--border);padding:1rem 2rem;text-align:center;font-size:.62rem;color:rgba(245,240,232,.15)}
     @media(max-width:640px){
       .form-grid{grid-template-columns:1fr}
@@ -133,9 +152,11 @@
 
 <main class="main">
 
+  <!-- ── STEP 1 ── -->
   <div id="step1">
     <h1 class="section-title">Dados do Colaborador</h1>
     <p class="section-sub">Preencha as informações do novo funcionário para gerar os termos de admissão.</p>
+
     <div class="form-grid">
       <div class="field" style="grid-column:1/-1">
         <label>Nome Completo *</label>
@@ -185,9 +206,11 @@
     </div>
   </div>
 
+  <!-- ── STEP 2 ── -->
   <div id="step2" style="display:none">
     <h1 class="section-title">Selecionar Termos</h1>
     <p class="section-sub">Os termos <strong style="color:var(--gold)">obrigatórios</strong> já estão selecionados. Adicione os opcionais conforme a função do colaborador.</p>
+
     <div class="terms-grid" id="termos-lista"></div>
     <div class="msg-error" id="err2">Selecione ao menos um termo para continuar.</div>
     <div class="btn-row">
@@ -196,17 +219,21 @@
     </div>
   </div>
 
+  <!-- ── STEP 3 ── -->
   <div id="step3" style="display:none">
     <h1 class="section-title">Revisão e Envio</h1>
     <p class="section-sub">Confirme os dados e clique em enviar. O PDF será gerado e enviado para assinatura digital via ClickSign.</p>
+
     <div class="review-block">
       <h3>Dados do Colaborador</h3>
       <div class="review-grid" id="review-dados"></div>
     </div>
+
     <div class="review-block">
       <h3>Termos Selecionados</h3>
       <div class="terms-selected-list" id="review-termos"></div>
     </div>
+
     <div class="msg-error" id="err3"></div>
     <div class="btn-row">
       <button class="btn-secondary" onclick="goStep2()">← Voltar</button>
@@ -218,6 +245,7 @@
 
 <footer>MR. CAPAS · Grupo Econômico Família Guerra · Sistema Interno</footer>
 
+<!-- ── LOADING OVERLAY ── -->
 <div class="overlay" id="ov-loading">
   <div class="overlay-card">
     <div class="spinner"></div>
@@ -232,18 +260,22 @@
   </div>
 </div>
 
+<!-- ── SUCCESS OVERLAY ── -->
 <div class="overlay" id="ov-success">
   <div class="overlay-card">
     <div class="overlay-icon">✅</div>
     <div class="overlay-title">Documento Enviado!</div>
-    <div class="overlay-msg">Envelope criado no ClickSign. Compartilhe o link abaixo para o colaborador assinar com selfie.</div>
-    <div id="ov-link-box" style="background:#1a1a1a;border:1px solid rgba(201,146,42,.25);border-radius:6px;padding:.75rem 1rem;margin:1rem 0;display:none">
-      <div style="font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(245,240,232,.4);margin-bottom:.35rem">Link de Assinatura</div>
-      <div id="ov-link-text" style="font-size:.72rem;color:#C9922A;word-break:break-all;line-height:1.5"></div>
+    <div class="overlay-msg">Envelope criado e signatário notificado pelo ClickSign.</div>
+    <div id="ov-notify-status" style="background:#1a1a1a;border:1px solid rgba(201,146,42,.18);border-radius:8px;padding:1rem;margin:1rem 0;text-align:left">
+      <div id="ov-email-status" style="font-size:.8rem;color:var(--white);display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem">
+        <span style="color:#4caf82;font-size:1rem">✓</span> Email enviado automaticamente pelo ClickSign
+      </div>
+      <div id="ov-whatsapp-status" style="font-size:.8rem;color:var(--muted);display:flex;align-items:center;gap:.5rem;display:none">
+        <span style="color:#25D366;font-size:1rem">✓</span> <span id="ov-whatsapp-text">WhatsApp enviado automaticamente</span>
+      </div>
     </div>
-    <div style="display:flex;flex-direction:column;gap:.6rem;margin-top:1rem">
-      <button class="btn-primary" id="btn-whatsapp" onclick="enviarWhatsApp()" style="background:#25D366;display:none">📱 Enviar por WhatsApp</button>
-      <button class="btn-secondary" id="btn-copiar" onclick="copiarLink()" style="display:none">📋 Copiar Link de Assinatura</button>
+    <div style="display:flex;flex-direction:column;gap:.6rem;margin-top:.5rem">
+      <button class="btn-secondary" id="btn-reenviar" onclick="reenviarNotificacao()" style="display:none">↺ Reenviar Notificação</button>
       <a href="#" id="ov-envelope-link" class="overlay-link" target="_blank" style="display:none">Ver envelope no ClickSign →</a>
     </div>
     <div class="btn-row" style="justify-content:center;margin-top:1.25rem">
@@ -253,8 +285,14 @@
 </div>
 
 <script>
+// ═══════════════════════════════════════════
+// CONFIGURAÇÃO
+// ═══════════════════════════════════════════
 const BACKEND_URL = 'https://mrcapas-clicksign-server.onrender.com/enviar';
 
+// ═══════════════════════════════════════════
+// DADOS DOS TERMOS
+// ═══════════════════════════════════════════
 const TERMOS = [
   {
     id:'ponto',mandatory:true,
@@ -284,12 +322,12 @@ O colaborador declara que recebeu e compreendeu o treinamento sobre o sistema de
 Pelo presente instrumento, o(a) colaborador(a) abaixo qualificado(a), doravante denominado "SIGNATÁRIO", se compromete a guardar absoluto sigilo sobre todas as informações confidenciais às quais tiver acesso em razão do exercício de suas atividades profissionais na empresa MR. CAPAS.
 
 INFORMAÇÕES CONFIDENCIAIS incluem, mas não se limitam a:
-- Dados de clientes (nome, CPF, endereço, histórico de compras, contatos);
-- Informações sobre fornecedores, condições comerciais e preços de compra;
-- Estratégias comerciais, metas de vendas e resultados financeiros;
-- Processos internos, sistemas, ferramentas e tecnologias utilizadas;
-- Informações sobre outros colaboradores;
-- Qualquer dado obtido em razão do contrato de trabalho.
+• Dados de clientes (nome, CPF, endereço, histórico de compras, contatos);
+• Informações sobre fornecedores, condições comerciais e preços de compra;
+• Estratégias comerciais, metas de vendas e resultados financeiros;
+• Processos internos, sistemas, ferramentas e tecnologias utilizadas;
+• Informações sobre outros colaboradores;
+• Qualquer dado obtido em razão do contrato de trabalho.
 
 OBRIGAÇÕES DO SIGNATÁRIO:
 1. Não divulgar, transferir ou utilizar as informações confidenciais para finalidade diversa das atividades profissionais;
@@ -310,11 +348,11 @@ O descumprimento deste compromisso sujeita o signatário às sanções civis, tr
 Pelo presente instrumento, o(a) colaborador(a) abaixo identificado(a) autoriza, de forma expressa e sem ônus adicional, o uso de sua imagem, voz e demais manifestações de sua personalidade pela empresa MR. CAPAS, integrante do Grupo Econômico Família Guerra.
 
 A presente autorização abrange:
-- Fotografias e vídeos realizados no ambiente de trabalho ou em eventos promovidos pela empresa;
-- Publicações em redes sociais oficiais da empresa (Instagram, Facebook, YouTube, WhatsApp Business e demais);
-- Materiais institucionais físicos e digitais (cartazes, banners, catálogos, apresentações);
-- Registros de treinamentos, capacitações e reconhecimentos profissionais;
-- Materiais de divulgação de produtos e serviços.
+• Fotografias e vídeos realizados no ambiente de trabalho ou em eventos promovidos pela empresa;
+• Publicações em redes sociais oficiais da empresa (Instagram, Facebook, YouTube, WhatsApp Business e demais);
+• Materiais institucionais físicos e digitais (cartazes, banners, catálogos, apresentações);
+• Registros de treinamentos, capacitações e reconhecimentos profissionais;
+• Materiais de divulgação de produtos e serviços.
 
 DISPOSIÇÕES GERAIS:
 1. A presente autorização é não exclusiva e intransferível, limitada ao uso para fins institucionais e promocionais da empresa;
@@ -339,9 +377,9 @@ RESPONSABILIDADES DO COLABORADOR:
 
 AUTORIZAÇÃO DE DESCONTO EM FOLHA (ART. 462 CLT):
 O(A) colaborador(a) autoriza expressamente, com fundamento no Art. 462 da Consolidação das Leis do Trabalho (CLT), o desconto em folha de pagamento de valores correspondentes a:
-- Perdas ou danos causados por dolo ou culpa comprovada do colaborador;
-- Divergências de estoque resultantes de negligência ou descuido no desempenho das funções;
-- Eventuais débitos relacionados a mercadorias retiradas sem autorização.
+• Perdas ou danos causados por dolo ou culpa comprovada do colaborador;
+• Divergências de estoque resultantes de negligência ou descuido no desempenho das funções;
+• Eventuais débitos relacionados a mercadorias retiradas sem autorização.
 
 Os descontos autorizados observarão os limites legais, não podendo ultrapassar o valor do dano efetivamente comprovado e respeitando os tetos previstos na legislação trabalhista.
 
@@ -387,9 +425,9 @@ CONTEÚDO ABORDADO NO TREINAMENTO:
 8. Tempo estimado por aplicação e produtividade esperada.
 
 EQUIPAMENTOS UTILIZADOS NO TREINAMENTO:
-- Dispositivos de treino (sem valor comercial)
-- Kit de aplicação padrão MR. CAPAS
-- Películas de demonstração
+• Dispositivos de treino (sem valor comercial)
+• Kit de aplicação padrão MR. CAPAS
+• Películas de demonstração
 
 AVALIAÇÃO:
 O colaborador demonstrou habilidade satisfatória nas técnicas ensinadas e está apto(a) a realizar aplicações em clientes, observando os padrões de qualidade exigidos pela empresa.
@@ -412,14 +450,14 @@ RESPONSABILIDADES DO APLICADOR:
 5. Comunicar ao cliente e ao responsável da loja qualquer incidente durante a aplicação.
 
 GARANTIA E RETRABALHO:
-- Aplicações com defeito de execução (bolhas, poeira ou desalinhamento evidentes) serão refeitas sem custo ao cliente, com nova película custeada pela unidade;
-- O retrabalho excessivo poderá implicar advertência e treinamento suplementar;
-- Danos ao dispositivo do cliente causados por imperícia serão apurados pela gerência, podendo resultar em responsabilização conforme Art. 462 da CLT.
+• Aplicações com defeito de execução (bolhas, poeira ou desalinhamento evidentes) serão refeitas sem custo ao cliente, com nova película custeada pela unidade;
+• O retrabalho excessivo poderá implicar advertência e treinamento suplementar;
+• Danos ao dispositivo do cliente causados por imperícia serão apurados pela gerência, podendo resultar em responsabilização conforme Art. 462 da CLT.
 
 NÃO SE INCLUI NA GARANTIA:
-- Bolhas causadas por impacto ou manuseio incorreto após a aplicação;
-- Destacamento por exposição a calor, umidade excessiva ou produtos químicos;
-- Danos pré-existentes no display identificados antes da aplicação.
+• Bolhas causadas por impacto ou manuseio incorreto após a aplicação;
+• Destacamento por exposição a calor, umidade excessiva ou produtos químicos;
+• Danos pré-existentes no display identificados antes da aplicação.
 
 O colaborador declara estar ciente de todas as responsabilidades acima e se compromete a prestar o serviço com o máximo de qualidade e atenção.`
   },
@@ -448,9 +486,9 @@ OBRIGAÇÕES DO COLABORADOR:
 
 RESPONSABILIDADE POR DANOS (ART. 462 CLT):
 O colaborador é responsável por danos causados ao aparelho por:
-- Negligência ou descuido comprovado;
-- Uso inadequado ou em desacordo com as orientações;
-- Perda ou furto resultante de imprudência.
+• Negligência ou descuido comprovado;
+• Uso inadequado ou em desacordo com as orientações;
+• Perda ou furto resultante de imprudência.
 
 Nestes casos, os custos de reparo ou reposição poderão ser descontados em folha, respeitados os limites legais.
 
@@ -458,13 +496,23 @@ O colaborador declara ter recebido o dispositivo nas condições descritas, em p
   }
 ];
 
+// ═══════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════
 let currentStep = 1;
-let selectedTermos = new Set(['ponto','sigilo']);
+let selectedTermos = new Set(['ponto','sigilo']); // mandatory
 
+// ═══════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', () => {
+  // set today as default admission date
   document.getElementById('f-data').value = new Date().toISOString().split('T')[0];
+  // CPF mask
   document.getElementById('f-cpf').addEventListener('input', maskCPF);
+  // Phone mask
   document.getElementById('f-phone').addEventListener('input', maskPhone);
+  // render terms
   renderTermos();
 });
 
@@ -486,267 +534,454 @@ function maskCPF(e) {
   e.target.value = v;
 }
 
+// ═══════════════════════════════════════════
+// RENDER TERMS
+// ═══════════════════════════════════════════
 function renderTermos() {
   const container = document.getElementById('termos-lista');
   container.innerHTML = TERMOS.map(t => {
     const sel = selectedTermos.has(t.id);
-    const cls = ['term-card', t.mandatory?'mandatory':'', sel?'selected':''].filter(Boolean).join(' ');
-    return `<div class="${cls}" id="tc-${t.id}" ${t.mandatory?'':` onclick="toggleTermo('${t.id}')"`}>
-        <div class="term-check"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,3"/></svg></div>
+    const cls = [
+      'term-card',
+      t.mandatory ? 'mandatory' : '',
+      sel ? 'selected' : ''
+    ].filter(Boolean).join(' ');
+    return `
+      <div class="${cls}" id="tc-${t.id}" ${t.mandatory ? '' : `onclick="toggleTermo('${t.id}')"`}>
+        <div class="term-check">
+          <svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,3"/></svg>
+        </div>
         <div class="term-info">
           <div class="term-name">${t.nome}</div>
           <div class="term-desc">${t.desc}</div>
-          <span class="term-badge ${t.mandatory?'badge-mandatory':'badge-optional'}">${t.mandatory?'Obrigatório':'Opcional'}</span>
+          <span class="term-badge ${t.mandatory ? 'badge-mandatory' : 'badge-optional'}">
+            ${t.mandatory ? 'Obrigatório' : 'Opcional'}
+          </span>
         </div>
       </div>`;
   }).join('');
 }
 
 function toggleTermo(id) {
-  if (selectedTermos.has(id)) selectedTermos.delete(id);
-  else selectedTermos.add(id);
+  if (selectedTermos.has(id)) {
+    selectedTermos.delete(id);
+  } else {
+    selectedTermos.add(id);
+  }
   renderTermos();
 }
 
-function goStep1(){showStep(1);}
-function goStep2(){
-  const err=document.getElementById('err1');
-  if(!validateStep1()){err.classList.add('show');return;}
-  err.classList.remove('show');showStep(2);
+// ═══════════════════════════════════════════
+// NAVIGATION
+// ═══════════════════════════════════════════
+function goStep1() {
+  showStep(1);
 }
-function goStep3(){
-  const err=document.getElementById('err2');
-  if(selectedTermos.size===0){err.classList.add('show');return;}
-  err.classList.remove('show');buildReview();showStep(3);
+
+function goStep2() {
+  const err = document.getElementById('err1');
+  if (!validateStep1()) {
+    err.classList.add('show');
+    return;
+  }
+  err.classList.remove('show');
+  showStep(2);
 }
-function showStep(n){
-  currentStep=n;
-  [1,2,3].forEach(i=>{
-    document.getElementById('step'+i).style.display=i===n?'block':'none';
-    const si=document.getElementById('si-'+i);
-    si.className='step-item'+(i<n?' done':i===n?' active':'');
-    si.querySelector('.step-num').textContent=i<n?'✓':i;
+
+function goStep3() {
+  const err = document.getElementById('err2');
+  if (selectedTermos.size === 0) {
+    err.classList.add('show');
+    return;
+  }
+  err.classList.remove('show');
+  buildReview();
+  showStep(3);
+}
+
+function showStep(n) {
+  currentStep = n;
+  [1,2,3].forEach(i => {
+    document.getElementById('step'+i).style.display = i === n ? 'block' : 'none';
+    const si = document.getElementById('si-'+i);
+    si.className = 'step-item' + (i < n ? ' done' : i === n ? ' active' : '');
+    si.querySelector('.step-num').textContent = i < n ? '✓' : i;
   });
-  window.scrollTo({top:0,behavior:'smooth'});
+  window.scrollTo({top:0, behavior:'smooth'});
 }
 
-function validateStep1(){
-  const nome=document.getElementById('f-nome').value.trim();
-  const cpf=document.getElementById('f-cpf').value.trim();
-  const email=document.getElementById('f-email').value.trim();
-  const cargo=document.getElementById('f-cargo').value;
-  const loja=document.getElementById('f-loja').value;
-  const data=document.getElementById('f-data').value;
-  return nome&&cpf.length>=11&&email&&cargo&&loja&&data;
+// ═══════════════════════════════════════════
+// VALIDATE
+// ═══════════════════════════════════════════
+function validateStep1() {
+  const nome = document.getElementById('f-nome').value.trim();
+  const cpf = document.getElementById('f-cpf').value.trim();
+  const email = document.getElementById('f-email').value.trim();
+  const cargo = document.getElementById('f-cargo').value;
+  const loja = document.getElementById('f-loja').value;
+  const data = document.getElementById('f-data').value;
+  return nome && cpf.length >= 11 && email && cargo && loja && data;
 }
 
-function buildReview(){
-  const col=getColaborador();
-  document.getElementById('review-dados').innerHTML=[
-    ['Nome Completo',col.nome],['CPF',col.cpf],['E-mail',col.email],
-    ['Cargo/Função',col.cargo],['Loja',col.loja],['Data de Admissão',formatDate(col.data)],
-  ].map(([l,v])=>`<div class="review-item"><div class="review-label">${l}</div><div class="review-value">${v}</div></div>`).join('');
-  document.getElementById('review-termos').innerHTML=TERMOS.filter(t=>selectedTermos.has(t.id))
-    .map(t=>`<div class="term-selected-row">${t.nome}</div>`).join('');
+// ═══════════════════════════════════════════
+// BUILD REVIEW
+// ═══════════════════════════════════════════
+function buildReview() {
+  const col = getColaborador();
+  const dadosEl = document.getElementById('review-dados');
+  const items = [
+    ['Nome Completo', col.nome],
+    ['CPF', col.cpf],
+    ['E-mail', col.email],
+    ['Cargo/Função', col.cargo],
+    ['Loja', col.loja],
+    ['Data de Admissão', formatDate(col.data)],
+  ];
+  dadosEl.innerHTML = items.map(([l,v]) =>
+    `<div class="review-item"><div class="review-label">${l}</div><div class="review-value">${v}</div></div>`
+  ).join('');
+
+  const termosEl = document.getElementById('review-termos');
+  const selected = TERMOS.filter(t => selectedTermos.has(t.id));
+  termosEl.innerHTML = selected.map(t =>
+    `<div class="term-selected-row">${t.nome}</div>`
+  ).join('');
 }
 
-function getColaborador(){
+function getColaborador() {
   return {
-    nome:document.getElementById('f-nome').value.trim(),
-    cpf:document.getElementById('f-cpf').value.trim(),
-    email:document.getElementById('f-email').value.trim(),
-    cargo:document.getElementById('f-cargo').value,
-    loja:document.getElementById('f-loja').value,
-    data:document.getElementById('f-data').value,
-    telefone:document.getElementById('f-phone').value.replace(/\D/g,''),
+    nome: document.getElementById('f-nome').value.trim(),
+    cpf: document.getElementById('f-cpf').value.trim(),
+    email: document.getElementById('f-email').value.trim(),
+    cargo: document.getElementById('f-cargo').value,
+    loja: document.getElementById('f-loja').value,
+    data: document.getElementById('f-data').value,
+    telefone: document.getElementById('f-phone').value.replace(/\D/g,''),
   };
 }
 
-function formatDate(d){
-  if(!d)return'';
-  const[y,m,day]=d.split('-');
+function formatDate(d) {
+  if (!d) return '';
+  const [y,m,day] = d.split('-');
   return `${day}/${m}/${y}`;
 }
 
-function gerarPDF(col,termosSelected){
-  const{jsPDF}=window.jspdf;
-  const doc=new jsPDF('p','mm','a4');
-  const W=210,ml=20,mr=20,tw=W-ml-mr;
-  doc.setFillColor(8,8,8);doc.rect(0,0,W,297,'F');
-  doc.setDrawColor(201,146,42);doc.setLineWidth(.5);
-  doc.line(ml,40,W-mr,40);doc.line(ml,257,W-mr,257);
-  doc.setTextColor(201,146,42);doc.setFont('helvetica','bold');doc.setFontSize(22);
-  doc.text('MR. CAPAS',W/2,55,{align:'center'});
-  doc.setFontSize(11);doc.setTextColor(200,190,175);doc.setFont('helvetica','normal');
-  doc.text('GRUPO ECONÔMICO FAMÍLIA GUERRA',W/2,64,{align:'center'});
-  doc.setFontSize(16);doc.setTextColor(245,240,232);doc.setFont('helvetica','bold');
-  doc.text('TERMOS DE ADMISSÃO',W/2,90,{align:'center'});
-  doc.setDrawColor(201,146,42);doc.setLineWidth(.3);doc.line(70,96,140,96);
-  doc.setFillColor(20,20,20);doc.setDrawColor(201,146,42);doc.setLineWidth(.4);
-  doc.roundedRect(ml,106,tw,95,3,3,'FD');
-  let y=120;
-  const lb=(label,val)=>{
-    doc.setFontSize(7);doc.setTextColor(160,140,100);doc.setFont('helvetica','normal');
-    doc.text(label.toUpperCase(),ml+8,y);
-    doc.setFontSize(10);doc.setTextColor(245,240,232);doc.setFont('helvetica','bold');
-    doc.text(val||'—',ml+8,y+6);y+=16;
+// ═══════════════════════════════════════════
+// PDF GENERATION
+// ═══════════════════════════════════════════
+function gerarPDF(col, termosSelected) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF('p','mm','a4');
+  const W = 210;
+  const ml = 20, mr = 20;
+  const tw = W - ml - mr;
+
+  // ── COVER PAGE ──
+  doc.setFillColor(8,8,8);
+  doc.rect(0,0,W,297,'F');
+
+  doc.setDrawColor(201,146,42);
+  doc.setLineWidth(.5);
+  doc.line(ml, 40, W-mr, 40);
+  doc.line(ml, 257, W-mr, 257);
+
+  doc.setTextColor(201,146,42);
+  doc.setFont('helvetica','bold');
+  doc.setFontSize(22);
+  doc.text('MR. CAPAS', W/2, 55, {align:'center'});
+
+  doc.setFontSize(11);
+  doc.setTextColor(200,190,175);
+  doc.setFont('helvetica','normal');
+  doc.text('GRUPO ECONÔMICO FAMÍLIA GUERRA', W/2, 64, {align:'center'});
+
+  doc.setFontSize(16);
+  doc.setTextColor(245,240,232);
+  doc.setFont('helvetica','bold');
+  doc.text('TERMOS DE ADMISSÃO', W/2, 90, {align:'center'});
+
+  // separator
+  doc.setDrawColor(201,146,42);
+  doc.setLineWidth(.3);
+  doc.line(70, 96, 140, 96);
+
+  // collaborator info box
+  doc.setFillColor(20,20,20);
+  doc.setDrawColor(201,146,42);
+  doc.setLineWidth(.4);
+  doc.roundedRect(ml, 106, tw, 95, 3, 3, 'FD');
+
+  let y = 120;
+  const lb = (label, val) => {
+    doc.setFontSize(7);
+    doc.setTextColor(160,140,100);
+    doc.setFont('helvetica','normal');
+    doc.text(label.toUpperCase(), ml+8, y);
+    doc.setFontSize(10);
+    doc.setTextColor(245,240,232);
+    doc.setFont('helvetica','bold');
+    doc.text(val || '—', ml+8, y+6);
+    y += 16;
   };
-  lb('Nome Completo',col.nome);lb('CPF',col.cpf);
-  lb('Cargo / Função',col.cargo);lb('Unidade',col.loja);
-  lb('Data de Admissão',formatDate(col.data));
-  doc.setFontSize(8);doc.setTextColor(160,140,100);doc.setFont('helvetica','normal');
-  doc.text('DOCUMENTOS INCLUÍDOS NESTE PACOTE:',ml,218);
-  y=226;
-  termosSelected.forEach(t=>{
-    doc.setFillColor(201,146,42);doc.circle(ml+2,y-1.5,1.2,'F');
-    doc.setFontSize(8.5);doc.setTextColor(220,210,190);doc.setFont('helvetica','normal');
-    doc.text(t.nome,ml+7,y);y+=8;
+
+  lb('Nome Completo', col.nome);
+  lb('CPF', col.cpf);
+  lb('Cargo / Função', col.cargo);
+  lb('Unidade', col.loja);
+  lb('Data de Admissão', formatDate(col.data));
+
+  // terms list on cover
+  doc.setFontSize(8);
+  doc.setTextColor(160,140,100);
+  doc.setFont('helvetica','normal');
+  doc.text('DOCUMENTOS INCLUÍDOS NESTE PACOTE:', ml, 218);
+
+  y = 226;
+  termosSelected.forEach((t, i) => {
+    doc.setFillColor(201,146,42);
+    doc.circle(ml+2, y-1.5, 1.2, 'F');
+    doc.setFontSize(8.5);
+    doc.setTextColor(220,210,190);
+    doc.setFont('helvetica','normal');
+    doc.text(t.nome, ml+7, y);
+    y += 8;
   });
-  doc.setFontSize(7.5);doc.setTextColor(100,90,70);
-  doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')} · Email: ${col.email}`,W/2,265,{align:'center'});
-  termosSelected.forEach(termo=>{
+
+  // footer cover
+  doc.setFontSize(7.5);
+  doc.setTextColor(100,90,70);
+  doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')} · Email: ${col.email}`, W/2, 265, {align:'center'});
+
+  // ── TERM PAGES ──
+  termosSelected.forEach(termo => {
     doc.addPage();
-    doc.setFillColor(15,15,15);doc.rect(0,0,W,28,'F');
-    doc.setDrawColor(201,146,42);doc.setLineWidth(.5);doc.line(0,28,W,28);
-    doc.setFontSize(8);doc.setTextColor(160,140,100);doc.setFont('helvetica','normal');
-    doc.text('MR. CAPAS · TERMO DE ADMISSÃO',ml,12);
-    doc.setFontSize(11);doc.setTextColor(201,146,42);doc.setFont('helvetica','bold');
-    doc.text(termo.nome.toUpperCase(),ml,22);
-    doc.setFontSize(8);doc.setTextColor(160,140,100);doc.setFont('helvetica','normal');
-    doc.text(`Colaborador: ${col.nome}  |  CPF: ${col.cpf}  |  Admissão: ${formatDate(col.data)}`,ml,36);
-    doc.setDrawColor(60,50,30);doc.setLineWidth(.2);doc.line(ml,39,W-mr,39);
-    doc.setFontSize(9.5);doc.setTextColor(220,210,190);doc.setFont('helvetica','normal');
-    const lines=doc.splitTextToSize(termo.conteudo,tw);
-    y=47;
-    for(const line of lines){
-      if(y>240){
+
+    // header band
+    doc.setFillColor(15,15,15);
+    doc.rect(0,0,W,28,'F');
+    doc.setDrawColor(201,146,42);
+    doc.setLineWidth(.5);
+    doc.line(0,28,W,28);
+
+    doc.setFontSize(8);
+    doc.setTextColor(160,140,100);
+    doc.setFont('helvetica','normal');
+    doc.text('MR. CAPAS · TERMO DE ADMISSÃO', ml, 12);
+
+    doc.setFontSize(11);
+    doc.setTextColor(201,146,42);
+    doc.setFont('helvetica','bold');
+    doc.text(termo.nome.toUpperCase(), ml, 22);
+
+    // collaborator header
+    doc.setFontSize(8);
+    doc.setTextColor(160,140,100);
+    doc.setFont('helvetica','normal');
+    let header = `Colaborador: ${col.nome}  |  CPF: ${col.cpf}  |  Admissão: ${formatDate(col.data)}`;
+    doc.text(header, ml, 36);
+
+    doc.setDrawColor(60,50,30);
+    doc.setLineWidth(.2);
+    doc.line(ml, 39, W-mr, 39);
+
+    // body text
+    doc.setFontSize(9.5);
+    doc.setTextColor(220,210,190);
+    doc.setFont('helvetica','normal');
+
+    const lines = doc.splitTextToSize(termo.conteudo, tw);
+    y = 47;
+    const lineH = 5;
+    const bottomMargin = 240;
+
+    for (const line of lines) {
+      if (y > bottomMargin) {
         doc.addPage();
-        doc.setFillColor(15,15,15);doc.rect(0,0,W,20,'F');
-        doc.setFontSize(8);doc.setTextColor(100,90,70);
-        doc.text('MR. CAPAS · '+termo.nome.toUpperCase()+' (continuação)',ml,13);
-        doc.setDrawColor(201,146,42);doc.setLineWidth(.3);doc.line(0,20,W,20);
-        y=30;doc.setFontSize(9.5);doc.setTextColor(220,210,190);doc.setFont('helvetica','normal');
+        // mini header on continuation
+        doc.setFillColor(15,15,15);
+        doc.rect(0,0,W,20,'F');
+        doc.setFontSize(8);
+        doc.setTextColor(100,90,70);
+        doc.text('MR. CAPAS · ' + termo.nome.toUpperCase() + ' (continuação)', ml, 13);
+        doc.setDrawColor(201,146,42);
+        doc.setLineWidth(.3);
+        doc.line(0,20,W,20);
+        y = 30;
+        doc.setFontSize(9.5);
+        doc.setTextColor(220,210,190);
+        doc.setFont('helvetica','normal');
       }
-      doc.text(line,ml,y);y+=5;
+      doc.text(line, ml, y);
+      y += lineH;
     }
-    y=Math.max(y+15,248);
-    if(y>255){doc.addPage();y=30;}
-    doc.setDrawColor(80,70,50);doc.setLineWidth(.3);
-    doc.line(ml,y,ml+80,y);
-    doc.setFontSize(7.5);doc.setTextColor(150,130,100);
-    doc.text('Assinatura do Colaborador',ml,y+5);
-    doc.text(col.nome,ml,y+10);doc.text(`CPF: ${col.cpf}`,ml,y+15);
-    doc.line(W-mr-70,y,W-mr,y);
-    doc.text('Data e Local',W-mr-70,y+5);
-    doc.text(`${formatDate(col.data)} · ${col.loja}`,W-mr-70,y+10);
-    doc.setFontSize(7);doc.setTextColor(80,70,50);
-    doc.text('Documento gerado pelo Sistema de Termos MR. CAPAS · Grupo Econômico Família Guerra',W/2,287,{align:'center'});
+
+    // signature block
+    y = Math.max(y + 15, 248);
+    if (y > 255) { doc.addPage(); y = 30; }
+
+    doc.setDrawColor(80,70,50);
+    doc.setLineWidth(.3);
+    doc.line(ml, y, ml+80, y);
+    doc.setFontSize(7.5);
+    doc.setTextColor(150,130,100);
+    doc.text('Assinatura do Colaborador', ml, y+5);
+    doc.text(col.nome, ml, y+10);
+    doc.text(`CPF: ${col.cpf}`, ml, y+15);
+
+    doc.line(W-mr-70, y, W-mr, y);
+    doc.text('Data e Local', W-mr-70, y+5);
+    doc.text(`${formatDate(col.data)} · ${col.loja}`, W-mr-70, y+10);
+
+    // page footer
+    doc.setFontSize(7);
+    doc.setTextColor(80,70,50);
+    doc.text('Documento gerado pelo Sistema de Termos MR. CAPAS · Grupo Econômico Família Guerra', W/2, 287, {align:'center'});
   });
+
   return doc.output('datauristring').split(',')[1];
 }
 
-function showLoading(){document.getElementById('ov-loading').classList.add('show');}
-function hideLoading(){document.getElementById('ov-loading').classList.remove('show');}
-function setStep(n,state){document.getElementById('ov-s'+n).className='overlay-step '+state;}
+// ═══════════════════════════════════════════
+// OVERLAY HELPERS
+// ═══════════════════════════════════════════
+function showLoading() {
+  document.getElementById('ov-loading').classList.add('show');
+}
+function hideLoading() {
+  document.getElementById('ov-loading').classList.remove('show');
+}
+let _envelopeId = null;
+let _envelopeLink = null;
+let _signerNome = null;
+let _signerPhone = null;
 
-let _signingLink=null,_envelopeLink=null,_signerNome=null,_signerPhone=null;
+function showSuccess(data, col) {
+  _envelopeId = data.envelopeId || null;
+  _envelopeLink = data.envelopeLink || null;
+  _signerNome = col ? col.nome.split(' ')[0] : 'Colaborador';
+  _signerPhone = col ? col.telefone : null;
 
-function showSuccess(data,col){
-  _signingLink=data.link||null;
-  _envelopeLink=data.envelopeLink||null;
-  _signerNome=col?col.nome.split(' ')[0]:'Colaborador';
-  _signerPhone=col?col.telefone:null;
-  if(_signingLink){
-    document.getElementById('ov-link-text').textContent=_signingLink;
-    document.getElementById('ov-link-box').style.display='block';
-    document.getElementById('btn-whatsapp').style.display='block';
-    document.getElementById('btn-copiar').style.display='block';
+  // Mostrar status de WhatsApp se telefone foi fornecido
+  const waStatus = document.getElementById('ov-whatsapp-status');
+  if (data.whatsappSent && _signerPhone) {
+    waStatus.style.display = 'flex';
+    document.getElementById('ov-whatsapp-text').textContent =
+      'WhatsApp enviado automaticamente para (' + _signerPhone.slice(0,2) + ') ' + _signerPhone.slice(2,7) + '-' + _signerPhone.slice(7);
   }
-  if(_envelopeLink){
-    document.getElementById('ov-envelope-link').href=_envelopeLink;
-    document.getElementById('ov-envelope-link').style.display='inline-block';
+
+  // Botão reenviar e link ClickSign
+  document.getElementById('btn-reenviar').style.display = 'block';
+  const envLink = document.getElementById('ov-envelope-link');
+  if (_envelopeLink) {
+    envLink.href = _envelopeLink;
+    envLink.style.display = 'inline-block';
   }
   document.getElementById('ov-success').classList.add('show');
 }
 
-function copiarLink(){
-  if(!_signingLink)return;
-  navigator.clipboard.writeText(_signingLink).then(()=>{
-    const btn=document.getElementById('btn-copiar');
-    const orig=btn.textContent;
-    btn.textContent='✅ Copiado!';
-    setTimeout(()=>btn.textContent=orig,2000);
-  });
-}
-
-function enviarWhatsApp(){
-  const link=_signingLink||_envelopeLink;
-  if(!link)return;
-  const msg=`Olá ${_signerNome}! Seguem seus documentos de admissão na MR. CAPAS para assinatura digital.\n\n`+
-    `Para assinar, acesse o link abaixo e siga as instruções (será necessário tirar uma selfie para confirmar sua identidade):\n\n`+
-    `${link}\n\nQualquer dúvida, entre em contato conosco. MR. CAPAS 🤝`;
-  const phone=_signerPhone&&_signerPhone.length>=10?'55'+_signerPhone:'';
-  const url=phone
-    ?`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`
-    :`https://wa.me/?text=${encodeURIComponent(msg)}`;
-  window.open(url,'_blank');
-}
-
-async function enviar(){
-  const btn=document.getElementById('btn-enviar');
-  const err=document.getElementById('err3');
-  err.classList.remove('show');btn.disabled=true;
-  const col=getColaborador();
-  const selected=TERMOS.filter(t=>selectedTermos.has(t.id));
-  showLoading();setStep(1,'active');setStep(2,'');setStep(3,'');setStep(4,'');
-  let pdfBase64;
-  try{
-    pdfBase64=gerarPDF(col,selected);
-    setStep(1,'done');setStep(2,'active');
-  }catch(e){
-    hideLoading();err.textContent='Erro ao gerar PDF: '+e.message;
-    err.classList.add('show');btn.disabled=false;return;
+async function reenviarNotificacao() {
+  const btn = document.getElementById('btn-reenviar');
+  const orig = btn.textContent;
+  btn.textContent = '⏳ Reenviando...';
+  btn.disabled = true;
+  try {
+    const resp = await fetch(BACKEND_URL.replace('/enviar', '/reenviar/' + _envelopeId), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ envelopeId: _envelopeId })
+    });
+    btn.textContent = resp.ok ? '✅ Reenviado!' : '❌ Erro ao reenviar';
+  } catch(e) {
+    btn.textContent = '❌ Erro';
   }
-  const fileName=`Admissao_${col.nome.split(' ')[0]}_${col.data}.pdf`;
-  try{
-    const resp=await fetch(BACKEND_URL,{
-      method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        colaborador:{nome:col.nome,cpf:col.cpf,email:col.email,cargo:col.cargo,loja:col.loja,data:col.data},
-        documento:{nome:fileName,pdf_base64:pdfBase64}
+  setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 3000);
+}
+function setStep(n, state) {
+  const el = document.getElementById('ov-s'+n);
+  el.className = 'overlay-step ' + state;
+}
+
+// ═══════════════════════════════════════════
+// ENVIAR
+// ═══════════════════════════════════════════
+async function enviar() {
+  const btn = document.getElementById('btn-enviar');
+  const err = document.getElementById('err3');
+  err.classList.remove('show');
+  btn.disabled = true;
+
+  const col = getColaborador();
+  const selected = TERMOS.filter(t => selectedTermos.has(t.id));
+
+  showLoading();
+  setStep(1,'active'); setStep(2,''); setStep(3,''); setStep(4,'');
+
+  let pdfBase64;
+  try {
+    pdfBase64 = gerarPDF(col, selected);
+    setStep(1,'done'); setStep(2,'active');
+  } catch(e) {
+    hideLoading();
+    err.textContent = 'Erro ao gerar PDF: ' + e.message;
+    err.classList.add('show');
+    btn.disabled = false;
+    return;
+  }
+
+  const fileName = `Admissao_${col.nome.split(' ')[0]}_${col.data}.pdf`;
+
+  try {
+    const resp = await fetch(BACKEND_URL, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        colaborador: { nome: col.nome, cpf: col.cpf, email: col.email, cargo: col.cargo, loja: col.loja, data: col.data },
+        documento: { nome: fileName, pdf_base64: pdfBase64 }
       })
     });
-    setStep(2,'done');setStep(3,'active');
-    await new Promise(r=>setTimeout(r,1000));
-    setStep(3,'done');setStep(4,'active');
-    const data=await resp.json();
-    setStep(4,resp.ok?'done':'');
-    if(!resp.ok){
+
+    setStep(2,'done'); setStep(3,'active');
+    await new Promise(r => setTimeout(r, 1000));
+    setStep(3,'done'); setStep(4,'active');
+
+    const data = await resp.json();
+    setStep(4, resp.ok ? 'done' : '');
+
+    if (!resp.ok) {
       hideLoading();
-      err.textContent=`Erro ao enviar (${resp.status}): ${data.detail?JSON.stringify(data.detail):data.error}`;
-      err.classList.add('show');btn.disabled=false;return;
+      const detail = data.detail ? JSON.stringify(data.detail) : data.error;
+      err.textContent = `Erro ao enviar (${resp.status}): ${detail}`;
+      err.classList.add('show');
+      btn.disabled = false;
+      return;
     }
-    await new Promise(r=>setTimeout(r,600));
-    hideLoading();showSuccess(data,col);
-  }catch(e){
-    hideLoading();err.textContent='Erro de conexão com o servidor.';
-    err.classList.add('show');btn.disabled=false;
+
+    await new Promise(r => setTimeout(r, 600));
+    hideLoading();
+    showSuccess(data, col);
+
+  } catch(e) {
+    hideLoading();
+    err.textContent = 'Erro de conexão com o servidor. Verifique se o backend está online.';
+    err.classList.add('show');
+    btn.disabled = false;
   }
 }
 
-function resetForm(){
+// ═══════════════════════════════════════════
+// RESET
+// ═══════════════════════════════════════════
+function resetForm() {
   document.getElementById('ov-success').classList.remove('show');
-  ['f-nome','f-cpf','f-email','f-phone'].forEach(id=>document.getElementById(id).value='');
-  document.getElementById('f-cargo').value='';
-  document.getElementById('f-loja').value='';
-  document.getElementById('f-data').value=new Date().toISOString().split('T')[0];
-  selectedTermos=new Set(['ponto','sigilo']);renderTermos();
-  document.getElementById('btn-enviar').disabled=false;
-  document.getElementById('ov-link-box').style.display='none';
-  document.getElementById('btn-whatsapp').style.display='none';
-  document.getElementById('btn-copiar').style.display='none';
-  document.getElementById('ov-envelope-link').style.display='none';
-  _signingLink=null;_envelopeLink=null;
+  document.getElementById('f-nome').value = '';
+  document.getElementById('f-cpf').value = '';
+  document.getElementById('f-email').value = '';
+  document.getElementById('f-cargo').value = '';
+  document.getElementById('f-loja').value = '';
+  document.getElementById('f-data').value = new Date().toISOString().split('T')[0];
+  selectedTermos = new Set(['ponto','sigilo']);
+  renderTermos();
+  document.getElementById('btn-enviar').disabled = false;
   showStep(1);
 }
 </script>
