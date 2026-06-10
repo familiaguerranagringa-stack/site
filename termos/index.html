@@ -935,7 +935,7 @@ async function enviar() {
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body: JSON.stringify({
-        colaborador: { nome: col.nome, cpf: col.cpf, email: col.email, cargo: col.cargo, loja: col.loja, data: col.data },
+        colaborador: { nome: col.nome, cpf: col.cpf, email: col.email, cargo: col.cargo, loja: col.loja, data: col.data, telefone: col.telefone },
         documento: { nome: fileName, pdf_base64: pdfBase64 }
       })
     });
