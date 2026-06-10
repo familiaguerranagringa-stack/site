@@ -119,6 +119,10 @@
         <input type="text" id="f-cpf" placeholder="000.000.000-00" maxlength="14" autocomplete="off">
       </div>
       <div class="field">
+        <label>Data de Nascimento *</label>
+        <input type="date" id="f-nasc">
+      </div>
+      <div class="field">
         <label>E-mail *</label>
         <input type="email" id="f-email" placeholder="email@colaborador.com" autocomplete="off">
       </div>
@@ -502,16 +506,18 @@ function showStep(n){
 function validateStep1(){
   const nome=document.getElementById('f-nome').value.trim();
   const cpf=document.getElementById('f-cpf').value.trim();
+  const nasc=document.getElementById('f-nasc').value;
   const email=document.getElementById('f-email').value.trim();
   const cargo=document.getElementById('f-cargo').value;
   const loja=document.getElementById('f-loja').value;
   const data=document.getElementById('f-data').value;
-  return nome&&cpf.length>=11&&email&&cargo&&loja&&data;
+  return nome&&cpf.length>=11&&nasc&&email&&cargo&&loja&&data;
 }
 function buildReview(){
   const col=getColaborador();
   document.getElementById('review-dados').innerHTML=[
-    ['Nome Completo',col.nome],['CPF',col.cpf],['E-mail',col.email],
+    ['Nome Completo',col.nome],['CPF',col.cpf],
+    ['Data de Nascimento',formatDate(col.nascimento)],['E-mail',col.email],
     ['Cargo/Função',col.cargo],['Loja',col.loja],['Data de Admissão',formatDate(col.data)],
   ].map(([l,v])=>`<div class="review-item"><div class="review-label">${l}</div><div class="review-value">${v}</div></div>`).join('');
   document.getElementById('review-termos').innerHTML=TERMOS.filter(t=>selectedTermos.has(t.id))
@@ -521,6 +527,7 @@ function getColaborador(){
   return {
     nome:document.getElementById('f-nome').value.trim(),
     cpf:document.getElementById('f-cpf').value.trim(),
+    nascimento:document.getElementById('f-nasc').value,
     email:document.getElementById('f-email').value.trim(),
     cargo:document.getElementById('f-cargo').value,
     loja:document.getElementById('f-loja').value,
@@ -565,6 +572,7 @@ function gerarPDF(col, termosSelected){
     doc.text(val||'—',ml+8,y+6);y+=16;
   };
   lb('Nome Completo',col.nome);lb('CPF',col.cpf);
+  lb('Data de Nascimento',formatDate(col.nascimento));
   lb('Cargo / Função',col.cargo);lb('Unidade',col.loja);
   lb('Data de Admissão',formatDate(col.data));
   doc.setFontSize(8);doc.setTextColor(160,140,100);doc.setFont('helvetica','normal');
@@ -713,7 +721,7 @@ async function enviar(){
     const resp=await fetch(BACKEND_URL,{
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
-        colaborador:{nome:col.nome,cpf:col.cpf,email:col.email,cargo:col.cargo,loja:col.loja,data:col.data,telefone:col.telefone},
+        colaborador:{nome:col.nome,cpf:col.cpf,nascimento:col.nascimento,email:col.email,cargo:col.cargo,loja:col.loja,data:col.data,telefone:col.telefone},
         documento:{nome:fileName,pdf_base64:pdfBase64}
       })
     });
@@ -737,7 +745,7 @@ async function enviar(){
 
 function resetForm(){
   document.getElementById('ov-success').classList.remove('show');
-  ['f-nome','f-cpf','f-email','f-phone'].forEach(id=>document.getElementById(id).value='');
+  ['f-nome','f-cpf','f-nasc','f-email','f-phone'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('f-cargo').value='';
   document.getElementById('f-loja').value='';
   document.getElementById('f-data').value=new Date().toISOString().split('T')[0];
