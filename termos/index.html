@@ -123,26 +123,22 @@
         <input type="email" id="f-email" placeholder="email@colaborador.com" autocomplete="off">
       </div>
       <div class="field">
-        <label>WhatsApp (opcional)</label>
+        <label>WhatsApp / Telefone</label>
         <input type="text" id="f-phone" placeholder="(22) 99999-9999" maxlength="15" autocomplete="off">
       </div>
       <div class="field">
         <label>Loja / Unidade *</label>
         <select id="f-loja" onchange="atualizarEmpresa()">
           <option value="">Selecionar unidade...</option>
-          <option value="SR. CAPAS (SAQUAREMA)">SR. CAPAS (SAQUAREMA)</option>
-          <option value="ESCRITÓRIO">ESCRITÓRIO</option>
-          <option value="LEANDRO GUERRA SOFTWARE E TECNOLOGIA LTDA">LEANDRO GUERRA SOFTWARE E TECNOLOGIA LTDA</option>
+          <option value="SR. CAPAS (SAQUAREMA)">Família Guerra Bacaxá Comércio e Prestadora de Serviços Ltda</option>
+          <option value="ESCRITÓRIO">Família Guerra Comércio e Prestadora de Serviços Ltda</option>
+          <option value="LEANDRO GUERRA SOFTWARE E TECNOLOGIA LTDA">Leandro Guerra Software e Tecnologia Ltda</option>
         </select>
       </div>
       <div class="field">
         <label>Cargo / Função *</label>
         <select id="f-cargo">
-          <option value="">Selecionar cargo...</option>
-          <option value="Vendedor(a)">Vendedor(a)</option>
-          <option value="Gerente">Gerente</option>
-          <option value="Financeiro">Financeiro</option>
-          <option value="Administrativo">Administrativo</option>
+          <option value="">Selecione a loja primeiro...</option>
         </select>
       </div>
       <div class="field">
@@ -227,17 +223,20 @@ const EMPRESAS = {
   'SR. CAPAS (SAQUAREMA)': {
     razaoSocial: 'Família Guerra Bacaxá Comércio e Prestadora de Serviços Ltda',
     grupo: 'GRUPO ECONÔMICO FAMÍLIA GUERRA',
-    representante: 'Leandro Guerra Marino Fiuza de Castro'
+    representante: 'Leandro Guerra Marino Fiuza de Castro',
+    cargos: ['Vendedor(a)', 'Gerente']
   },
   'ESCRITÓRIO': {
     razaoSocial: 'Família Guerra Comércio e Prestadora de Serviços Ltda',
     grupo: 'GRUPO ECONÔMICO FAMÍLIA GUERRA',
-    representante: 'Leandro Guerra Marino Fiuza de Castro'
+    representante: 'Leandro Guerra Marino Fiuza de Castro',
+    cargos: ['Financeiro', 'Administrativo', 'Marketing']
   },
   'LEANDRO GUERRA SOFTWARE E TECNOLOGIA LTDA': {
     razaoSocial: 'Leandro Guerra Software e Tecnologia Ltda',
     grupo: 'GRUPO ECONÔMICO FAMÍLIA GUERRA',
-    representante: 'Leandro Guerra Marino Fiuza de Castro'
+    representante: 'Leandro Guerra Marino Fiuza de Castro',
+    cargos: ['Staff', 'Programador']
   }
 };
 function getEmpresa(loja) {
@@ -261,6 +260,17 @@ function atualizarEmpresa() {
 
   // Título da página
   document.title = 'Termos de Admissão — ' + emp.razaoSocial;
+
+  // Atualiza opções de cargo/função
+  const cargoSel = document.getElementById('f-cargo');
+  const currentCargo = cargoSel.value;
+  cargoSel.innerHTML = '<option value="">Selecionar cargo...</option>';
+  (emp.cargos || []).forEach(cargo => {
+    const opt = document.createElement('option');
+    opt.value = cargo; opt.textContent = cargo;
+    if (cargo === currentCargo) opt.selected = true;
+    cargoSel.appendChild(opt);
+  });
 }
 
 // ═══ TERMOS ═══
