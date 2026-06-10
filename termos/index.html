@@ -35,7 +35,7 @@
     .field input,.field select{background:#161616;border:1px solid var(--border);color:var(--white);padding:.75rem 1rem;border-radius:6px;font-size:.92rem;font-family:"Inter",sans-serif;outline:none;transition:border .2s;width:100%}
     .field input:focus,.field select:focus{border-color:var(--gold)}
     .field input::placeholder{color:rgba(245,240,232,.25)}
-    .field select option{background:#161616;color:var(--white)}
+    .field select option{background:#161616;color:var(--white);text-transform:uppercase}
     .terms-grid{display:grid;gap:.75rem}
     .term-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:1.1rem 1.25rem;display:flex;align-items:flex-start;gap:1rem;cursor:pointer;transition:all .2s}
     .term-card:hover:not(.mandatory){border-color:rgba(201,146,42,.4);background:var(--card-h)}
@@ -267,7 +267,7 @@ function atualizarEmpresa() {
   cargoSel.innerHTML = '<option value="">Selecionar cargo...</option>';
   (emp.cargos || []).forEach(cargo => {
     const opt = document.createElement('option');
-    opt.value = cargo; opt.textContent = cargo;
+    opt.value = cargo; opt.textContent = cargo.toUpperCase();
     if (cargo === currentCargo) opt.selected = true;
     cargoSel.appendChild(opt);
   });
