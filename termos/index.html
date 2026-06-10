@@ -1,0 +1,918 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Termos de Admissão — MR. CAPAS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <style>
+    *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+    :root{
+      --bg:#080808;--card:#141414;--card-h:#1c1c1c;
+      --gold:#C9922A;--gold-dim:rgba(201,146,42,0.15);
+      --white:#F5F0E8;--muted:rgba(245,240,232,0.5);
+      --border:rgba(201,146,42,0.18);
+      --red:#e05555;--green:#4caf82;
+      --radius:8px;
+    }
+    html{scroll-behavior:smooth}
+    body{font-family:"Inter",sans-serif;background:var(--bg);color:var(--white);min-height:100vh;display:flex;flex-direction:column}
+
+    /* ── TOP BAR ── */
+    .topbar{background:#0d0d0d;border-bottom:1px solid var(--border);padding:.9rem 2rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;position:sticky;top:0;z-index:50}
+    .topbar-brand{font-family:"Cinzel",serif;font-size:.85rem;letter-spacing:.15em;color:var(--gold)}
+    .topbar-nav{display:flex;align-items:center;gap:.75rem}
+    .btn-back{font-size:.65rem;letter-spacing:.1em;text-transform:uppercase;background:transparent;border:1px solid var(--border);color:var(--muted);padding:5px 14px;border-radius:4px;cursor:pointer;font-family:"Inter",sans-serif;text-decoration:none;transition:all .2s}
+    .btn-back:hover{color:var(--gold);border-color:var(--gold)}
+
+    /* ── STEPPER ── */
+    .stepper-wrap{padding:2rem 2rem 0;max-width:860px;margin:0 auto;width:100%}
+    .stepper{display:flex;align-items:center;gap:0;margin-bottom:2.5rem}
+    .step-item{display:flex;flex-direction:column;align-items:center;flex:1;position:relative}
+    .step-item:not(:last-child)::after{content:'';position:absolute;top:16px;left:50%;width:100%;height:1px;background:var(--border);z-index:0}
+    .step-item.active::after,.step-item.done::after{background:var(--gold)}
+    .step-num{width:32px;height:32px;border-radius:50%;border:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:.7rem;font-weight:600;color:var(--muted);background:var(--bg);position:relative;z-index:1;transition:all .3s}
+    .step-item.active .step-num{border-color:var(--gold);color:var(--gold);background:var(--gold-dim)}
+    .step-item.done .step-num{border-color:var(--gold);background:var(--gold);color:#fff}
+    .step-label{font-size:.58rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-top:.4rem;text-align:center}
+    .step-item.active .step-label{color:var(--gold)}
+
+    /* ── MAIN ── */
+    .main{flex:1;padding:0 2rem 3rem;max-width:860px;margin:0 auto;width:100%}
+    .section-title{font-family:"Cinzel",serif;font-size:1.2rem;font-weight:600;color:var(--white);margin-bottom:.35rem}
+    .section-sub{font-size:.8rem;color:var(--muted);margin-bottom:1.75rem;line-height:1.6}
+
+    /* ── FORM ── */
+    .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+    .form-grid.full{grid-template-columns:1fr}
+    .field{display:flex;flex-direction:column;gap:.45rem}
+    .field label{font-size:.65rem;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);font-weight:500}
+    .field input,.field select{background:#161616;border:1px solid var(--border);color:var(--white);padding:.75rem 1rem;border-radius:6px;font-size:.92rem;font-family:"Inter",sans-serif;outline:none;transition:border .2s;width:100%}
+    .field input:focus,.field select:focus{border-color:var(--gold)}
+    .field input::placeholder{color:rgba(245,240,232,.25)}
+    .field select option{background:#161616;color:var(--white)}
+
+    /* ── TERMS LIST ── */
+    .terms-grid{display:grid;gap:.75rem}
+    .term-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:1.1rem 1.25rem;display:flex;align-items:flex-start;gap:1rem;cursor:pointer;transition:all .2s}
+    .term-card:hover:not(.mandatory){border-color:rgba(201,146,42,.4);background:var(--card-h)}
+    .term-card.selected{border-color:var(--gold);background:var(--gold-dim)}
+    .term-card.mandatory{cursor:default;border-color:rgba(201,146,42,.25)}
+    .term-check{width:20px;height:20px;border:1.5px solid var(--border);border-radius:4px;flex-shrink:0;display:flex;align-items:center;justify-content:center;margin-top:2px;transition:all .2s}
+    .term-card.selected .term-check,.term-card.mandatory .term-check{background:var(--gold);border-color:var(--gold)}
+    .term-check svg{width:12px;height:12px;stroke:#fff;stroke-width:2.5;fill:none;stroke-linecap:round;stroke-linejoin:round;display:none}
+    .term-card.selected .term-check svg,.term-card.mandatory .term-check svg{display:block}
+    .term-info{flex:1}
+    .term-name{font-size:.88rem;font-weight:500;color:var(--white);margin-bottom:.25rem;line-height:1.4}
+    .term-desc{font-size:.74rem;color:var(--muted);line-height:1.55}
+    .term-badge{font-size:.52rem;letter-spacing:.1em;text-transform:uppercase;padding:2px 7px;border-radius:3px;display:inline-block;margin-top:.4rem}
+    .badge-mandatory{background:rgba(201,146,42,.12);color:var(--gold);border:1px solid rgba(201,146,42,.3)}
+    .badge-optional{background:rgba(245,240,232,.06);color:var(--muted);border:1px solid rgba(245,240,232,.1)}
+
+    /* ── REVIEW ── */
+    .review-block{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:1.5rem;margin-bottom:1.25rem}
+    .review-block h3{font-family:"Cinzel",serif;font-size:.82rem;letter-spacing:.1em;color:var(--gold);margin-bottom:1rem;text-transform:uppercase}
+    .review-grid{display:grid;grid-template-columns:1fr 1fr;gap:.6rem .5rem}
+    .review-item{display:flex;flex-direction:column;gap:.2rem}
+    .review-label{font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+    .review-value{font-size:.85rem;color:var(--white)}
+    .terms-selected-list{display:flex;flex-direction:column;gap:.5rem}
+    .term-selected-row{display:flex;align-items:center;gap:.6rem;font-size:.82rem;color:var(--white)}
+    .term-selected-row::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--gold);flex-shrink:0}
+
+    /* ── BUTTONS ── */
+    .btn-row{display:flex;gap:.75rem;margin-top:1.75rem;justify-content:flex-end}
+    .btn-primary{background:var(--gold);color:#fff;border:none;padding:.9rem 2rem;border-radius:6px;font-size:.78rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;font-family:"Inter",sans-serif;transition:background .2s}
+    .btn-primary:hover:not(:disabled){background:#e0a830}
+    .btn-primary:disabled{opacity:.5;cursor:not-allowed}
+    .btn-secondary{background:transparent;border:1px solid var(--border);color:var(--muted);padding:.9rem 1.5rem;border-radius:6px;font-size:.78rem;cursor:pointer;font-family:"Inter",sans-serif;transition:all .2s}
+    .btn-secondary:hover{color:var(--white);border-color:var(--gold)}
+
+    /* ── LOADING / SUCCESS ── */
+    .overlay{position:fixed;inset:0;background:rgba(8,8,8,.88);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:100;padding:2rem;opacity:0;pointer-events:none;transition:opacity .3s}
+    .overlay.show{opacity:1;pointer-events:all}
+    .overlay-card{background:#141414;border:1px solid var(--border);border-radius:12px;padding:2.5rem;width:100%;max-width:440px;text-align:center}
+    .spinner{width:44px;height:44px;border:3px solid rgba(201,146,42,.2);border-top-color:var(--gold);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 1.25rem}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .overlay-icon{font-size:2.5rem;margin-bottom:1rem}
+    .overlay-title{font-family:"Cinzel",serif;font-size:1.1rem;color:var(--white);margin-bottom:.5rem}
+    .overlay-msg{font-size:.82rem;color:var(--muted);line-height:1.65}
+    .overlay-steps{display:flex;flex-direction:column;gap:.4rem;margin:1.25rem 0;text-align:left}
+    .overlay-step{font-size:.78rem;color:var(--muted);display:flex;align-items:center;gap:.6rem}
+    .overlay-step.done{color:var(--green)}
+    .overlay-step.active{color:var(--white)}
+    .overlay-step::before{content:'';width:8px;height:8px;border-radius:50%;background:var(--border);flex-shrink:0}
+    .overlay-step.done::before{background:var(--green)}
+    .overlay-step.active::before{background:var(--gold)}
+    .overlay-link{display:inline-block;margin-top:1.25rem;color:var(--gold);font-size:.82rem;text-decoration:none;border-bottom:1px solid rgba(201,146,42,.3);padding-bottom:1px}
+    .overlay-link:hover{border-color:var(--gold)}
+
+    .msg-error{background:rgba(224,85,85,.1);border:1px solid rgba(224,85,85,.3);border-radius:6px;padding:.9rem 1.1rem;font-size:.8rem;color:var(--red);margin-top:1rem;display:none;line-height:1.55}
+    .msg-error.show{display:block}
+
+    footer{border-top:1px solid var(--border);padding:1rem 2rem;text-align:center;font-size:.62rem;color:rgba(245,240,232,.15)}
+    @media(max-width:640px){
+      .form-grid{grid-template-columns:1fr}
+      .review-grid{grid-template-columns:1fr}
+      .topbar{padding:.8rem 1rem}
+      .stepper-wrap,.main{padding-left:1rem;padding-right:1rem}
+      .btn-row{flex-direction:column}
+      .btn-primary,.btn-secondary{width:100%;text-align:center}
+    }
+  </style>
+</head>
+<body>
+
+<header class="topbar">
+  <span class="topbar-brand">MR. CAPAS — Sistema de Termos</span>
+  <nav class="topbar-nav">
+    <a href="/painel" class="btn-back">← Painel</a>
+  </nav>
+</header>
+
+<div class="stepper-wrap">
+  <div class="stepper">
+    <div class="step-item active" id="si-1">
+      <div class="step-num">1</div>
+      <div class="step-label">Colaborador</div>
+    </div>
+    <div class="step-item" id="si-2">
+      <div class="step-num">2</div>
+      <div class="step-label">Termos</div>
+    </div>
+    <div class="step-item" id="si-3">
+      <div class="step-num">3</div>
+      <div class="step-label">Revisão</div>
+    </div>
+  </div>
+</div>
+
+<main class="main">
+
+  <!-- ── STEP 1 ── -->
+  <div id="step1">
+    <h1 class="section-title">Dados do Colaborador</h1>
+    <p class="section-sub">Preencha as informações do novo funcionário para gerar os termos de admissão.</p>
+
+    <div class="form-grid">
+      <div class="field" style="grid-column:1/-1">
+        <label>Nome Completo *</label>
+        <input type="text" id="f-nome" placeholder="Nome completo do colaborador" autocomplete="off">
+      </div>
+      <div class="field">
+        <label>CPF *</label>
+        <input type="text" id="f-cpf" placeholder="000.000.000-00" maxlength="14" autocomplete="off">
+      </div>
+      <div class="field">
+        <label>E-mail *</label>
+        <input type="email" id="f-email" placeholder="email@colaborador.com" autocomplete="off">
+      </div>
+      <div class="field">
+        <label>Cargo / Função *</label>
+        <input type="text" id="f-cargo" placeholder="Ex: Vendedor, Gerente, Técnico" autocomplete="off">
+      </div>
+      <div class="field">
+        <label>Setor</label>
+        <input type="text" id="f-setor" placeholder="Ex: Operações, Vendas" autocomplete="off">
+      </div>
+      <div class="field">
+        <label>Loja *</label>
+        <select id="f-loja">
+          <option value="">Selecionar unidade...</option>
+          <option value="MR. CAPAS Araruama">MR. CAPAS Araruama</option>
+          <option value="MR. CAPAS Bacaxá (Saquarema)">MR. CAPAS Bacaxá (Saquarema)</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Data de Admissão *</label>
+        <input type="date" id="f-data">
+      </div>
+    </div>
+    <div class="msg-error" id="err1">Preencha todos os campos obrigatórios (*) antes de continuar.</div>
+    <div class="btn-row">
+      <button class="btn-primary" onclick="goStep2()">Próximo: Selecionar Termos →</button>
+    </div>
+  </div>
+
+  <!-- ── STEP 2 ── -->
+  <div id="step2" style="display:none">
+    <h1 class="section-title">Selecionar Termos</h1>
+    <p class="section-sub">Os termos <strong style="color:var(--gold)">obrigatórios</strong> já estão selecionados. Adicione os opcionais conforme a função do colaborador.</p>
+
+    <div class="terms-grid" id="termos-lista"></div>
+    <div class="msg-error" id="err2">Selecione ao menos um termo para continuar.</div>
+    <div class="btn-row">
+      <button class="btn-secondary" onclick="goStep1()">← Voltar</button>
+      <button class="btn-primary" onclick="goStep3()">Próximo: Revisar →</button>
+    </div>
+  </div>
+
+  <!-- ── STEP 3 ── -->
+  <div id="step3" style="display:none">
+    <h1 class="section-title">Revisão e Envio</h1>
+    <p class="section-sub">Confirme os dados e clique em enviar. O PDF será gerado e enviado para assinatura digital via ClickSign.</p>
+
+    <div class="review-block">
+      <h3>Dados do Colaborador</h3>
+      <div class="review-grid" id="review-dados"></div>
+    </div>
+
+    <div class="review-block">
+      <h3>Termos Selecionados</h3>
+      <div class="terms-selected-list" id="review-termos"></div>
+    </div>
+
+    <div class="msg-error" id="err3"></div>
+    <div class="btn-row">
+      <button class="btn-secondary" onclick="goStep2()">← Voltar</button>
+      <button class="btn-primary" id="btn-enviar" onclick="enviar()">⟳ Gerar PDF e Enviar para Assinatura</button>
+    </div>
+  </div>
+
+</main>
+
+<footer>MR. CAPAS · Grupo Econômico Família Guerra · Sistema Interno</footer>
+
+<!-- ── LOADING OVERLAY ── -->
+<div class="overlay" id="ov-loading">
+  <div class="overlay-card">
+    <div class="spinner"></div>
+    <div class="overlay-title">Enviando para Assinatura</div>
+    <div class="overlay-msg">Aguarde enquanto processamos o documento no ClickSign.</div>
+    <div class="overlay-steps">
+      <div class="overlay-step" id="ov-s1">Gerando PDF dos termos...</div>
+      <div class="overlay-step" id="ov-s2">Criando envelope no ClickSign...</div>
+      <div class="overlay-step" id="ov-s3">Vinculando signatário...</div>
+      <div class="overlay-step" id="ov-s4">Ativando para assinatura...</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── SUCCESS OVERLAY ── -->
+<div class="overlay" id="ov-success">
+  <div class="overlay-card">
+    <div class="overlay-icon">✅</div>
+    <div class="overlay-title">Documento Enviado!</div>
+    <div class="overlay-msg" id="ov-success-msg">O documento foi enviado com sucesso. O colaborador receberá um e-mail com o link para assinatura digital.</div>
+    <a href="#" id="ov-link" class="overlay-link" target="_blank">Abrir no ClickSign →</a>
+    <div class="btn-row" style="justify-content:center;margin-top:1.5rem">
+      <button class="btn-primary" onclick="resetForm()">+ Novo Colaborador</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════
+// CONFIGURAÇÃO
+// ═══════════════════════════════════════════
+const BACKEND_URL = 'https://mrcapas-clicksign-server.onrender.com/enviar';
+
+// ═══════════════════════════════════════════
+// DADOS DOS TERMOS
+// ═══════════════════════════════════════════
+const TERMOS = [
+  {
+    id:'ponto',mandatory:true,
+    nome:'Ciência de Controle de Ponto Eletrônico',
+    desc:'Conhecimento e aceite do sistema de registro de ponto (Portaria MTE 671/2021).',
+    conteudo:`CIÊNCIA DE CONTROLE DE PONTO ELETRÔNICO
+
+Pelo presente instrumento, o(a) colaborador(a) abaixo identificado(a) declara ter tomado pleno conhecimento das normas e procedimentos relativos ao controle de jornada de trabalho adotados pela empresa MR. CAPAS, conforme estabelecido pela Portaria MTE nº 671/2021.
+
+OBRIGAÇÕES DO COLABORADOR:
+1. Registrar obrigatoriamente os horários de entrada, intervalo para refeição/descanso e saída em todos os dias trabalhados, utilizando o sistema eletrônico de controle de ponto disponibilizado pela empresa.
+2. Em caso de impossibilidade de registro (falha técnica, esquecimento ou ausência do ponto), comunicar imediatamente ao responsável da unidade para que seja feita a anotação manual justificada.
+3. Não registrar o ponto de outro colaborador nem permitir que seu ponto seja registrado por terceiros, sob pena de caracterizar ato faltoso grave.
+4. Verificar mensalmente o extrato de horas trabalhadas, comunicando eventuais divergências ao setor responsável no prazo de até 5 (cinco) dias úteis após o fechamento do período.
+
+CONSEQUÊNCIAS DO NÃO CUMPRIMENTO:
+O descumprimento das obrigações acima poderá implicar em: desconto dos períodos não registrados; advertência escrita; e demais medidas disciplinares previstas na legislação trabalhista vigente.
+
+O colaborador declara que recebeu e compreendeu o treinamento sobre o sistema de registro de ponto e concorda integralmente com as disposições deste termo.`
+  },
+  {
+    id:'sigilo',mandatory:true,
+    nome:'Compromisso de Sigilo e Confidencialidade',
+    desc:'Acordo de confidencialidade sobre informações comerciais, operacionais e de clientes.',
+    conteudo:`COMPROMISSO DE SIGILO E CONFIDENCIALIDADE
+
+Pelo presente instrumento, o(a) colaborador(a) abaixo qualificado(a), doravante denominado "SIGNATÁRIO", se compromete a guardar absoluto sigilo sobre todas as informações confidenciais às quais tiver acesso em razão do exercício de suas atividades profissionais na empresa MR. CAPAS.
+
+INFORMAÇÕES CONFIDENCIAIS incluem, mas não se limitam a:
+• Dados de clientes (nome, CPF, endereço, histórico de compras, contatos);
+• Informações sobre fornecedores, condições comerciais e preços de compra;
+• Estratégias comerciais, metas de vendas e resultados financeiros;
+• Processos internos, sistemas, ferramentas e tecnologias utilizadas;
+• Informações sobre outros colaboradores;
+• Qualquer dado obtido em razão do contrato de trabalho.
+
+OBRIGAÇÕES DO SIGNATÁRIO:
+1. Não divulgar, transferir ou utilizar as informações confidenciais para finalidade diversa das atividades profissionais;
+2. Não compartilhar senhas de acesso a sistemas internos com terceiros;
+3. Comunicar imediatamente ao superior hierárquico qualquer tentativa de acesso indevido às informações da empresa;
+4. Devolver, ao término do vínculo empregatício, todos os materiais e documentos físicos ou digitais que contenham informações confidenciais.
+
+VIGÊNCIA: As obrigações deste compromisso vigoram durante toda a relação de emprego e por período de 24 (vinte e quatro) meses após o término do contrato de trabalho, independentemente do motivo do desligamento.
+
+O descumprimento deste compromisso sujeita o signatário às sanções civis, trabalhistas e criminais previstas na legislação brasileira, incluindo a Lei nº 9.279/1996 (Propriedade Industrial) e o Marco Civil da Internet (Lei nº 12.965/2014).`
+  },
+  {
+    id:'imagem',mandatory:false,
+    nome:'Autorização de Uso de Imagem',
+    desc:'Permissão para uso da imagem do colaborador em materiais institucionais e redes sociais.',
+    conteudo:`AUTORIZAÇÃO DE USO DE IMAGEM
+
+Pelo presente instrumento, o(a) colaborador(a) abaixo identificado(a) autoriza, de forma expressa e sem ônus adicional, o uso de sua imagem, voz e demais manifestações de sua personalidade pela empresa MR. CAPAS, integrante do Grupo Econômico Família Guerra.
+
+A presente autorização abrange:
+• Fotografias e vídeos realizados no ambiente de trabalho ou em eventos promovidos pela empresa;
+• Publicações em redes sociais oficiais da empresa (Instagram, Facebook, YouTube, WhatsApp Business e demais);
+• Materiais institucionais físicos e digitais (cartazes, banners, catálogos, apresentações);
+• Registros de treinamentos, capacitações e reconhecimentos profissionais;
+• Materiais de divulgação de produtos e serviços.
+
+DISPOSIÇÕES GERAIS:
+1. A presente autorização é não exclusiva e intransferível, limitada ao uso para fins institucionais e promocionais da empresa;
+2. Não poderá o colaborador pleitear qualquer remuneração adicional pelo uso de sua imagem nos termos autorizados;
+3. Esta autorização vigorará enquanto durar o vínculo empregatício. Após o término do contrato, o uso de imagens já publicadas poderá ser mantido, vedada nova captação;
+4. O colaborador poderá solicitar a retirada de imagens específicas mediante requerimento escrito ao responsável da unidade, que analisará o pedido no prazo de 15 dias.`
+  },
+  {
+    id:'estoque',mandatory:false,
+    nome:'Responsabilidade por Divergência de Estoque',
+    desc:'Comprometimento com o controle de mercadorias e autorização de desconto em folha (Art. 462 CLT).',
+    conteudo:`RESPONSABILIDADE POR DIVERGÊNCIA DE ESTOQUE E AUTORIZAÇÃO DE DESCONTO EM FOLHA
+
+Pelo presente instrumento, o(a) colaborador(a) abaixo identificado(a) declara estar ciente de suas responsabilidades relativas ao controle de estoque e mercadorias da unidade MR. CAPAS em que exerce suas atividades.
+
+RESPONSABILIDADES DO COLABORADOR:
+1. Zelar pela integridade, conservação e organização das mercadorias sob sua guarda ou manuseio;
+2. Realizar a conferência dos produtos no recebimento, comunicando imediatamente divergências ou avarias ao responsável;
+3. Não remover mercadorias da loja sem autorização documentada;
+4. Participar dos inventários periódicos realizados pela empresa;
+5. Comunicar qualquer irregularidade, perda, furto ou avaria que tome conhecimento.
+
+AUTORIZAÇÃO DE DESCONTO EM FOLHA (ART. 462 CLT):
+O(A) colaborador(a) autoriza expressamente, com fundamento no Art. 462 da Consolidação das Leis do Trabalho (CLT), o desconto em folha de pagamento de valores correspondentes a:
+• Perdas ou danos causados por dolo ou culpa comprovada do colaborador;
+• Divergências de estoque resultantes de negligência ou descuido no desempenho das funções;
+• Eventuais débitos relacionados a mercadorias retiradas sem autorização.
+
+Os descontos autorizados observarão os limites legais, não podendo ultrapassar o valor do dano efetivamente comprovado e respeitando os tetos previstos na legislação trabalhista.
+
+O colaborador declara estar ciente de que a autorização acima não configura presunção de culpa, dependendo sempre de processo investigativo interno com ampla defesa e contraditório.`
+  },
+  {
+    id:'transporte',mandatory:false,
+    nome:'Ciência sobre Despesas de Transporte durante Treinamento',
+    desc:'Esclarecimento sobre o período de treinamento inicial e custos de deslocamento.',
+    conteudo:`CIÊNCIA SOBRE DESPESAS DE TRANSPORTE DURANTE PERÍODO DE TREINAMENTO
+
+Pelo presente instrumento, o(a) colaborador(a) abaixo identificado(a) declara ter sido informado(a) acerca das condições relacionadas ao deslocamento durante o período de treinamento inicial.
+
+PERÍODO DE TREINAMENTO:
+O período de treinamento compreende os primeiros dias de atividade do colaborador, podendo ser realizado na própria unidade de trabalho ou em outra loja do grupo, conforme necessidade operacional. A duração será comunicada no início da contratação.
+
+CONDIÇÕES DE DESLOCAMENTO:
+1. Durante o período de treinamento em unidade diversa da contratada, o colaborador terá direito ao reembolso das despesas de transporte público (ônibus, metrô, trem), mediante apresentação de comprovantes;
+2. O reembolso será processado no contracheque do mês subsequente ao treinamento;
+3. O uso de transporte particular (aplicativo, carro próprio) poderá ser reembolsado mediante solicitação prévia e autorização do responsável da unidade;
+4. Despesas não documentadas ou não autorizadas previamente não serão reembolsadas.
+
+DECLARAÇÃO:
+O colaborador declara que tomou ciência dessas condições antes do início do período de treinamento, concordando com os termos acima estabelecidos.`
+  },
+  {
+    id:'hydrogel-treino',mandatory:false,
+    nome:'Ficha de Treinamento — Película Hydrogel',
+    desc:'Registro de conclusão do treinamento em aplicação de películas protetoras de tela.',
+    conteudo:`FICHA DE REGISTRO DE TREINAMENTO
+APLICAÇÃO DE PELÍCULA PROTETORA HYDROGEL
+
+Pelo presente instrumento, o(a) colaborador(a) abaixo identificado(a) certifica ter concluído com aproveitamento o treinamento em aplicação de películas protetoras de tela (hydrogel) ministrado pela empresa MR. CAPAS.
+
+CONTEÚDO ABORDADO NO TREINAMENTO:
+1. Tipos e especificações das películas hydrogel (espessura, flexibilidade, resistência);
+2. Preparação da superfície: limpeza e desinfecção do display;
+3. Técnica de aplicação: posicionamento, alinhamento e fixação sem bolhas;
+4. Uso correto dos equipamentos: espátula, pano de microfibra e luvas;
+5. Procedimentos em caso de erro na aplicação;
+6. Garantia de qualidade e critérios de retrabalho;
+7. Armazenamento correto dos insumos;
+8. Tempo estimado por aplicação e produtividade esperada.
+
+EQUIPAMENTOS UTILIZADOS NO TREINAMENTO:
+• Dispositivos de treino (sem valor comercial)
+• Kit de aplicação padrão MR. CAPAS
+• Películas de demonstração
+
+AVALIAÇÃO:
+O colaborador demonstrou habilidade satisfatória nas técnicas ensinadas e está apto(a) a realizar aplicações em clientes, observando os padrões de qualidade exigidos pela empresa.
+
+O colaborador declara que participou integralmente do treinamento e se compromete a aplicar os conhecimentos adquiridos no exercício de suas funções.`
+  },
+  {
+    id:'hydrogel-aceite',mandatory:false,
+    nome:'Termo de Aceite — Aplicação de Película Hydrogel',
+    desc:'Responsabilidade pela qualidade na aplicação de películas e gestão de retrabalhos.',
+    conteudo:`TERMO DE ACEITE — SERVIÇO DE APLICAÇÃO DE PELÍCULA HYDROGEL
+
+Pelo presente instrumento, o(a) colaborador(a) abaixo identificado(a), devidamente treinado(a) na aplicação de películas protetoras de tela hydrogel, declara estar ciente de suas responsabilidades na prestação deste serviço aos clientes da MR. CAPAS.
+
+RESPONSABILIDADES DO APLICADOR:
+1. Inspecionar o dispositivo do cliente antes da aplicação, registrando qualquer dano pré-existente;
+2. Obter confirmação expressa do cliente sobre o modelo do dispositivo e tipo de película;
+3. Realizar a aplicação conforme as técnicas aprendidas no treinamento;
+4. Garantir a qualidade da aplicação: sem bolhas, poeira, descentralização ou destacamento imediato;
+5. Comunicar ao cliente e ao responsável da loja qualquer incidente durante a aplicação.
+
+GARANTIA E RETRABALHO:
+• Aplicações com defeito de execução (bolhas, poeira ou desalinhamento evidentes) serão refeitas sem custo ao cliente, com nova película custeada pela unidade;
+• O retrabalho excessivo poderá implicar advertência e treinamento suplementar;
+• Danos ao dispositivo do cliente causados por imperícia serão apurados pela gerência, podendo resultar em responsabilização conforme Art. 462 da CLT.
+
+NÃO SE INCLUI NA GARANTIA:
+• Bolhas causadas por impacto ou manuseio incorreto após a aplicação;
+• Destacamento por exposição a calor, umidade excessiva ou produtos químicos;
+• Danos pré-existentes no display identificados antes da aplicação.
+
+O colaborador declara estar ciente de todas as responsabilidades acima e se compromete a prestar o serviço com o máximo de qualidade e atenção.`
+  },
+  {
+    id:'celular',mandatory:false,
+    nome:'Termo de Entrega de Aparelho Celular Corporativo',
+    desc:'Registro de entrega e responsabilidades sobre dispositivo móvel de uso corporativo.',
+    conteudo:`TERMO DE ENTREGA E RESPONSABILIDADE — APARELHO CELULAR CORPORATIVO
+
+Pelo presente instrumento, a empresa MR. CAPAS registra a entrega de aparelho celular corporativo ao(à) colaborador(a) abaixo identificado(a), para uso exclusivo nas atividades profissionais.
+
+IDENTIFICAÇÃO DO DISPOSITIVO:
+Modelo: _________________________
+IMEI: _________________________
+Número de série: _________________________
+Condição na entrega: ☐ Novo  ☐ Recondicionado  ☐ Usado com boas condições
+Acessórios entregues: ☐ Carregador  ☐ Cabo  ☐ Capa protetora  ☐ Película
+
+OBRIGAÇÕES DO COLABORADOR:
+1. Utilizar o aparelho exclusivamente para fins profissionais relacionados às atividades na MR. CAPAS;
+2. Zelar pela conservação, não submetendo o dispositivo a riscos desnecessários;
+3. Não instalar aplicativos sem autorização ou que comprometam a segurança do dispositivo;
+4. Reportar imediatamente qualquer dano, perda ou furto ao responsável da unidade;
+5. Não ceder ou emprestar o aparelho a terceiros;
+6. Devolver o dispositivo e todos os acessórios ao término do contrato de trabalho, independentemente do motivo do desligamento.
+
+RESPONSABILIDADE POR DANOS (ART. 462 CLT):
+O colaborador é responsável por danos causados ao aparelho por:
+• Negligência ou descuido comprovado;
+• Uso inadequado ou em desacordo com as orientações;
+• Perda ou furto resultante de imprudência.
+
+Nestes casos, os custos de reparo ou reposição poderão ser descontados em folha, respeitados os limites legais.
+
+O colaborador declara ter recebido o dispositivo nas condições descritas, em perfeito estado de funcionamento, assumindo as responsabilidades acima.`
+  }
+];
+
+// ═══════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════
+let currentStep = 1;
+let selectedTermos = new Set(['ponto','sigilo']); // mandatory
+
+// ═══════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', () => {
+  // set today as default admission date
+  document.getElementById('f-data').value = new Date().toISOString().split('T')[0];
+  // CPF mask
+  document.getElementById('f-cpf').addEventListener('input', maskCPF);
+  // render terms
+  renderTermos();
+});
+
+function maskCPF(e) {
+  let v = e.target.value.replace(/\D/g,'');
+  if (v.length > 11) v = v.slice(0,11);
+  if (v.length > 9) v = v.replace(/(\d{3})(\d{3})(\d{3})(\d{1,2})/,'$1.$2.$3-$4');
+  else if (v.length > 6) v = v.replace(/(\d{3})(\d{3})(\d{1,3})/,'$1.$2.$3');
+  else if (v.length > 3) v = v.replace(/(\d{3})(\d{1,3})/,'$1.$2');
+  e.target.value = v;
+}
+
+// ═══════════════════════════════════════════
+// RENDER TERMS
+// ═══════════════════════════════════════════
+function renderTermos() {
+  const container = document.getElementById('termos-lista');
+  container.innerHTML = TERMOS.map(t => {
+    const sel = selectedTermos.has(t.id);
+    const cls = [
+      'term-card',
+      t.mandatory ? 'mandatory' : '',
+      sel ? 'selected' : ''
+    ].filter(Boolean).join(' ');
+    return `
+      <div class="${cls}" id="tc-${t.id}" ${t.mandatory ? '' : `onclick="toggleTermo('${t.id}')"`}>
+        <div class="term-check">
+          <svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,3"/></svg>
+        </div>
+        <div class="term-info">
+          <div class="term-name">${t.nome}</div>
+          <div class="term-desc">${t.desc}</div>
+          <span class="term-badge ${t.mandatory ? 'badge-mandatory' : 'badge-optional'}">
+            ${t.mandatory ? 'Obrigatório' : 'Opcional'}
+          </span>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function toggleTermo(id) {
+  if (selectedTermos.has(id)) {
+    selectedTermos.delete(id);
+  } else {
+    selectedTermos.add(id);
+  }
+  renderTermos();
+}
+
+// ═══════════════════════════════════════════
+// NAVIGATION
+// ═══════════════════════════════════════════
+function goStep1() {
+  showStep(1);
+}
+
+function goStep2() {
+  const err = document.getElementById('err1');
+  if (!validateStep1()) {
+    err.classList.add('show');
+    return;
+  }
+  err.classList.remove('show');
+  showStep(2);
+}
+
+function goStep3() {
+  const err = document.getElementById('err2');
+  if (selectedTermos.size === 0) {
+    err.classList.add('show');
+    return;
+  }
+  err.classList.remove('show');
+  buildReview();
+  showStep(3);
+}
+
+function showStep(n) {
+  currentStep = n;
+  [1,2,3].forEach(i => {
+    document.getElementById('step'+i).style.display = i === n ? 'block' : 'none';
+    const si = document.getElementById('si-'+i);
+    si.className = 'step-item' + (i < n ? ' done' : i === n ? ' active' : '');
+    si.querySelector('.step-num').textContent = i < n ? '✓' : i;
+  });
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+// ═══════════════════════════════════════════
+// VALIDATE
+// ═══════════════════════════════════════════
+function validateStep1() {
+  const nome = document.getElementById('f-nome').value.trim();
+  const cpf = document.getElementById('f-cpf').value.trim();
+  const email = document.getElementById('f-email').value.trim();
+  const cargo = document.getElementById('f-cargo').value.trim();
+  const loja = document.getElementById('f-loja').value;
+  const data = document.getElementById('f-data').value;
+  return nome && cpf.length >= 11 && email && cargo && loja && data;
+}
+
+// ═══════════════════════════════════════════
+// BUILD REVIEW
+// ═══════════════════════════════════════════
+function buildReview() {
+  const col = getColaborador();
+  const dadosEl = document.getElementById('review-dados');
+  const items = [
+    ['Nome Completo', col.nome],
+    ['CPF', col.cpf],
+    ['E-mail', col.email],
+    ['Cargo/Função', col.cargo],
+    ['Setor', col.setor || '—'],
+    ['Loja', col.loja],
+    ['Data de Admissão', formatDate(col.data)],
+  ];
+  dadosEl.innerHTML = items.map(([l,v]) =>
+    `<div class="review-item"><div class="review-label">${l}</div><div class="review-value">${v}</div></div>`
+  ).join('');
+
+  const termosEl = document.getElementById('review-termos');
+  const selected = TERMOS.filter(t => selectedTermos.has(t.id));
+  termosEl.innerHTML = selected.map(t =>
+    `<div class="term-selected-row">${t.nome}</div>`
+  ).join('');
+}
+
+function getColaborador() {
+  return {
+    nome: document.getElementById('f-nome').value.trim(),
+    cpf: document.getElementById('f-cpf').value.trim(),
+    email: document.getElementById('f-email').value.trim(),
+    cargo: document.getElementById('f-cargo').value.trim(),
+    setor: document.getElementById('f-setor').value.trim(),
+    loja: document.getElementById('f-loja').value,
+    data: document.getElementById('f-data').value,
+  };
+}
+
+function formatDate(d) {
+  if (!d) return '';
+  const [y,m,day] = d.split('-');
+  return `${day}/${m}/${y}`;
+}
+
+// ═══════════════════════════════════════════
+// PDF GENERATION
+// ═══════════════════════════════════════════
+function gerarPDF(col, termosSelected) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF('p','mm','a4');
+  const W = 210;
+  const ml = 20, mr = 20;
+  const tw = W - ml - mr;
+
+  // ── COVER PAGE ──
+  doc.setFillColor(8,8,8);
+  doc.rect(0,0,W,297,'F');
+
+  doc.setDrawColor(201,146,42);
+  doc.setLineWidth(.5);
+  doc.line(ml, 40, W-mr, 40);
+  doc.line(ml, 257, W-mr, 257);
+
+  doc.setTextColor(201,146,42);
+  doc.setFont('helvetica','bold');
+  doc.setFontSize(22);
+  doc.text('MR. CAPAS', W/2, 55, {align:'center'});
+
+  doc.setFontSize(11);
+  doc.setTextColor(200,190,175);
+  doc.setFont('helvetica','normal');
+  doc.text('GRUPO ECONÔMICO FAMÍLIA GUERRA', W/2, 64, {align:'center'});
+
+  doc.setFontSize(16);
+  doc.setTextColor(245,240,232);
+  doc.setFont('helvetica','bold');
+  doc.text('TERMOS DE ADMISSÃO', W/2, 90, {align:'center'});
+
+  // separator
+  doc.setDrawColor(201,146,42);
+  doc.setLineWidth(.3);
+  doc.line(70, 96, 140, 96);
+
+  // collaborator info box
+  doc.setFillColor(20,20,20);
+  doc.setDrawColor(201,146,42);
+  doc.setLineWidth(.4);
+  doc.roundedRect(ml, 106, tw, 95, 3, 3, 'FD');
+
+  let y = 120;
+  const lb = (label, val) => {
+    doc.setFontSize(7);
+    doc.setTextColor(160,140,100);
+    doc.setFont('helvetica','normal');
+    doc.text(label.toUpperCase(), ml+8, y);
+    doc.setFontSize(10);
+    doc.setTextColor(245,240,232);
+    doc.setFont('helvetica','bold');
+    doc.text(val || '—', ml+8, y+6);
+    y += 16;
+  };
+
+  lb('Nome Completo', col.nome);
+  lb('CPF', col.cpf);
+  lb('Cargo / Função', col.cargo + (col.setor ? ' — ' + col.setor : ''));
+  lb('Unidade', col.loja);
+  lb('Data de Admissão', formatDate(col.data));
+
+  // terms list on cover
+  doc.setFontSize(8);
+  doc.setTextColor(160,140,100);
+  doc.setFont('helvetica','normal');
+  doc.text('DOCUMENTOS INCLUÍDOS NESTE PACOTE:', ml, 218);
+
+  y = 226;
+  termosSelected.forEach((t, i) => {
+    doc.setFillColor(201,146,42);
+    doc.circle(ml+2, y-1.5, 1.2, 'F');
+    doc.setFontSize(8.5);
+    doc.setTextColor(220,210,190);
+    doc.setFont('helvetica','normal');
+    doc.text(t.nome, ml+7, y);
+    y += 8;
+  });
+
+  // footer cover
+  doc.setFontSize(7.5);
+  doc.setTextColor(100,90,70);
+  doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')} · Email: ${col.email}`, W/2, 265, {align:'center'});
+
+  // ── TERM PAGES ──
+  termosSelected.forEach(termo => {
+    doc.addPage();
+
+    // header band
+    doc.setFillColor(15,15,15);
+    doc.rect(0,0,W,28,'F');
+    doc.setDrawColor(201,146,42);
+    doc.setLineWidth(.5);
+    doc.line(0,28,W,28);
+
+    doc.setFontSize(8);
+    doc.setTextColor(160,140,100);
+    doc.setFont('helvetica','normal');
+    doc.text('MR. CAPAS · TERMO DE ADMISSÃO', ml, 12);
+
+    doc.setFontSize(11);
+    doc.setTextColor(201,146,42);
+    doc.setFont('helvetica','bold');
+    doc.text(termo.nome.toUpperCase(), ml, 22);
+
+    // collaborator header
+    doc.setFontSize(8);
+    doc.setTextColor(160,140,100);
+    doc.setFont('helvetica','normal');
+    let header = `Colaborador: ${col.nome}  |  CPF: ${col.cpf}  |  Admissão: ${formatDate(col.data)}`;
+    doc.text(header, ml, 36);
+
+    doc.setDrawColor(60,50,30);
+    doc.setLineWidth(.2);
+    doc.line(ml, 39, W-mr, 39);
+
+    // body text
+    doc.setFontSize(9.5);
+    doc.setTextColor(220,210,190);
+    doc.setFont('helvetica','normal');
+
+    const lines = doc.splitTextToSize(termo.conteudo, tw);
+    y = 47;
+    const lineH = 5;
+    const bottomMargin = 240;
+
+    for (const line of lines) {
+      if (y > bottomMargin) {
+        doc.addPage();
+        // mini header on continuation
+        doc.setFillColor(15,15,15);
+        doc.rect(0,0,W,20,'F');
+        doc.setFontSize(8);
+        doc.setTextColor(100,90,70);
+        doc.text('MR. CAPAS · ' + termo.nome.toUpperCase() + ' (continuação)', ml, 13);
+        doc.setDrawColor(201,146,42);
+        doc.setLineWidth(.3);
+        doc.line(0,20,W,20);
+        y = 30;
+        doc.setFontSize(9.5);
+        doc.setTextColor(220,210,190);
+        doc.setFont('helvetica','normal');
+      }
+      doc.text(line, ml, y);
+      y += lineH;
+    }
+
+    // signature block
+    y = Math.max(y + 15, 248);
+    if (y > 255) { doc.addPage(); y = 30; }
+
+    doc.setDrawColor(80,70,50);
+    doc.setLineWidth(.3);
+    doc.line(ml, y, ml+80, y);
+    doc.setFontSize(7.5);
+    doc.setTextColor(150,130,100);
+    doc.text('Assinatura do Colaborador', ml, y+5);
+    doc.text(col.nome, ml, y+10);
+    doc.text(`CPF: ${col.cpf}`, ml, y+15);
+
+    doc.line(W-mr-70, y, W-mr, y);
+    doc.text('Data e Local', W-mr-70, y+5);
+    doc.text(`${formatDate(col.data)} · ${col.loja}`, W-mr-70, y+10);
+
+    // page footer
+    doc.setFontSize(7);
+    doc.setTextColor(80,70,50);
+    doc.text('Documento gerado pelo Sistema de Termos MR. CAPAS · Grupo Econômico Família Guerra', W/2, 287, {align:'center'});
+  });
+
+  return doc.output('datauristring').split(',')[1];
+}
+
+// ═══════════════════════════════════════════
+// OVERLAY HELPERS
+// ═══════════════════════════════════════════
+function showLoading() {
+  document.getElementById('ov-loading').classList.add('show');
+}
+function hideLoading() {
+  document.getElementById('ov-loading').classList.remove('show');
+}
+function showSuccess(link) {
+  document.getElementById('ov-link').href = link || '#';
+  document.getElementById('ov-link').style.display = link ? 'inline-block' : 'none';
+  document.getElementById('ov-success').classList.add('show');
+}
+function setStep(n, state) {
+  const el = document.getElementById('ov-s'+n);
+  el.className = 'overlay-step ' + state;
+}
+
+// ═══════════════════════════════════════════
+// ENVIAR
+// ═══════════════════════════════════════════
+async function enviar() {
+  const btn = document.getElementById('btn-enviar');
+  const err = document.getElementById('err3');
+  err.classList.remove('show');
+  btn.disabled = true;
+
+  const col = getColaborador();
+  const selected = TERMOS.filter(t => selectedTermos.has(t.id));
+
+  showLoading();
+  setStep(1,'active'); setStep(2,''); setStep(3,''); setStep(4,'');
+
+  let pdfBase64;
+  try {
+    pdfBase64 = gerarPDF(col, selected);
+    setStep(1,'done'); setStep(2,'active');
+  } catch(e) {
+    hideLoading();
+    err.textContent = 'Erro ao gerar PDF: ' + e.message;
+    err.classList.add('show');
+    btn.disabled = false;
+    return;
+  }
+
+  const fileName = `Admissao_${col.nome.split(' ')[0]}_${col.data}.pdf`;
+
+  try {
+    const resp = await fetch(BACKEND_URL, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        colaborador: { nome: col.nome, cpf: col.cpf, email: col.email, cargo: col.cargo, setor: col.setor, loja: col.loja, data: col.data },
+        documento: { nome: fileName, pdf_base64: pdfBase64 }
+      })
+    });
+
+    setStep(2,'done'); setStep(3,'active');
+    await new Promise(r => setTimeout(r, 1000));
+    setStep(3,'done'); setStep(4,'active');
+
+    const data = await resp.json();
+    setStep(4, resp.ok ? 'done' : '');
+
+    if (!resp.ok) {
+      hideLoading();
+      const detail = data.detail ? JSON.stringify(data.detail) : data.error;
+      err.textContent = `Erro ao enviar (${resp.status}): ${detail}`;
+      err.classList.add('show');
+      btn.disabled = false;
+      return;
+    }
+
+    await new Promise(r => setTimeout(r, 600));
+    hideLoading();
+    showSuccess(data.link || null);
+
+  } catch(e) {
+    hideLoading();
+    err.textContent = 'Erro de conexão com o servidor. Verifique se o backend está online.';
+    err.classList.add('show');
+    btn.disabled = false;
+  }
+}
+
+// ═══════════════════════════════════════════
+// RESET
+// ═══════════════════════════════════════════
+function resetForm() {
+  document.getElementById('ov-success').classList.remove('show');
+  document.getElementById('f-nome').value = '';
+  document.getElementById('f-cpf').value = '';
+  document.getElementById('f-email').value = '';
+  document.getElementById('f-cargo').value = '';
+  document.getElementById('f-setor').value = '';
+  document.getElementById('f-loja').value = '';
+  document.getElementById('f-data').value = new Date().toISOString().split('T')[0];
+  selectedTermos = new Set(['ponto','sigilo']);
+  renderTermos();
+  document.getElementById('btn-enviar').disabled = false;
+  showStep(1);
+}
+</script>
+</body>
+</html>
