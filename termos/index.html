@@ -225,31 +225,42 @@ const BACKEND_URL = 'https://mrcapas-clicksign-server.onrender.com/enviar';
 // ═══ MAPEAMENTO DE EMPRESAS ═══
 const EMPRESAS = {
   'SR. CAPAS (SAQUAREMA)': {
-    nomeFantasia: 'SR. CAPAS',
     razaoSocial: 'Família Guerra Bacaxá Comércio e Prestadora de Serviços Ltda',
     grupo: 'GRUPO ECONÔMICO FAMÍLIA GUERRA',
     representante: 'Leandro Guerra Marino Fiuza de Castro'
   },
   'ESCRITÓRIO': {
-    nomeFantasia: 'ESCRITÓRIO',
     razaoSocial: 'Família Guerra Comércio e Prestadora de Serviços Ltda',
     grupo: 'GRUPO ECONÔMICO FAMÍLIA GUERRA',
     representante: 'Leandro Guerra Marino Fiuza de Castro'
   },
   'LEANDRO GUERRA SOFTWARE E TECNOLOGIA LTDA': {
-    nomeFantasia: 'LG SOFTWARE',
     razaoSocial: 'Leandro Guerra Software e Tecnologia Ltda',
     grupo: 'GRUPO ECONÔMICO FAMÍLIA GUERRA',
     representante: 'Leandro Guerra Marino Fiuza de Castro'
   }
 };
 function getEmpresa(loja) {
-  return EMPRESAS[loja] || { nomeFantasia: loja, razaoSocial: loja, grupo: 'GRUPO ECONÔMICO FAMÍLIA GUERRA', representante: 'Leandro Guerra Marino Fiuza de Castro' };
+  return EMPRESAS[loja] || { razaoSocial: loja, grupo: 'GRUPO ECONÔMICO FAMÍLIA GUERRA', representante: 'Leandro Guerra Marino Fiuza de Castro' };
 }
 function atualizarEmpresa() {
   const loja = document.getElementById('f-loja').value;
+  if (!loja) return;
   const emp = getEmpresa(loja);
-  document.getElementById('topbar-title').textContent = emp.nomeFantasia ? emp.nomeFantasia + ' — Sistema de Termos' : 'Sistema de Termos';
+
+  // Topbar
+  document.getElementById('topbar-title').textContent = emp.razaoSocial + ' — Sistema de Termos';
+
+  // Subtítulo do formulário
+  document.querySelector('#step1 .section-sub').textContent =
+    'Preencha as informações do novo colaborador de ' + emp.razaoSocial + '.';
+
+  // Footer
+  document.getElementById('footer-txt').textContent =
+    emp.razaoSocial + ' · Sistema Interno';
+
+  // Título da página
+  document.title = 'Termos de Admissão — ' + emp.razaoSocial;
 }
 
 // ═══ TERMOS ═══
@@ -260,7 +271,7 @@ const TERMOS = [
 CONTRATANTE: ${emp.razaoSocial}, representada por seu Sócio-Administrador ${emp.representante}.
 COLABORADOR: conforme identificado neste documento.
 
-Pelo presente instrumento, o(a) colaborador(a) declara ter tomado pleno conhecimento das normas e procedimentos relativos ao controle de jornada de trabalho adotados pela empresa ${emp.nomeFantasia}, conforme estabelecido pela Portaria MTE nº 671/2021.
+Pelo presente instrumento, o(a) colaborador(a) declara ter tomado pleno conhecimento das normas e procedimentos relativos ao controle de jornada de trabalho adotados pela empresa ${emp.razaoSocial}, conforme estabelecido pela Portaria MTE nº 671/2021.
 
 OBRIGAÇÕES DO COLABORADOR:
 1. Registrar obrigatoriamente os horários de entrada, intervalo para refeição/descanso e saída em todos os dias trabalhados, utilizando o sistema eletrônico de controle de ponto disponibilizado pela empresa.
@@ -277,7 +288,7 @@ O descumprimento das obrigações acima poderá implicar em: desconto dos perío
 CONTRATANTE: ${emp.razaoSocial}, representada por seu Sócio-Administrador ${emp.representante}.
 SIGNATÁRIO: conforme identificado neste documento.
 
-Pelo presente instrumento, o(a) colaborador(a) se compromete a guardar absoluto sigilo sobre todas as informações confidenciais às quais tiver acesso em razão do exercício de suas atividades profissionais na empresa ${emp.nomeFantasia}.
+Pelo presente instrumento, o(a) colaborador(a) se compromete a guardar absoluto sigilo sobre todas as informações confidenciais às quais tiver acesso em razão do exercício de suas atividades profissionais na empresa ${emp.razaoSocial}.
 
 INFORMAÇÕES CONFIDENCIAIS incluem, mas não se limitam a:
 • Dados de clientes (nome, CPF, endereço, histórico de compras, contatos);
@@ -300,7 +311,7 @@ VIGÊNCIA: As obrigações deste compromisso vigoram durante toda a relação de
 
 CONTRATANTE: ${emp.razaoSocial}, representada por seu Sócio-Administrador ${emp.representante}.
 
-Pelo presente instrumento, o(a) colaborador(a) autoriza, de forma expressa e sem ônus adicional, o uso de sua imagem, voz e demais manifestações de sua personalidade pela empresa ${emp.nomeFantasia}, integrante do ${emp.grupo}.
+Pelo presente instrumento, o(a) colaborador(a) autoriza, de forma expressa e sem ônus adicional, o uso de sua imagem, voz e demais manifestações de sua personalidade pela empresa ${emp.razaoSocial}, integrante do ${emp.grupo}.
 
 A presente autorização abrange:
 • Fotografias e vídeos realizados no ambiente de trabalho ou em eventos promovidos pela empresa;
@@ -319,7 +330,7 @@ DISPOSIÇÕES GERAIS:
 
 CONTRATANTE: ${emp.razaoSocial}, representada por seu Sócio-Administrador ${emp.representante}.
 
-Pelo presente instrumento, o(a) colaborador(a) declara estar ciente de suas responsabilidades relativas ao controle de estoque e mercadorias da unidade ${emp.nomeFantasia} em que exerce suas atividades.
+Pelo presente instrumento, o(a) colaborador(a) declara estar ciente de suas responsabilidades relativas ao controle de estoque e mercadorias da unidade ${emp.razaoSocial} em que exerce suas atividades.
 
 RESPONSABILIDADES DO COLABORADOR:
 1. Zelar pela integridade, conservação e organização das mercadorias sob sua guarda ou manuseio;
@@ -338,7 +349,7 @@ Os descontos autorizados observarão os limites legais, não podendo ultrapassar
 
 CONTRATANTE: ${emp.razaoSocial}, representada por seu Sócio-Administrador ${emp.representante}.
 
-Pelo presente instrumento, o(a) colaborador(a) declara ter sido informado(a) acerca das condições relacionadas ao deslocamento durante o período de treinamento inicial na empresa ${emp.nomeFantasia}.
+Pelo presente instrumento, o(a) colaborador(a) declara ter sido informado(a) acerca das condições relacionadas ao deslocamento durante o período de treinamento inicial na empresa ${emp.razaoSocial}.
 
 CONDIÇÕES DE DESLOCAMENTO:
 1. Durante o período de treinamento em unidade diversa da contratada, o colaborador terá direito ao reembolso das despesas de transporte público (ônibus, metrô, trem), mediante apresentação de comprovantes;
@@ -351,7 +362,7 @@ CONDIÇÕES DE DESLOCAMENTO:
 
 CONTRATANTE: ${emp.razaoSocial}, representada por seu Sócio-Administrador ${emp.representante}.
 
-Pelo presente instrumento, o(a) colaborador(a) certifica ter concluído com aproveitamento o treinamento em aplicação de películas protetoras de tela (hydrogel) ministrado pela empresa ${emp.nomeFantasia}.
+Pelo presente instrumento, o(a) colaborador(a) certifica ter concluído com aproveitamento o treinamento em aplicação de películas protetoras de tela (hydrogel) ministrado pela empresa ${emp.razaoSocial}.
 
 CONTEÚDO ABORDADO NO TREINAMENTO:
 1. Tipos e especificações das películas hydrogel (espessura, flexibilidade, resistência);
@@ -369,7 +380,7 @@ O colaborador declara que participou integralmente do treinamento e está apto(a
 
 CONTRATANTE: ${emp.razaoSocial}, representada por seu Sócio-Administrador ${emp.representante}.
 
-Pelo presente instrumento, o(a) colaborador(a), devidamente treinado(a) na aplicação de películas protetoras de tela hydrogel, declara estar ciente de suas responsabilidades na prestação deste serviço aos clientes da ${emp.nomeFantasia}.
+Pelo presente instrumento, o(a) colaborador(a), devidamente treinado(a) na aplicação de películas protetoras de tela hydrogel, declara estar ciente de suas responsabilidades na prestação deste serviço aos clientes da ${emp.razaoSocial}.
 
 RESPONSABILIDADES DO APLICADOR:
 1. Inspecionar o dispositivo do cliente antes da aplicação, registrando qualquer dano pré-existente;
@@ -388,7 +399,7 @@ NÃO SE INCLUI NA GARANTIA:
 
 CONTRATANTE: ${emp.razaoSocial}, representada por seu Sócio-Administrador ${emp.representante}.
 
-Pelo presente instrumento, a empresa ${emp.nomeFantasia} registra a entrega de aparelho celular corporativo ao(à) colaborador(a) abaixo identificado(a), para uso exclusivo nas atividades profissionais.
+Pelo presente instrumento, a empresa ${emp.razaoSocial} registra a entrega de aparelho celular corporativo ao(à) colaborador(a) abaixo identificado(a), para uso exclusivo nas atividades profissionais.
 
 IDENTIFICAÇÃO DO DISPOSITIVO:
 Modelo: _________________________
@@ -398,7 +409,7 @@ Condição na entrega: ☐ Novo  ☐ Recondicionado  ☐ Usado com boas condiç�
 Acessórios entregues: ☐ Carregador  ☐ Cabo  ☐ Capa protetora  ☐ Película
 
 OBRIGAÇÕES DO COLABORADOR:
-1. Utilizar o aparelho exclusivamente para fins profissionais relacionados às atividades na ${emp.nomeFantasia};
+1. Utilizar o aparelho exclusivamente para fins profissionais relacionados às atividades na ${emp.razaoSocial};
 2. Zelar pela conservação, não submetendo o dispositivo a riscos desnecessários;
 3. Não instalar aplicativos sem autorização ou que comprometam a segurança do dispositivo;
 4. Reportar imediatamente qualquer dano, perda ou furto ao responsável da unidade;
@@ -524,11 +535,13 @@ function gerarPDF(col, termosSelected){
   doc.setFillColor(8,8,8);doc.rect(0,0,W,297,'F');
   doc.setDrawColor(201,146,42);doc.setLineWidth(.5);
   doc.line(ml,40,W-mr,40);doc.line(ml,257,W-mr,257);
-  doc.setTextColor(201,146,42);doc.setFont('helvetica','bold');doc.setFontSize(22);
-  doc.text(emp.nomeFantasia,W/2,55,{align:'center'});
-  doc.setFontSize(10);doc.setTextColor(200,190,175);doc.setFont('helvetica','normal');
-  doc.text(emp.razaoSocial,W/2,63,{align:'center'});
-  doc.setFontSize(9);doc.text(emp.grupo,W/2,71,{align:'center'});
+  // Título da capa: razão social (pode ser longa, usa splitTextToSize)
+  doc.setTextColor(201,146,42);doc.setFont('helvetica','bold');doc.setFontSize(14);
+  const titleLines=doc.splitTextToSize(emp.razaoSocial,tw-10);
+  let titleY=52;
+  titleLines.forEach(line=>{doc.text(line,W/2,titleY,{align:'center'});titleY+=8;});
+  doc.setFontSize(9);doc.setTextColor(200,190,175);doc.setFont('helvetica','normal');
+  doc.text(emp.grupo,W/2,titleY+2,{align:'center'});
   doc.setFontSize(16);doc.setTextColor(245,240,232);doc.setFont('helvetica','bold');
   doc.text('TERMOS DE ADMISSÃO',W/2,90,{align:'center'});
   doc.setDrawColor(201,146,42);doc.setLineWidth(.3);doc.line(70,96,140,96);
@@ -553,7 +566,7 @@ function gerarPDF(col, termosSelected){
     doc.text(t.nome,ml+7,y);y+=8;
   });
   doc.setFontSize(7);doc.setTextColor(100,90,70);
-  doc.text(`Representante: ${emp.representante} · Gerado em: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}`,W/2,265,{align:'center'});
+  doc.text(`Representante: ${emp.representante} · ${new Date().toLocaleDateString('pt-BR')}`,W/2,265,{align:'center'});
 
   // Páginas dos termos
   termosSelected.forEach(termo=>{
@@ -562,7 +575,8 @@ function gerarPDF(col, termosSelected){
     doc.setFillColor(15,15,15);doc.rect(0,0,W,28,'F');
     doc.setDrawColor(201,146,42);doc.setLineWidth(.5);doc.line(0,28,W,28);
     doc.setFontSize(8);doc.setTextColor(160,140,100);doc.setFont('helvetica','normal');
-    doc.text(emp.nomeFantasia+' · TERMO DE ADMISSÃO',ml,12);
+    const shortName=emp.razaoSocial.length>50?emp.razaoSocial.substring(0,50)+'...':emp.razaoSocial;
+    doc.text(shortName+' · TERMO DE ADMISSÃO',ml,12);
     doc.setFontSize(11);doc.setTextColor(201,146,42);doc.setFont('helvetica','bold');
     doc.text(termo.nome.toUpperCase(),ml,22);
     doc.setFontSize(8);doc.setTextColor(160,140,100);doc.setFont('helvetica','normal');
@@ -576,7 +590,8 @@ function gerarPDF(col, termosSelected){
         doc.addPage();
         doc.setFillColor(15,15,15);doc.rect(0,0,W,20,'F');
         doc.setFontSize(8);doc.setTextColor(100,90,70);
-        doc.text(emp.nomeFantasia+' · '+termo.nome.toUpperCase()+' (continuação)',ml,13);
+        const sName=emp.razaoSocial.length>40?emp.razaoSocial.substring(0,40)+'...':emp.razaoSocial;
+        doc.text(sName+' · '+termo.nome.toUpperCase()+' (continuação)',ml,13);
         doc.setDrawColor(201,146,42);doc.setLineWidth(.3);doc.line(0,20,W,20);
         y=30;doc.setFontSize(9.5);doc.setTextColor(220,210,190);doc.setFont('helvetica','normal');
       }
@@ -593,7 +608,7 @@ function gerarPDF(col, termosSelected){
     doc.text('Data e Local',W-mr-70,y+5);
     doc.text(`${formatDate(col.data)} · ${col.loja}`,W-mr-70,y+10);
     doc.setFontSize(7);doc.setTextColor(80,70,50);
-    doc.text('Documento gerado pelo Sistema de Termos '+emp.nomeFantasia+' · '+emp.grupo,W/2,287,{align:'center'});
+    doc.text('Documento gerado pelo Sistema de Termos · '+emp.razaoSocial,W/2,287,{align:'center'});
   });
   return doc.output('datauristring').split(',')[1];
 }
@@ -682,7 +697,8 @@ async function enviar(){
     err.classList.add('show');btn.disabled=false;return;
   }
   const emp=getEmpresa(col.loja);
-  const fileName=`Admissao_${emp.nomeFantasia.replace(/\s/g,'_')}_${col.nome.split(' ')[0]}_${col.data}.pdf`;
+  const empSlug=emp.razaoSocial.split(' ').slice(0,3).join('_');
+  const fileName=`Admissao_${empSlug}_${col.nome.split(' ')[0]}_${col.data}.pdf`;
   try{
     const resp=await fetch(BACKEND_URL,{
       method:'POST',headers:{'Content-Type':'application/json'},
