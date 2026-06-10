@@ -265,17 +265,15 @@
   <div class="overlay-card">
     <div class="overlay-icon">✅</div>
     <div class="overlay-title">Documento Enviado!</div>
-    <div class="overlay-msg">Envelope criado e signatário notificado pelo ClickSign.</div>
-    <div id="ov-notify-status" style="background:#1a1a1a;border:1px solid rgba(201,146,42,.18);border-radius:8px;padding:1rem;margin:1rem 0;text-align:left">
-      <div id="ov-email-status" style="font-size:.8rem;color:var(--white);display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem">
-        <span style="color:#4caf82;font-size:1rem">✓</span> Email enviado automaticamente pelo ClickSign
-      </div>
-      <div id="ov-whatsapp-status" style="font-size:.8rem;color:var(--muted);display:flex;align-items:center;gap:.5rem;display:none">
-        <span style="color:#25D366;font-size:1rem">✓</span> <span id="ov-whatsapp-text">WhatsApp enviado automaticamente</span>
-      </div>
+    <div class="overlay-msg">Email enviado automaticamente. Use o botão abaixo para também enviar pelo WhatsApp.</div>
+    <div id="ov-link-box" style="background:#1a1a1a;border:1px solid rgba(201,146,42,.25);border-radius:6px;padding:.75rem 1rem;margin:1rem 0;display:none">
+      <div style="font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(245,240,232,.4);margin-bottom:.35rem">Link de Assinatura</div>
+      <div id="ov-link-text" style="font-size:.72rem;color:#C9922A;word-break:break-all;line-height:1.5"></div>
     </div>
-    <div style="display:flex;flex-direction:column;gap:.6rem;margin-top:.5rem">
-      <button class="btn-secondary" id="btn-reenviar" onclick="reenviarNotificacao()" style="display:none">↺ Reenviar Notificação</button>
+    <div style="display:flex;flex-direction:column;gap:.6rem;margin-top:.75rem">
+      <button class="btn-primary" id="btn-whatsapp" onclick="enviarWhatsApp()" style="background:#25D366;display:none">📱 Enviar por WhatsApp</button>
+      <button class="btn-secondary" id="btn-copiar" onclick="copiarLink()" style="display:none">📋 Copiar Link</button>
+      <button class="btn-secondary" id="btn-reenviar" onclick="reenviarNotificacao()" style="display:none">↺ Reenviar Email</button>
       <a href="#" id="ov-envelope-link" class="overlay-link" target="_blank" style="display:none">Ver envelope no ClickSign →</a>
     </div>
     <div class="btn-row" style="justify-content:center;margin-top:1.25rem">
@@ -850,26 +848,25 @@ function showLoading() {
 function hideLoading() {
   document.getElementById('ov-loading').classList.remove('show');
 }
+let _signingLink = null;
 let _envelopeId = null;
 let _envelopeLink = null;
 let _signerNome = null;
 let _signerPhone = null;
 
 function showSuccess(data, col) {
+  _signingLink = data.link || null;
   _envelopeId = data.envelopeId || null;
   _envelopeLink = data.envelopeLink || null;
   _signerNome = col ? col.nome.split(' ')[0] : 'Colaborador';
   _signerPhone = col ? col.telefone : null;
 
-  // Mostrar status de WhatsApp se telefone foi fornecido
-  const waStatus = document.getElementById('ov-whatsapp-status');
-  if (data.whatsappSent && _signerPhone) {
-    waStatus.style.display = 'flex';
-    document.getElementById('ov-whatsapp-text').textContent =
-      'WhatsApp enviado automaticamente para (' + _signerPhone.slice(0,2) + ') ' + _signerPhone.slice(2,7) + '-' + _signerPhone.slice(7);
+  if (_signingLink) {
+    document.getElementById('ov-link-text').textContent = _signingLink;
+    document.getElementById('ov-link-box').style.display = 'block';
+    document.getElementById('btn-whatsapp').style.display = 'block';
+    document.getElementById('btn-copiar').style.display = 'block';
   }
-
-  // Botão reenviar e link ClickSign
   document.getElementById('btn-reenviar').style.display = 'block';
   const envLink = document.getElementById('ov-envelope-link');
   if (_envelopeLink) {
@@ -877,6 +874,28 @@ function showSuccess(data, col) {
     envLink.style.display = 'inline-block';
   }
   document.getElementById('ov-success').classList.add('show');
+}
+
+function copiarLink() {
+  if (!_signingLink) return;
+  navigator.clipboard.writeText(_signingLink).then(() => {
+    const btn = document.getElementById('btn-copiar');
+    const orig = btn.textContent;
+    btn.textContent = '✅ Copiado!';
+    setTimeout(() => btn.textContent = orig, 2000);
+  });
+}
+
+function enviarWhatsApp() {
+  const link = _signingLink;
+  if (!link) return;
+  const msg = 'Olá ' + _signerNome + '! Seguem seus documentos de admissão na MR. CAPAS para assinatura digital.\n\n' +
+    'Acesse o link abaixo para assinar (será necessário tirar uma selfie):\n\n' + link +
+    '\n\nQualquer dúvida entre em contato. MR. CAPAS 🤝';
+  const phone = _signerPhone && _signerPhone.length >= 10 ? '55' + _signerPhone : '';
+  const url = phone ? 'https://wa.me/' + phone + '?text=' + encodeURIComponent(msg)
+                    : 'https://wa.me/?text=' + encodeURIComponent(msg);
+  window.open(url, '_blank');
 }
 
 async function reenviarNotificacao() {
