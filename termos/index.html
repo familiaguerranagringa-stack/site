@@ -265,11 +265,24 @@
   <div class="overlay-card">
     <div class="overlay-icon">✅</div>
     <div class="overlay-title">Documento Enviado!</div>
-    <div class="overlay-msg">Email enviado automaticamente. Use o botão abaixo para também enviar pelo WhatsApp.</div>
+    <div class="overlay-msg">Email enviado automaticamente pelo ClickSign. O link de assinatura ativa em instantes.</div>
+
+    <!-- Countdown bar -->
+    <div id="ov-countdown-wrap" style="margin:1rem 0;display:none">
+      <div style="font-size:.65rem;color:var(--muted);text-align:center;margin-bottom:.5rem">
+        Aguardando link ativar... <span id="ov-countdown-num" style="color:var(--gold);font-weight:600">60</span>s
+      </div>
+      <div style="background:#1a1a1a;border-radius:4px;height:4px;overflow:hidden">
+        <div id="ov-countdown-bar" style="height:100%;background:var(--gold);width:100%;transition:width 1s linear"></div>
+      </div>
+    </div>
+
+    <!-- Link box (shown after countdown) -->
     <div id="ov-link-box" style="background:#1a1a1a;border:1px solid rgba(201,146,42,.25);border-radius:6px;padding:.75rem 1rem;margin:1rem 0;display:none">
       <div style="font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(245,240,232,.4);margin-bottom:.35rem">Link de Assinatura</div>
       <div id="ov-link-text" style="font-size:.72rem;color:#C9922A;word-break:break-all;line-height:1.5"></div>
     </div>
+
     <div style="display:flex;flex-direction:column;gap:.6rem;margin-top:.75rem">
       <button class="btn-primary" id="btn-whatsapp" onclick="enviarWhatsApp()" style="background:#25D366;display:none">📱 Enviar por WhatsApp</button>
       <button class="btn-secondary" id="btn-copiar" onclick="copiarLink()" style="display:none">📋 Copiar Link</button>
@@ -874,6 +887,30 @@ function showSuccess(data, col) {
     envLink.style.display = 'inline-block';
   }
   document.getElementById('ov-success').classList.add('show');
+  // Inicia countdown de 60s para ativar o link
+  if (_signingLink) iniciarCountdown();
+}
+
+function iniciarCountdown() {
+  const wrap = document.getElementById('ov-countdown-wrap');
+  const num = document.getElementById('ov-countdown-num');
+  const bar = document.getElementById('ov-countdown-bar');
+  wrap.style.display = 'block';
+  let t = 60;
+  num.textContent = t;
+  const iv = setInterval(() => {
+    t--;
+    num.textContent = t;
+    bar.style.width = (t / 60 * 100) + '%';
+    if (t <= 0) {
+      clearInterval(iv);
+      wrap.style.display = 'none';
+      // Link e botões liberados
+      document.getElementById('ov-link-box').style.display = 'block';
+      document.getElementById('btn-whatsapp').style.display = 'block';
+      document.getElementById('btn-copiar').style.display = 'block';
+    }
+  }, 1000);
 }
 
 function copiarLink() {
