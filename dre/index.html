@@ -1,0 +1,1145 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DRE Mensal · Grupo Família Guerra</title>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:          #080808;
+      --bg-card:     #111111;
+      --bg-hover:    #161616;
+      --bg-section:  #0D0D0D;
+      --bg-sub:      #161616;
+      --border:      #242424;
+      --border-lite: #1C1C1C;
+      --gold:        #C9A850;
+      --gold-lt:     #E8D080;
+      --gold-dim:    #6A5520;
+      --gold-bg:     #1A1400;
+      --text:        #EBEBEB;
+      --muted:       #8A8A8A;
+      --dim:         #444444;
+      --green:       #4ADE80;
+      --red:         #F87171;
+      --blue:        #7FB8C9;
+      --teal:        #7FC9A8;
+    }
+
+    html, body {
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Sans', system-ui, sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ─── LOGIN ─────────────────────────────────────────── */
+    #login-overlay {
+      position: fixed; inset: 0;
+      background: var(--bg);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 200;
+    }
+
+    .login-card {
+      width: 340px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-top: 3px solid var(--gold);
+      border-radius: 10px;
+      padding: 40px 32px 32px;
+    }
+
+    .login-eyebrow {
+      font-family: 'Syne', sans-serif;
+      font-size: 10px; font-weight: 700;
+      letter-spacing: 0.24em; color: var(--gold);
+      text-transform: uppercase; margin-bottom: 6px;
+    }
+
+    .login-title {
+      font-family: 'Syne', sans-serif;
+      font-size: 26px; font-weight: 800;
+      color: var(--text); margin-bottom: 32px;
+      line-height: 1.15;
+    }
+
+    .field-wrap { margin-bottom: 16px; }
+
+    .field-wrap label {
+      display: block;
+      font-size: 11px; font-weight: 500;
+      letter-spacing: 0.11em; text-transform: uppercase;
+      color: var(--muted); margin-bottom: 7px;
+    }
+
+    .field-wrap input {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 14px;
+      padding: 10px 14px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    .field-wrap input:focus { border-color: var(--gold); }
+
+    .login-err {
+      font-size: 12px; color: var(--red);
+      margin-bottom: 10px; display: none;
+    }
+
+    .btn-primary {
+      width: 100%;
+      background: var(--gold); color: #000;
+      font-family: 'Syne', sans-serif;
+      font-size: 12px; font-weight: 700;
+      letter-spacing: 0.13em; text-transform: uppercase;
+      border: none; border-radius: 6px;
+      padding: 13px; cursor: pointer;
+      transition: background 0.15s; margin-top: 6px;
+    }
+    .btn-primary:hover { background: var(--gold-lt); }
+
+    /* ─── APP ────────────────────────────────────────────── */
+    #app { display: none; flex-direction: column; min-height: 100vh; }
+    #app.on { display: flex; }
+
+    /* HEADER */
+    .app-hdr {
+      height: 56px;
+      background: var(--bg-card);
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center;
+      padding: 0 20px; gap: 18px;
+      position: sticky; top: 0; z-index: 100;
+      flex-shrink: 0;
+    }
+
+    .hdr-back {
+      font-size: 12px; color: var(--muted);
+      text-decoration: none;
+      display: flex; align-items: center; gap: 5px;
+      transition: color 0.15s; white-space: nowrap;
+    }
+    .hdr-back:hover { color: var(--gold); }
+
+    .hdr-sep { width: 1px; height: 18px; background: var(--border); }
+
+    .hdr-brand {
+      font-family: 'Syne', sans-serif;
+      font-size: 11px; font-weight: 700;
+      letter-spacing: 0.16em; color: var(--gold);
+      text-transform: uppercase; white-space: nowrap;
+    }
+
+    .hdr-module {
+      font-family: 'Syne', sans-serif;
+      font-size: 14px; font-weight: 600;
+      color: var(--text); white-space: nowrap;
+    }
+
+    .hdr-space { flex: 1; }
+
+    .period-wrap {
+      display: flex; align-items: center; gap: 8px;
+    }
+
+    .period-wrap label {
+      font-size: 11px; letter-spacing: 0.1em;
+      text-transform: uppercase; color: var(--muted);
+    }
+
+    .period-wrap select {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 5px; color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 13px; padding: 5px 9px;
+      outline: none; cursor: pointer;
+    }
+    .period-wrap select:focus { border-color: var(--gold); }
+
+    .btn-ghost {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 12px; padding: 6px 12px;
+      border-radius: 5px; cursor: pointer;
+      transition: all 0.15s; white-space: nowrap;
+    }
+    .btn-ghost:hover { border-color: var(--gold); color: var(--gold); }
+
+    .btn-text {
+      background: none; border: none;
+      color: var(--dim); font-size: 12px;
+      font-family: 'DM Sans', sans-serif;
+      cursor: pointer; padding: 6px 8px;
+      transition: color 0.15s;
+    }
+    .btn-text:hover { color: var(--red); }
+
+    /* COMPANY TABS */
+    .co-tabs {
+      background: var(--bg-card);
+      border-bottom: 1px solid var(--border);
+      display: flex; padding: 0 20px;
+      overflow-x: auto; flex-shrink: 0;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+    .co-tabs::-webkit-scrollbar { display: none; }
+
+    .co-tab {
+      position: relative;
+      padding: 12px 22px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 12px; font-weight: 500;
+      color: var(--muted); cursor: pointer;
+      white-space: nowrap; border: none;
+      background: none; transition: color 0.15s;
+      user-select: none; text-align: left;
+    }
+
+    .co-tab .tab-name {
+      font-family: 'Syne', sans-serif;
+      font-size: 11px; font-weight: 700;
+      letter-spacing: 0.1em; text-transform: uppercase;
+      display: block;
+    }
+
+    .co-tab .tab-sub {
+      font-size: 10px; color: var(--dim);
+      display: block; margin-top: 2px;
+    }
+
+    .co-tab::after {
+      content: '';
+      position: absolute; bottom: 0; left: 0; right: 0;
+      height: 2px; background: var(--gold);
+      transform: scaleX(0); transition: transform 0.2s;
+    }
+
+    .co-tab.active { color: var(--text); }
+    .co-tab.active::after { transform: scaleX(1); }
+    .co-tab.active .tab-sub { color: var(--muted); }
+    .co-tab:hover { color: var(--text); }
+
+    /* BODY */
+    .app-body {
+      display: flex; flex: 1; min-height: 0; overflow: hidden;
+    }
+
+    /* DRE AREA */
+    .dre-area {
+      flex: 1; overflow-y: auto; padding: 26px 22px 56px;
+    }
+
+    .dre-top {
+      display: flex; align-items: flex-end;
+      justify-content: space-between; margin-bottom: 28px;
+    }
+
+    .dre-co-name {
+      font-size: 11px; font-weight: 500;
+      letter-spacing: 0.13em; text-transform: uppercase;
+      color: var(--gold); margin-bottom: 5px;
+    }
+
+    .dre-period-label {
+      font-family: 'Syne', sans-serif;
+      font-size: 24px; font-weight: 800;
+      color: var(--text); line-height: 1;
+    }
+
+    .save-ind {
+      font-size: 12px; color: var(--dim);
+      transition: color 0.3s; align-self: flex-end;
+    }
+
+    /* DRE ROW BASE */
+    .dre-rows { width: 100%; }
+
+    .dre-row {
+      display: flex; align-items: stretch;
+      border-bottom: 1px solid var(--border-lite);
+    }
+
+    .row-lbl {
+      flex: 1; padding: 0 16px;
+      display: flex; align-items: center;
+      gap: 8px; font-size: 13px; color: var(--text);
+    }
+
+    .row-val {
+      width: 192px; min-width: 192px;
+      display: flex; align-items: center;
+      justify-content: flex-end;
+      padding: 0 16px; font-size: 13px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Header row */
+    .dre-row.is-hdr {
+      background: var(--bg-section);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      margin-top: 12px;
+    }
+    .dre-row.is-hdr:first-child { margin-top: 0; }
+
+    .dre-row.is-hdr .row-lbl {
+      padding: 10px 16px;
+      font-family: 'Syne', sans-serif;
+      font-size: 10px; font-weight: 700;
+      letter-spacing: 0.22em; color: var(--gold);
+      text-transform: uppercase;
+    }
+
+    .dre-row.is-hdr .row-lbl::before {
+      content: '';
+      width: 3px; height: 14px;
+      background: var(--gold); border-radius: 2px;
+      flex-shrink: 0;
+    }
+
+    /* Input row */
+    .dre-row.is-input { min-height: 42px; }
+    .dre-row.is-input:hover { background: var(--bg-hover); }
+
+    .row-sign {
+      font-size: 12px; font-weight: 600;
+      width: 14px; flex-shrink: 0; line-height: 1;
+    }
+    .s-pos { color: var(--green); }
+    .s-neg { color: var(--red); }
+
+    .dre-input {
+      width: 100%; background: transparent;
+      border: none; border-bottom: 1px dashed #2C2C2C;
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 13px; font-variant-numeric: tabular-nums;
+      text-align: right; padding: 6px 0;
+      outline: none; transition: border-color 0.15s;
+    }
+    .dre-input::placeholder { color: var(--dim); }
+    .dre-input:focus { border-bottom: 1px solid var(--gold); }
+    .dre-input.filled { border-bottom-color: #3C3C3C; }
+
+    /* Calc row */
+    .dre-row.is-calc {
+      background: var(--bg-section); min-height: 36px;
+    }
+    .dre-row.is-calc .row-lbl {
+      font-size: 11px; font-weight: 500;
+      text-transform: uppercase; letter-spacing: 0.07em;
+      color: var(--muted); padding: 8px 16px 8px 28px;
+    }
+    .dre-row.is-calc .row-val {
+      font-size: 12px; font-weight: 500;
+    }
+
+    /* Subtotal row */
+    .dre-row.is-sub {
+      background: var(--bg-sub);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      min-height: 46px;
+    }
+    .dre-row.is-sub .row-lbl {
+      font-family: 'Syne', sans-serif;
+      font-size: 11px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.09em;
+      color: var(--text);
+    }
+    .dre-row.is-sub .row-val {
+      font-family: 'Syne', sans-serif;
+      font-size: 15px; font-weight: 700;
+    }
+    .dre-row.is-sub.hl {
+      background: linear-gradient(90deg, #1A1600, #181400);
+    }
+
+    /* Final row */
+    .dre-row.is-final {
+      background: linear-gradient(90deg, #1A1500, #1C1700);
+      border-top: 1px solid var(--gold-dim);
+      border-bottom: 1px solid var(--gold-dim);
+      min-height: 58px; margin-top: 10px;
+    }
+    .dre-row.is-final .row-lbl {
+      font-family: 'Syne', sans-serif;
+      font-size: 12px; font-weight: 800;
+      text-transform: uppercase; letter-spacing: 0.11em;
+      color: var(--gold);
+    }
+    .dre-row.is-final .row-val {
+      font-family: 'Syne', sans-serif;
+      font-size: 21px; font-weight: 800;
+    }
+
+    /* value color classes */
+    .v-pos  { color: var(--green); }
+    .v-neg  { color: var(--red); }
+    .v-zero { color: var(--dim); }
+    .v-neu  { color: var(--text); }
+
+    /* SIDEBAR */
+    .sidebar {
+      width: 256px; min-width: 256px;
+      background: var(--bg-card);
+      border-left: 1px solid var(--border);
+      padding: 24px 18px;
+      overflow-y: auto;
+      display: flex; flex-direction: column;
+    }
+
+    .sb-ttl {
+      font-family: 'Syne', sans-serif;
+      font-size: 10px; font-weight: 700;
+      letter-spacing: 0.22em; color: var(--gold);
+      text-transform: uppercase; margin-bottom: 22px;
+    }
+
+    .sb-metric { margin-bottom: 18px; }
+
+    .sb-lbl {
+      font-size: 10px; letter-spacing: 0.1em;
+      text-transform: uppercase; color: var(--muted);
+      margin-bottom: 4px;
+    }
+
+    .sb-val {
+      font-family: 'Syne', sans-serif;
+      font-size: 20px; font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      line-height: 1.1;
+    }
+
+    .sb-pct {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 11px; color: var(--muted);
+      font-weight: 400; margin-left: 5px;
+    }
+
+    .sb-sep { height: 1px; background: var(--border); margin: 16px 0; }
+
+    .sb-note-ttl {
+      font-size: 10px; letter-spacing: 0.1em;
+      text-transform: uppercase; color: var(--muted);
+      margin-bottom: 8px; margin-top: 4px;
+    }
+
+    .notes-ta {
+      width: 100%;
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: 6px; color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 12px; padding: 10px;
+      resize: vertical; min-height: 80px;
+      outline: none; line-height: 1.5;
+    }
+    .notes-ta::placeholder { color: var(--dim); }
+    .notes-ta:focus { border-color: var(--gold); }
+
+    /* ─── CONSOLIDATED TABLE ─────────────────────────────── */
+    .cons-wrap { overflow-x: auto; }
+
+    .cons-tbl {
+      width: 100%; border-collapse: collapse;
+      font-size: 13px; min-width: 640px;
+    }
+
+    .cons-tbl th {
+      text-align: right; padding: 10px 12px;
+      font-size: 10px; font-weight: 700;
+      letter-spacing: 0.15em; text-transform: uppercase;
+      border-bottom: 1px solid var(--border);
+      font-family: 'Syne', sans-serif;
+      white-space: nowrap;
+    }
+    .cons-tbl th:first-child { text-align: left; width: 34%; }
+    .th-cap  { color: var(--gold); }
+    .th-esc  { color: var(--teal); }
+    .th-sw   { color: var(--blue); }
+    .th-tot  { color: var(--text); }
+
+    .cons-tbl td {
+      padding: 7px 12px;
+      border-bottom: 1px solid var(--border-lite);
+      font-variant-numeric: tabular-nums;
+      vertical-align: middle;
+    }
+    .cons-tbl td:not(:first-child) { text-align: right; }
+
+    .r-hdr td {
+      background: var(--bg-section);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      padding: 10px 12px 5px;
+    }
+    .r-hdr td span {
+      font-family: 'Syne', sans-serif;
+      font-size: 10px; font-weight: 700;
+      letter-spacing: 0.22em; color: var(--gold);
+      text-transform: uppercase;
+    }
+
+    .r-inp td:first-child { padding-left: 22px; color: var(--text); }
+    .r-inp td:not(:first-child) { color: var(--dim); }
+    .r-inp td.has-v { color: var(--text); }
+
+    .r-calc td {
+      background: var(--bg-section);
+      font-size: 11px; font-weight: 500;
+      text-transform: uppercase; letter-spacing: 0.06em;
+      color: var(--muted);
+    }
+
+    .r-sub td {
+      background: var(--bg-sub);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+    .r-sub td:first-child {
+      font-family: 'Syne', sans-serif;
+      font-size: 11px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.07em;
+      color: var(--text);
+    }
+    .r-sub td:not(:first-child) {
+      font-family: 'Syne', sans-serif;
+      font-size: 14px; font-weight: 700;
+    }
+
+    .r-fin td {
+      background: linear-gradient(90deg, #1A1500, #1C1700);
+      border-top: 1px solid var(--gold-dim);
+      border-bottom: 1px solid var(--gold-dim);
+    }
+    .r-fin td:first-child {
+      font-family: 'Syne', sans-serif;
+      font-size: 12px; font-weight: 800;
+      text-transform: uppercase; letter-spacing: 0.11em;
+      color: var(--gold);
+    }
+    .r-fin td:not(:first-child) {
+      font-family: 'Syne', sans-serif;
+      font-size: 18px; font-weight: 800;
+    }
+
+    /* ─── PRINT ──────────────────────────────────────────── */
+    @media print {
+      .app-hdr, .co-tabs, .sidebar { display: none !important; }
+      #app { display: flex !important; }
+      .app-body { overflow: visible; }
+      .dre-area { padding: 0; overflow: visible; }
+      .dre-input { border-bottom: none !important; }
+      body { background: white; color: black; }
+      :root {
+        --text: #000; --bg: #fff;
+        --bg-card: #f8f8f8; --bg-hover: #fff;
+        --bg-section: #f2f2f2; --bg-sub: #ebebeb;
+        --border: #ccc; --border-lite: #ddd;
+        --gold: #7a5800; --gold-dim: #aa9000;
+        --muted: #555; --dim: #999;
+        --green: #1a6a30; --red: #b52a20;
+      }
+    }
+
+    /* ─── RESPONSIVE ─────────────────────────────────────── */
+    @media (max-width: 920px) { .sidebar { display: none; } }
+
+    @media (max-width: 640px) {
+      .app-hdr { padding: 0 12px; gap: 10px; }
+      .hdr-brand { display: none; }
+      .period-wrap label { display: none; }
+      .dre-area { padding: 16px 10px 40px; }
+      .row-val { width: 148px; min-width: 148px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════ LOGIN ═══════════════════ -->
+<div id="login-overlay">
+  <div class="login-card">
+    <div class="login-eyebrow">Grupo Família Guerra</div>
+    <div class="login-title">DRE Mensal</div>
+    <div class="field-wrap">
+      <label>Usuário</label>
+      <input type="text" id="lu" placeholder="usuário" autocomplete="username">
+    </div>
+    <div class="field-wrap">
+      <label>Senha</label>
+      <input type="password" id="lp" placeholder="••••••••••" autocomplete="current-password">
+    </div>
+    <div class="login-err" id="lerr">Usuário ou senha incorretos.</div>
+    <button class="btn-primary" onclick="doLogin()">Entrar</button>
+  </div>
+</div>
+
+<!-- ═══════════════════ APP ═══════════════════ -->
+<div id="app">
+
+  <header class="app-hdr">
+    <a href="/painel" class="hdr-back">&#8592; Painel</a>
+    <div class="hdr-sep"></div>
+    <div class="hdr-brand">Família Guerra</div>
+    <div class="hdr-sep"></div>
+    <div class="hdr-module">DRE Mensal</div>
+    <div class="hdr-space"></div>
+    <div class="period-wrap">
+      <label>Período</label>
+      <select id="sel-month" onchange="onPeriodChange()"></select>
+      <select id="sel-year"  onchange="onPeriodChange()"></select>
+    </div>
+    <button class="btn-ghost" onclick="window.print()">⎙&nbsp;Imprimir</button>
+    <button class="btn-text"  onclick="doLogout()">Sair</button>
+  </header>
+
+  <div class="co-tabs">
+    <button class="co-tab active" data-co="srcapas"     onclick="selectCo(this)">
+      <span class="tab-name">SR. CAPAS</span>
+      <span class="tab-sub">Bacaxá / Saquarema</span>
+    </button>
+    <button class="co-tab" data-co="escritorio" onclick="selectCo(this)">
+      <span class="tab-name">Escritório</span>
+      <span class="tab-sub">Família Guerra Comércio</span>
+    </button>
+    <button class="co-tab" data-co="software"   onclick="selectCo(this)">
+      <span class="tab-name">LG Software</span>
+      <span class="tab-sub">Leandro Guerra Software</span>
+    </button>
+    <button class="co-tab" data-co="consolidado" onclick="selectCo(this)">
+      <span class="tab-name">Consolidado</span>
+      <span class="tab-sub">Grupo Família Guerra</span>
+    </button>
+  </div>
+
+  <div class="app-body">
+
+    <div class="dre-area" id="dre-area">
+      <div class="dre-top">
+        <div>
+          <div class="dre-co-name"      id="lbl-co">SR. CAPAS · Bacaxá / Saquarema</div>
+          <div class="dre-period-label" id="lbl-period">—</div>
+        </div>
+        <div class="save-ind" id="save-ind">—</div>
+      </div>
+      <div id="dre-rows"></div>
+    </div>
+
+    <aside class="sidebar">
+      <div class="sb-ttl">Resumo</div>
+
+      <div class="sb-metric">
+        <div class="sb-lbl">Receita Líquida</div>
+        <div class="sb-val v-neu" id="sb-rl">—</div>
+      </div>
+      <div class="sb-metric">
+        <div class="sb-lbl">Lucro Bruto</div>
+        <div class="sb-val v-neu" id="sb-lb">—</div>
+      </div>
+      <div class="sb-metric">
+        <div class="sb-lbl">Margem Bruta</div>
+        <div class="sb-val v-neu" id="sb-mb">—</div>
+      </div>
+
+      <div class="sb-sep"></div>
+
+      <div class="sb-metric">
+        <div class="sb-lbl">EBITDA</div>
+        <div class="sb-val v-neu" id="sb-ebitda">—</div>
+      </div>
+      <div class="sb-metric">
+        <div class="sb-lbl">Margem EBITDA</div>
+        <div class="sb-val v-neu" id="sb-mebitda">—</div>
+      </div>
+
+      <div class="sb-sep"></div>
+
+      <div class="sb-metric">
+        <div class="sb-lbl">Resultado Líquido</div>
+        <div class="sb-val v-neu" id="sb-res">—</div>
+      </div>
+      <div class="sb-metric">
+        <div class="sb-lbl">Margem Líquida</div>
+        <div class="sb-val v-neu" id="sb-mres">—</div>
+      </div>
+
+      <div class="sb-sep"></div>
+
+      <div id="notes-wrap">
+        <div class="sb-note-ttl">Observações</div>
+        <textarea class="notes-ta" id="notes-ta"
+          placeholder="Anotações sobre este período..."
+          oninput="saveNotes()"></textarea>
+      </div>
+    </aside>
+
+  </div>
+</div><!-- /#app -->
+
+<script>
+// ══════════════════════════════════════════════════════════
+// AUTH
+// ══════════════════════════════════════════════════════════
+const CREDS = { u:'Guerra', p:'Resiliencia2023@' };
+
+function doLogin() {
+  const u = document.getElementById('lu').value.trim();
+  const p = document.getElementById('lp').value;
+  if (u === CREDS.u && p === CREDS.p) {
+    sessionStorage.setItem('gfg_dre', '1');
+    document.getElementById('login-overlay').style.display = 'none';
+    document.getElementById('app').classList.add('on');
+    init();
+  } else {
+    const el = document.getElementById('lerr');
+    el.style.display = 'block';
+    document.getElementById('lp').value = '';
+    setTimeout(() => el.style.display = 'none', 3000);
+  }
+}
+
+function doLogout() {
+  sessionStorage.removeItem('gfg_dre');
+  location.reload();
+}
+
+document.getElementById('lp').addEventListener('keydown', e => { if (e.key==='Enter') doLogin(); });
+document.getElementById('lu').addEventListener('keydown', e => { if (e.key==='Enter') document.getElementById('lp').focus(); });
+
+if (sessionStorage.getItem('gfg_dre') === '1') {
+  document.getElementById('login-overlay').style.display = 'none';
+  document.getElementById('app').classList.add('on');
+}
+
+// ══════════════════════════════════════════════════════════
+// CONSTANTS
+// ══════════════════════════════════════════════════════════
+const MONTHS = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
+                'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+
+const COMPANIES = {
+  srcapas:     { name:'SR. CAPAS',    sub:'Bacaxá / Saquarema',        thCls:'th-cap'  },
+  escritorio:  { name:'Escritório',   sub:'Família Guerra Comércio',   thCls:'th-esc'  },
+  software:    { name:'LG Software',  sub:'Leandro Guerra Software',   thCls:'th-sw'   },
+  consolidado: { name:'Consolidado',  sub:'Grupo Família Guerra',      thCls:'th-tot'  }
+};
+
+// DRE schema
+// T: H=header, I=input, C=calc, S=subtotal, F=final
+// sign: 1=add, -1=deduction/cost  (UI indicator only — inputs always stored positive)
+// fn:   derivation from the `d` object (all inputs are positive)
+const SCHEMA = [
+  { id:'h1',        T:'H', lbl:'RECEITA OPERACIONAL BRUTA' },
+  { id:'vendas',    T:'I', lbl:'Vendas / Receitas de Serviços',                      sign:1  },
+  { id:'outras_rec',T:'I', lbl:'Outras Receitas Operacionais',                       sign:1  },
+  { id:'tot_bruto', T:'C', lbl:'Total Receita Bruta',
+    fn: d => d.vendas + d.outras_rec },
+
+  { id:'h2',        T:'H', lbl:'DEDUÇÕES DA RECEITA BRUTA' },
+  { id:'imp_rec',   T:'I', lbl:'Impostos sobre Receitas (Simples Nacional / ISS / ICMS)', sign:-1 },
+  { id:'devol',     T:'I', lbl:'Devoluções e Cancelamentos',                         sign:-1 },
+  { id:'tot_ded',   T:'C', lbl:'Total Deduções',
+    fn: d => -(d.imp_rec + d.devol) },
+
+  { id:'rec_liq',   T:'S', lbl:'RECEITA OPERACIONAL LÍQUIDA',
+    fn: d => d.tot_bruto + d.tot_ded },
+
+  { id:'h3',        T:'H', lbl:'CUSTOS' },
+  { id:'cmv',       T:'I', lbl:'CMV — Custo das Mercadorias / Serviços Vendidos',    sign:-1 },
+
+  { id:'luc_bruto', T:'S', lbl:'LUCRO BRUTO',
+    fn: d => d.rec_liq - d.cmv },
+
+  { id:'h4',        T:'H', lbl:'DESPESAS OPERACIONAIS' },
+  { id:'d_pessoal', T:'I', lbl:'Pessoal (Salários, Encargos, Pró-labore)',           sign:-1 },
+  { id:'d_aluguel', T:'I', lbl:'Aluguel e Locações',                                sign:-1 },
+  { id:'d_util',    T:'I', lbl:'Energia Elétrica / Água / Internet / Telefone',     sign:-1 },
+  { id:'d_mkt',     T:'I', lbl:'Marketing e Publicidade',                           sign:-1 },
+  { id:'d_terc',    T:'I', lbl:'Serviços de Terceiros (Contabilidade, TI, etc.)',   sign:-1 },
+  { id:'d_manut',   T:'I', lbl:'Manutenção e Conservação',                          sign:-1 },
+  { id:'d_outros',  T:'I', lbl:'Outras Despesas Operacionais',                      sign:-1 },
+  { id:'tot_desp',  T:'C', lbl:'Total Despesas Operacionais',
+    fn: d => -(d.d_pessoal+d.d_aluguel+d.d_util+d.d_mkt+d.d_terc+d.d_manut+d.d_outros) },
+
+  { id:'ebitda',    T:'S', lbl:'RESULTADO OPERACIONAL (EBITDA)', hl:true,
+    fn: d => d.luc_bruto + d.tot_desp },
+
+  { id:'h5',        T:'H', lbl:'RESULTADO FINANCEIRO' },
+  { id:'desp_fin',  T:'I', lbl:'Despesas Financeiras (Juros, IOF, Tarifas Bancárias)', sign:-1 },
+  { id:'rec_fin',   T:'I', lbl:'Receitas Financeiras',                               sign:1  },
+  { id:'res_fin',   T:'S', lbl:'Resultado Financeiro',
+    fn: d => d.rec_fin - d.desp_fin },
+
+  { id:'h6',        T:'H', lbl:'IMPOSTOS SOBRE O RESULTADO' },
+  { id:'irpj',      T:'I', lbl:'IRPJ / CSLL (se aplicável)',                         sign:-1 },
+
+  { id:'resultado', T:'F', lbl:'RESULTADO LÍQUIDO DO EXERCÍCIO',
+    fn: d => d.ebitda + d.res_fin - d.irpj }
+];
+
+// ══════════════════════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════════════════════
+const NOW = new Date();
+const ST = {
+  co:    'srcapas',
+  month: NOW.getMonth() + 1,
+  year:  NOW.getFullYear()
+};
+
+// ══════════════════════════════════════════════════════════
+// STORAGE
+// ══════════════════════════════════════════════════════════
+function sKey(co, m, y) {
+  return `gfg_dre_${co}_${y}_${String(m).padStart(2,'0')}`;
+}
+
+function loadData(co, m, y) {
+  try { return JSON.parse(localStorage.getItem(sKey(co,m,y)) || '{}'); }
+  catch { return {}; }
+}
+
+function persData(co, m, y, raw) {
+  localStorage.setItem(sKey(co,m,y), JSON.stringify(raw));
+  flashSaved();
+}
+
+function loadNotes(co, m, y) {
+  return localStorage.getItem(sKey(co,m,y)+'_n') || '';
+}
+
+function persNotes(co, m, y, txt) {
+  localStorage.setItem(sKey(co,m,y)+'_n', txt);
+}
+
+let _savedTmr;
+function flashSaved() {
+  const el = document.getElementById('save-ind');
+  if (!el) return;
+  el.textContent = '✓ Salvo';
+  el.style.color = 'var(--green)';
+  clearTimeout(_savedTmr);
+  _savedTmr = setTimeout(() => {
+    el.textContent = 'Salvo automaticamente';
+    el.style.color = 'var(--dim)';
+  }, 2200);
+}
+
+// ══════════════════════════════════════════════════════════
+// CALCULATION ENGINE
+// ══════════════════════════════════════════════════════════
+function compute(raw) {
+  const d = {};
+  // First pass: inputs (always positive)
+  SCHEMA.forEach(r => {
+    if (r.T === 'I') d[r.id] = Math.abs(parseFloat(raw[r.id]) || 0);
+  });
+  // Second pass: derived values
+  SCHEMA.forEach(r => {
+    if (r.fn) d[r.id] = r.fn(d);
+  });
+  return d;
+}
+
+// ══════════════════════════════════════════════════════════
+// FORMAT
+// ══════════════════════════════════════════════════════════
+const BRL = new Intl.NumberFormat('pt-BR', { style:'currency', currency:'BRL' });
+
+function fmt(n)     { return BRL.format(n ?? 0); }
+function vcls(n)    { return n > 0 ? 'v-pos' : n < 0 ? 'v-neg' : 'v-zero'; }
+function pct(n, b)  {
+  if (!b || b === 0 || isNaN(b)) return '—';
+  return (n / b * 100).toFixed(1) + '%';
+}
+
+// ══════════════════════════════════════════════════════════
+// PERIOD SELECTORS
+// ══════════════════════════════════════════════════════════
+function renderPeriodSelectors() {
+  const ms = document.getElementById('sel-month');
+  const ys = document.getElementById('sel-year');
+  ms.innerHTML = MONTHS.map((m,i) =>
+    `<option value="${i+1}"${i+1===ST.month?' selected':''}>${m}</option>`).join('');
+  const y = ST.year;
+  ys.innerHTML = [y-2,y-1,y,y+1].map(v =>
+    `<option value="${v}"${v===y?' selected':''}>${v}</option>`).join('');
+}
+
+// ══════════════════════════════════════════════════════════
+// RENDER — SINGLE COMPANY DRE
+// ══════════════════════════════════════════════════════════
+function renderDRE(co) {
+  const raw = loadData(co, ST.month, ST.year);
+  const d   = compute(raw);
+  const comp = COMPANIES[co];
+
+  document.getElementById('lbl-co').textContent     = comp.name + ' · ' + comp.sub;
+  document.getElementById('lbl-period').textContent = MONTHS[ST.month-1] + ' ' + ST.year;
+  document.getElementById('save-ind').textContent   = 'Salvo automaticamente';
+  document.getElementById('save-ind').style.color   = 'var(--dim)';
+
+  let html = '';
+
+  SCHEMA.forEach(r => {
+    if (r.T === 'H') {
+      html += `
+        <div class="dre-row is-hdr">
+          <div class="row-lbl">${r.lbl}</div>
+        </div>`;
+
+    } else if (r.T === 'I') {
+      const v      = raw[r.id] ? Number(raw[r.id]) : '';
+      const sCls   = r.sign === 1 ? 's-pos' : 's-neg';
+      const sChr   = r.sign === 1 ? '+' : '−';
+      html += `
+        <div class="dre-row is-input">
+          <div class="row-lbl">
+            <span class="row-sign ${sCls}">${sChr}</span>
+            ${r.lbl}
+          </div>
+          <div class="row-val">
+            <input class="dre-input${v?' filled':''}"
+              type="number" step="0.01" min="0"
+              data-id="${r.id}"
+              value="${v}" placeholder="0,00"
+              oninput="onInput(this)"
+              onblur="autoSave()">
+          </div>
+        </div>`;
+
+    } else if (r.T === 'C') {
+      html += `
+        <div class="dre-row is-calc">
+          <div class="row-lbl">${r.lbl}</div>
+          <div class="row-val ${vcls(d[r.id])}" id="c-${r.id}">${fmt(d[r.id])}</div>
+        </div>`;
+
+    } else if (r.T === 'S') {
+      const extra = r.hl ? ' hl' : '';
+      html += `
+        <div class="dre-row is-sub${extra}">
+          <div class="row-lbl">${r.lbl}</div>
+          <div class="row-val ${vcls(d[r.id])}" id="c-${r.id}">${fmt(d[r.id])}</div>
+        </div>`;
+
+    } else if (r.T === 'F') {
+      html += `
+        <div class="dre-row is-final">
+          <div class="row-lbl">${r.lbl}</div>
+          <div class="row-val ${vcls(d[r.id])}" id="c-${r.id}">${fmt(d[r.id])}</div>
+        </div>`;
+    }
+  });
+
+  document.getElementById('dre-rows').innerHTML = html;
+
+  // Notes
+  const nw = document.getElementById('notes-wrap');
+  if (nw) nw.style.display = '';
+  const ta = document.getElementById('notes-ta');
+  if (ta) ta.value = loadNotes(co, ST.month, ST.year);
+
+  updateSidebar(d);
+}
+
+// ══════════════════════════════════════════════════════════
+// RENDER — CONSOLIDATED
+// ══════════════════════════════════════════════════════════
+function renderConsolidated() {
+  const cos  = ['srcapas','escritorio','software'];
+  const ds   = {};
+  cos.forEach(c => { ds[c] = compute(loadData(c, ST.month, ST.year)); });
+
+  // Build aggregated d
+  const agg = {};
+  SCHEMA.forEach(r => {
+    if (r.T === 'I') agg[r.id] = cos.reduce((s,c) => s + (ds[c][r.id]||0), 0);
+  });
+  SCHEMA.forEach(r => {
+    if (r.fn) agg[r.id] = r.fn(agg);
+  });
+
+  document.getElementById('lbl-co').textContent     = 'Consolidado · Grupo Família Guerra';
+  document.getElementById('lbl-period').textContent = MONTHS[ST.month-1] + ' ' + ST.year;
+  const nw = document.getElementById('notes-wrap');
+  if (nw) nw.style.display = 'none';
+
+  let html = `<div class="cons-wrap"><table class="cons-tbl">
+    <thead><tr>
+      <th>Item DRE</th>
+      <th class="th-cap">SR. CAPAS</th>
+      <th class="th-esc">Escritório</th>
+      <th class="th-sw">LG Software</th>
+      <th class="th-tot">Consolidado</th>
+    </tr></thead><tbody>`;
+
+  SCHEMA.forEach(r => {
+    if (r.T === 'H') {
+      html += `<tr class="r-hdr"><td colspan="5"><span>${r.lbl}</span></td></tr>`;
+
+    } else if (r.T === 'I') {
+      const sCls = r.sign===1 ? 's-pos' : 's-neg';
+      const sChr = r.sign===1 ? '+' : '−';
+      html += `<tr class="r-inp">
+        <td><span class="row-sign ${sCls}" style="margin-right:6px">${sChr}</span>${r.lbl}</td>
+        ${cos.map(c => {
+          const v = ds[c][r.id];
+          return `<td class="${v>0?'has-v':''}">${v>0 ? fmt(v) : '—'}</td>`;
+        }).join('')}
+        <td class="${vcls(agg[r.id])}">${fmt(agg[r.id])}</td>
+      </tr>`;
+
+    } else if (r.T === 'C') {
+      html += `<tr class="r-calc">
+        <td>${r.lbl}</td>
+        ${cos.map(c=>`<td class="${vcls(ds[c][r.id])}">${fmt(ds[c][r.id])}</td>`).join('')}
+        <td class="${vcls(agg[r.id])}">${fmt(agg[r.id])}</td>
+      </tr>`;
+
+    } else if (r.T === 'S') {
+      html += `<tr class="r-sub">
+        <td>${r.lbl}</td>
+        ${cos.map(c=>`<td class="${vcls(ds[c][r.id])}">${fmt(ds[c][r.id])}</td>`).join('')}
+        <td class="${vcls(agg[r.id])}">${fmt(agg[r.id])}</td>
+      </tr>`;
+
+    } else if (r.T === 'F') {
+      html += `<tr class="r-fin">
+        <td>${r.lbl}</td>
+        ${cos.map(c=>`<td class="${vcls(ds[c][r.id])}">${fmt(ds[c][r.id])}</td>`).join('')}
+        <td class="${vcls(agg[r.id])}">${fmt(agg[r.id])}</td>
+      </tr>`;
+    }
+  });
+
+  html += `</tbody></table></div>`;
+  document.getElementById('dre-rows').innerHTML = html;
+  updateSidebar(agg);
+}
+
+// ══════════════════════════════════════════════════════════
+// SIDEBAR UPDATE
+// ══════════════════════════════════════════════════════════
+function updateSidebar(d) {
+  const base = d.rec_liq || 0;
+
+  function setVal(id, val) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = fmt(val);
+    el.className   = 'sb-val ' + vcls(val);
+  }
+
+  function setPct(id, num, b) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = pct(num, b || base);
+    el.className   = 'sb-val ' + vcls(num);
+  }
+
+  setVal('sb-rl', d.rec_liq);
+  setVal('sb-lb', d.luc_bruto);
+  setPct('sb-mb', d.luc_bruto);
+  setVal('sb-ebitda', d.ebitda);
+  setPct('sb-mebitda', d.ebitda);
+  setVal('sb-res', d.resultado);
+  setPct('sb-mres', d.resultado);
+}
+
+// ══════════════════════════════════════════════════════════
+// LIVE INPUT HANDLER
+// ══════════════════════════════════════════════════════════
+function onInput(el) {
+  el.classList.toggle('filled', !!el.value);
+  const raw = collectRaw();
+  const d   = compute(raw);
+
+  SCHEMA.forEach(r => {
+    if (r.T==='C' || r.T==='S' || r.T==='F') {
+      const cel = document.getElementById('c-'+r.id);
+      if (cel) {
+        cel.textContent = fmt(d[r.id]);
+        cel.className   = 'row-val ' + vcls(d[r.id]);
+      }
+    }
+  });
+
+  updateSidebar(d);
+}
+
+function collectRaw() {
+  const raw = {};
+  document.querySelectorAll('.dre-input').forEach(el => {
+    raw[el.dataset.id] = parseFloat(el.value) || 0;
+  });
+  return raw;
+}
+
+let _autoTmr;
+function autoSave() {
+  if (ST.co === 'consolidado') return;
+  clearTimeout(_autoTmr);
+  _autoTmr = setTimeout(() => {
+    persData(ST.co, ST.month, ST.year, collectRaw());
+  }, 600);
+}
+
+function saveNotes() {
+  if (ST.co === 'consolidado') return;
+  persNotes(ST.co, ST.month, ST.year,
+    document.getElementById('notes-ta').value);
+}
+
+// ══════════════════════════════════════════════════════════
+// NAVIGATION
+// ══════════════════════════════════════════════════════════
+function selectCo(btn) {
+  document.querySelectorAll('.co-tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  ST.co = btn.dataset.co;
+  render();
+}
+
+function onPeriodChange() {
+  ST.month = Number(document.getElementById('sel-month').value);
+  ST.year  = Number(document.getElementById('sel-year').value);
+  render();
+}
+
+function render() {
+  if (ST.co === 'consolidado') renderConsolidated();
+  else renderDRE(ST.co);
+}
+
+// ══════════════════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════════════════
+function init() {
+  renderPeriodSelectors();
+  render();
+}
+
+if (document.getElementById('app').classList.contains('on')) {
+  init();
+}
+</script>
+</body>
+</html>
