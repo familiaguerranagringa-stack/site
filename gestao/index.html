@@ -327,7 +327,8 @@ function calcTotais(){
   // Financeiras primeiro (inclui Moeda Social como parceiro)
   const finTotal=PARCEIROS.reduce((s,p)=>{
     const k=p.toLowerCase().replace(/\s+/g,'_');
-    return s+(fi[k]||[]).reduce((a,r)=>a+(+r.vr||0),0);
+    // Só conta transações com data de recebimento preenchida
+    return s+(fi[k]||[]).filter(r=>r.dr).reduce((a,r)=>a+(+r.vr||0),0);
   },0);
   // Faturamento bruto = entradas diretas + financeiras
   const fat=en.reduce((s,r)=>s+(+r.din||0)+(+r.pix||0)+(+r.cart||0)+(+r.rend||0)+(+r.cred||0),0)+finTotal;
@@ -514,19 +515,21 @@ function renderFin(){
   const p=PARCEIROS[finTab];
   const key=p.toLowerCase().replace(/\s+/g,'_');
   const rows=fi[key]||[];
-  let tVv=0,tTx=0,tVr=0;
+  let tVv=0,tTx=0,tVr=0,tAReceber=0;
   const tRows=rows.map(r=>{
     tVv+=(+r.vv||0);tTx+=(+r.tx||0);tVr+=(+r.vr||0);
+    const valorLiquido=(+r.vv||0)-(+r.tx||0);
+    if(!r.dr)tAReceber+=valorLiquido;
     const dv=r.dv?new Date(r.dv+'T12:00:00').toLocaleDateString('pt-BR'):'—';
     const dp=r.dp?new Date(r.dp+'T12:00:00').toLocaleDateString('pt-BR'):'—';
     const dr=r.dr?new Date(r.dr+'T12:00:00').toLocaleDateString('pt-BR'):'—';
-    const recebido=r.vr>0&&r.dr;
+    const recebido=!!r.dr;
     return `<tr>
       <td style="font-family:'Syne',sans-serif;font-size:11px;color:var(--muted)">${dv}</td>
       <td>${fmt(r.vv)}</td>
       <td class="dim">${dp}</td>
       <td class="neg">${r.tx?fmt(r.tx):'—'}</td>
-      <td class="${recebido?'pos':'dim'}">${r.vr?fmt(r.vr):'—'}</td>
+      <td class="${recebido?'pos':'amber'}">${recebido?fmt(r.vr):'<span class="badge b-pend">A Receber</span>'}</td>
       <td class="dim">${dr}</td>
       <td style="text-align:right;white-space:nowrap">
         ${!recebido?`<button class="btn-sm btn-ok" onclick="marcarRecebido('${key}','${r.id}')" style="margin-right:4px;white-space:nowrap">✓ Recebido</button>`:`<span class="badge b-ok">✓ Recebido</span>`}
@@ -559,7 +562,7 @@ function renderFin(){
   <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:4px">
     <div class="kpi"><div class="kpi-label">Total Vendido</div><div class="kpi-value">${fmt(tVv)}</div></div>
     <div class="kpi"><div class="kpi-label">Recebido</div><div class="kpi-value pos">${fmt(tVr)}</div></div>
-    <div class="kpi"><div class="kpi-label">A Receber</div><div class="kpi-value gold">${fmt(tVv-tTx-tVr)}</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--amber)"></div><div class="kpi-label">A Receber</div><div class="kpi-value" style="color:var(--amber)">${fmt(tAReceber)}</div></div>
   </div>`:`<div class="empty">💳 <div>Sem transações de ${p} neste período.</div></div>`}`;
   c.innerHTML=h;
 }
@@ -585,7 +588,7 @@ function addFi(key){
   const fi=loadO('fin');const arr=fi[key]||[];
   const vv=+document.getElementById('f-vv').value;
   if(!vv){notify('Informe o valor da venda','err');return}
-  arr.push({id:uuid(),dv:document.getElementById('f-dv').value,vv,dp:document.getElementById('f-dp').value,tx:+document.getElementById('f-tx').value||0,vr:+document.getElementById('f-vr').value||0,dr:document.getElementById('f-dr').value});
+  arr.push({id:uuid(),dv:document.getElementById('f-dv').value,vv,dp:document.getElementById('f-dp').value,tx:+document.getElementById('f-tx').value||0,vr:0,dr:''});
   fi[key]=arr;saveO('fin',fi);renderFin();
 }
 function delFi(key,id){
@@ -1115,7 +1118,7 @@ function confirmVoice(){
   } else if(modulo==='financeira'){
     const fi=loadO('fin');const k=(dados.parceiro||'ume').toLowerCase().replace(/\s+/g,'_');
     const arr=fi[k]||[];
-    arr.push({id:uuid(),dv:dados.dv||today(),vv:+dados.vv||0,dp:dados.dp||'',tx:+dados.tx||0,vr:+dados.vr||0,dr:dados.dr||''});
+    arr.push({id:uuid(),dv:dados.dv||today(),vv:+dados.vv||0,dp:dados.dp||'',tx:+dados.tx||0,vr:0,dr:''});
     fi[k]=arr;saveO('fin',fi);notify('Financeira registrada por voz! 🎤','ok');
     setTab('financeiras',document.querySelector('[data-tab="financeiras"]'));
   } else if(modulo==='funcionario'){
