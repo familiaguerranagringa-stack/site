@@ -215,6 +215,10 @@ tr:hover td{background:var(--bg-hover)}
 
 <script>
 const CREDS={u:'Guerra',p:'Resiliencia2023@'};
+const CREDS_EXTRA=[
+  {u:'TERRA',p:'110205',nome:'Terra'},
+  {u:'PAIVA',p:'913700',nome:'Paiva'},
+];
 const MESES=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 const PARCEIROS=['UME','Payjoy','Moeda Social','Brasilcard','Parcelex','Crefaz'];
 const CAT_SAIDA=['Despesa Operacional','Compra Mercadoria','Marketing','Tributo','Pessoal','Erro de Caixa','Perda','Estorno','Outro'];
@@ -256,9 +260,9 @@ function checkAuth(){
   if(ok)initApp();
 }
 function doLogin(){
-  const u=document.getElementById('l-user').value.trim(),p=document.getElementById('l-pass').value;
+  const u=document.getElementById('l-user').value.trim().toUpperCase(),p=document.getElementById('l-pass').value;
   // login admin
-  if(u===CREDS.u&&p===CREDS.p){
+  if(u===CREDS.u.toUpperCase()&&p===CREDS.p){
     sessionStorage.setItem('srcapas_ok','1');
     sessionStorage.setItem('srcapas_role','admin');
     sessionStorage.setItem('srcapas_nome','Leandro');
@@ -267,9 +271,20 @@ function doLogin(){
     document.getElementById('voice-btn').style.display='flex';
     initApp();return;
   }
-  // login funcionário
+  // login usuários extras (Terra, Paiva)
+  const extra=CREDS_EXTRA.find(c=>c.u.toUpperCase()===u&&c.p===p);
+  if(extra){
+    sessionStorage.setItem('srcapas_ok','1');
+    sessionStorage.setItem('srcapas_role','funcionario');
+    sessionStorage.setItem('srcapas_nome',extra.nome);
+    document.getElementById('login-screen').style.display='none';
+    document.getElementById('app').style.display='flex';
+    document.getElementById('voice-btn').style.display='flex';
+    initApp();return;
+  }
+  // login funcionário cadastrado no sistema
   const funs=JSON.parse(localStorage.getItem('srcapas_funcionarios_bacaxa')||'[]');
-  const fun=funs.find(f=>f.user&&f.user===u.toLowerCase()&&f.pwd===p);
+  const fun=funs.find(f=>f.user&&f.user.toUpperCase()===u&&f.pwd===p);
   if(fun){
     sessionStorage.setItem('srcapas_ok','1');
     sessionStorage.setItem('srcapas_role','funcionario');
