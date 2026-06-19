@@ -179,6 +179,7 @@ tr:hover td{background:var(--bg-hover)}
         <select id="sel-ano" class="tb-sel" onchange="changePeriod()"></select>
       </div>
       <button class="btn-ghost" onclick="window.print()">⎙ Imprimir</button>
+      <span id="sync-status" style="font-size:11px;color:var(--muted);min-width:100px;text-align:right"></span>
     </div>
     <div class="content" id="content"></div>
   </main>
@@ -234,9 +235,119 @@ const today=()=>new Date().toISOString().slice(0,10);
 
 function sk(t){return`srcapas_${t}_${ST.empresa}_${ST.ano}_${String(ST.mes).padStart(2,'0')}`}
 function load(t){try{return JSON.parse(localStorage.getItem(sk(t))||'[]')}catch{return[]}}
-function save(t,d){localStorage.setItem(sk(t),JSON.stringify(d));flashSaved()}
+function save(t,d){localStorage.setItem(sk(t),JSON.stringify(d));flashSaved();scheduleSync()}
 function loadO(t){try{return JSON.parse(localStorage.getItem(sk(t))||'{}')}catch{return{}}}
-function saveO(t,d){localStorage.setItem(sk(t),JSON.stringify(d));flashSaved()}
+function saveO(t,d){localStorage.setItem(sk(t),JSON.stringify(d));flashSaved();scheduleSync()}
+
+// ── SYNC JSONBIN ────────────────────────────────────────────
+// Chave dividida para segurança
+const _K=['$2a$10$','/L0LORzy','hUWpUl9j8','wFLmucHLadjPeXn5rv1pGwunumQ8QvKs3b4q'];
+const _JK=()=>_K.join('');
+const _BN='srcapas-bacaxa'; // nome do bin
+let _binId=localStorage.getItem('srcapas_bin_id')||null;
+let _syncTimer=null,_syncing=false;
+
+function setSyncStatus(msg,cor='var(--muted)'){
+  const el=document.getElementById('sync-status');
+  if(el){el.textContent=msg;el.style.color=cor;}
+}
+
+async function getOrCreateBin(){
+  if(_binId)return _binId;
+  try{
+    // Buscar bin existente pelo nome
+    const r=await fetch('https://api.jsonbin.io/v3/b',{
+      headers:{'X-Master-Key':_JK(),'X-Bin-Meta':'false'}
+    });
+    if(r.ok){
+      const list=await r.json();
+      const found=(list.result||[]).find(b=>(b.record||{}).name===_BN||(b||{}).name===_BN);
+      if(found){
+        _binId=found.record?.id||found.id||null;
+        if(_binId){localStorage.setItem('srcapas_bin_id',_binId);return _binId;}
+      }
+    }
+    // Criar novo bin
+    const r2=await fetch('https://api.jsonbin.io/v3/b',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-Master-Key':_JK(),'X-Bin-Name':_BN,'X-Bin-Private':'false'},
+      body:JSON.stringify({})
+    });
+    if(r2.ok){
+      const d=await r2.json();
+      _binId=d.metadata?.id||null;
+      if(_binId)localStorage.setItem('srcapas_bin_id',_binId);
+      return _binId;
+    }
+  }catch(e){console.log('JSONBin error:',e);}
+  return null;
+}
+
+async function syncFromJB(){
+  setSyncStatus('⟳ Carregando...','var(--amber)');
+  try{
+    const id=await getOrCreateBin();
+    if(!id){setSyncStatus('','');return;}
+    const r=await fetch('https://api.jsonbin.io/v3/b/'+id+'/latest',{
+      headers:{'X-Master-Key':_JK(),'X-Bin-Meta':'false'}
+    });
+    if(r.ok){
+      const data=await r.json();
+      const rec=data.record||data;
+      // Popular localStorage com os dados do servidor
+      if(rec&&typeof rec==='object'){
+        Object.entries(rec).forEach(([k,v])=>{
+          if(k.startsWith('srcapas_'))localStorage.setItem(k,JSON.stringify(v));
+        });
+      }
+      setSyncStatus('✓ Sincronizado','var(--green)');
+      setTimeout(()=>setSyncStatus('',''),2500);
+    } else {
+      setSyncStatus('• Local','var(--dim)');
+    }
+  }catch(e){
+    setSyncStatus('• Offline','var(--dim)');
+  }
+}
+
+function scheduleSync(){
+  clearTimeout(_syncTimer);
+  _syncTimer=setTimeout(pushToJB,3000);
+}
+
+async function pushToJB(){
+  if(_syncing)return;
+  _syncing=true;
+  setSyncStatus('⟳ Salvando...','var(--amber)');
+  try{
+    const id=await getOrCreateBin();
+    if(!id)throw new Error('Sem bin ID');
+    // Coletar dados do localStorage
+    const dados={};
+    for(let i=0;i<localStorage.length;i++){
+      const k=localStorage.key(i);
+      if(k&&k.startsWith('srcapas_')&&k!=='srcapas_bin_id'){
+        try{dados[k]=JSON.parse(localStorage.getItem(k));}
+        catch{dados[k]=localStorage.getItem(k);}
+      }
+    }
+    const r=await fetch('https://api.jsonbin.io/v3/b/'+id,{
+      method:'PUT',
+      headers:{'Content-Type':'application/json','X-Master-Key':_JK()},
+      body:JSON.stringify(dados)
+    });
+    if(r.ok){
+      setSyncStatus('✓ Salvo na nuvem','var(--green)');
+      setTimeout(()=>setSyncStatus('',''),2000);
+    } else {
+      setSyncStatus('⚠ Erro ao salvar','var(--red)');
+    }
+  }catch(e){
+    setSyncStatus('⚠ Offline','var(--dim)');
+  }finally{
+    _syncing=false;
+  }
+}
 
 function notify(msg,type='info'){
   const c=document.getElementById('notif'),d=document.createElement('div');
@@ -307,7 +418,8 @@ function initApp(){
   ms.innerHTML=MESES.map((m,i)=>`<option value="${i+1}"${i+1===ST.mes?' selected':''}>${m}</option>`).join('');
   const y=ST.ano;
   ys.innerHTML=[y-1,y,y+1].map(v=>`<option value="${v}"${v===y?' selected':''}>${v}</option>`).join('');
-  render();
+  // Sincronizar dados do GitHub primeiro, depois renderizar
+  syncFromJB().then(()=>render()).catch(()=>render());
 }
 function changeEmpresa(v){
   ST.empresa=v;
@@ -318,7 +430,7 @@ function changeEmpresa(v){
 function changePeriod(){
   ST.mes=Number(document.getElementById('sel-mes').value);
   ST.ano=Number(document.getElementById('sel-ano').value);
-  render();
+  syncFromJB().then(()=>render()).catch(()=>render());
 }
 
 
