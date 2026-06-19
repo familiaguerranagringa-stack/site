@@ -135,18 +135,7 @@ tr:hover td{background:var(--bg-hover)}
 <body>
 <div id="notif"></div>
 
-<div class="modal-bg" id="api-modal" style="display:none">
-  <div class="modal">
-    <h2>Configurar IA por Voz</h2>
-    <p>Insira sua chave de API da Anthropic para ativar o lançamento por voz. Fica salva apenas no seu dispositivo.</p>
-    <div class="fl" style="margin-bottom:16px"><label>Anthropic API Key</label><input class="fi" type="password" id="api-key-input" placeholder="sk-ant-..."></div>
-    <div style="display:flex;gap:10px">
-      <button class="btn-gold" style="flex:1" onclick="saveApiKey()">Ativar IA por Voz</button>
-      <button class="btn-ghost" onclick="document.getElementById('api-modal').style.display='none'">Cancelar</button>
-    </div>
-    <p style="font-size:10px;color:var(--dim);margin-top:10px;margin-bottom:0">Sem chave? Acesse <a href="https://console.anthropic.com" style="color:var(--gold)" target="_blank">console.anthropic.com</a></p>
-  </div>
-</div>
+
 
 <div id="app">
   <aside class="sidebar">
@@ -172,7 +161,7 @@ tr:hover td{background:var(--bg-hover)}
     <button class="sb-item" data-tab="verificacao" onclick="setTab('verificacao',this)">📋 Verificação Mensal</button>
     <button class="sb-item" data-tab="dre" onclick="setTab('dre',this)">📊 DRE</button>
     <div class="sb-bottom">
-      <button class="sb-item" onclick="document.getElementById('api-modal').style.display='flex'" style="width:100%;margin:0">🎤 Configurar IA</button>
+
       <button class="sb-item" onclick="doLogout()" style="width:100%;margin:4px 0 0;color:var(--dim)">↩ Sair</button>
     </div>
   </aside>
@@ -292,14 +281,7 @@ function changePeriod(){
   ST.ano=Number(document.getElementById('sel-ano').value);
   render();
 }
-function saveApiKey(){
-  const k=document.getElementById('api-key-input').value.trim();
-  if(!k.startsWith('sk-ant-')){notify('Chave inválida (deve começar com sk-ant-)','err');return}
-  localStorage.setItem('srcapas_apikey',k);
-  document.getElementById('api-modal').style.display='none';
-  notify('IA por voz ativada com sucesso!','ok');
-}
-function getApiKey(){return localStorage.getItem('srcapas_apikey')||''}
+
 
 // TAB
 const TITLES={dashboard:'Dashboard',entradas:'Entradas',saidas:'Saídas',financeiras:'Financeiras',verificacao:'Verificação Mensal',dre:'DRE — Resultado do Exercício'};
@@ -705,14 +687,12 @@ function renderDRE(){
   document.getElementById('content').innerHTML=h;
 }
 
-// VOICE IA
+// VOICE — processamento local sem API externa
 let recognition=null,vListening=false,vPending=null;
 function toggleVoice(){if(!vListening)startVoice();else stopVoice()}
 function startVoice(){
-  const key=getApiKey();
-  if(!key){document.getElementById('api-modal').style.display='flex';notify('Configure a API key primeiro 🎤','info');return}
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-  if(!SR){notify('Navegador não suporta reconhecimento de voz. Use Chrome.','err');return}
+  if(!SR){notify('Use o Google Chrome para reconhecimento de voz.','err');return}
   recognition=new SR();
   recognition.lang='pt-BR';
   recognition.interimResults=true;
@@ -721,9 +701,9 @@ function startVoice(){
     vListening=true;
     document.getElementById('voice-btn').classList.add('listening');
     document.getElementById('vp').classList.add('show');
-    document.getElementById('vp-txt').textContent='Ouvindo...';
+    document.getElementById('vp-txt').textContent='Ouvindo... fale agora!';
     document.getElementById('vp-res').classList.remove('show');
-    document.getElementById('vp-st').textContent='Ouvindo...';
+    document.getElementById('vp-st').textContent='🎤 Ouvindo...';
   };
   recognition.onresult=(e)=>{
     const t=Array.from(e.results).map(r=>r[0].transcript).join('');
@@ -733,7 +713,7 @@ function startVoice(){
   recognition.onend=()=>{
     vListening=false;
     document.getElementById('voice-btn').classList.remove('listening');
-    document.getElementById('vp-st').textContent='Interpretando com IA...';
+    document.getElementById('vp-st').textContent='Interpretando...';
   };
   recognition.onerror=e=>{stopVoice();notify('Erro no microfone: '+e.error,'err')};
   recognition.start();
@@ -743,46 +723,127 @@ function stopVoice(){
   vListening=false;
   document.getElementById('voice-btn').classList.remove('listening');
 }
-async function processVoice(text){
-  const key=getApiKey();
-  const sys=`Você é o assistente de gestão financeira do SR. CAPAS, loja de capas e acessórios de celular no Brasil.
-O usuário falou um comando de voz. Interprete e retorne APENAS JSON válido sem markdown.
 
-Módulos: entrada, saida, financeira, custo_fixo, funcionario
+// Parser de linguagem natural em português — sem API externa
+function parsePtBR(text){
+  const t=text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
 
-Para "entrada": {modulo:"entrada", dados:{data, din, pix, tpix, cart, tcart, ms, rend, cred, obs}, descricao_humana:"..."}
-Para "saida": {modulo:"saida", dados:{data, cat, forma, val, desc}, descricao_humana:"..."}
-  Categorias saida: Despesa Operacional, Compra Mercadoria, Marketing, Tributo, Pessoal, Erro de Caixa, Perda, Estorno, Outro
-  Formas: PIX, Dinheiro, Cartão, Boleto, Débito Automático
-Para "custo_fixo": {modulo:"custo_fixo", dados:{nome, val, venc, forma, obs}, descricao_humana:"..."}
-Para "financeira": {modulo:"financeira", dados:{parceiro, dv, vv, dp, tx, vr, dr}, descricao_humana:"..."}
-  Parceiros: UME, Payjoy, Moeda Social, Brasilcard, Parcelex, Crefaz
-
-Regras:
-- Converta valores por extenso para número. "trezentos" = 300, "mil e duzentos" = 1200
-- Data padrão se não informada: ${today()}
-- Infira a categoria pelo contexto: luz/energia=Despesa Operacional, passagem=Despesa Operacional, compra de estoque/fornecedor=Compra Mercadoria
-- Retorne APENAS o JSON, nada mais`;
-
-  try{
-    const r=await fetch('https://api.anthropic.com/v1/messages',{
-      method:'POST',
-      headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01'},
-      body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:400,system:sys,messages:[{role:'user',content:text}]})
-    });
-    const d=await r.json();
-    const raw=d.content?.[0]?.text||'{}';
-    const json=JSON.parse(raw.replace(/```json|```/g,'').trim());
-    vPending=json;
-    const res=document.getElementById('vp-res');
-    res.textContent='✓ Entendi: '+json.descricao_humana;
-    res.classList.add('show');
-    document.getElementById('vp-st').textContent='Confirme ou cancele';
-  }catch(e){
-    document.getElementById('vp-st').textContent='Erro';
-    document.getElementById('vp-txt').textContent='Erro: '+e.message;
-    notify('Erro na IA. Verifique sua API key.','err');
+  // ── VALOR ──────────────────────────────────────────────
+  const UNIDADES={'zero':0,'um':1,'uma':1,'dois':2,'duas':2,'tres':3,'quatro':4,'cinco':5,'seis':6,'sete':7,'oito':8,'nove':9,'dez':10,'onze':11,'doze':12,'treze':13,'quatorze':14,'catorze':14,'quinze':15,'dezesseis':16,'dezessete':17,'dezoito':18,'dezenove':19,'vinte':20,'trinta':30,'quarenta':40,'cinquenta':50,'sessenta':60,'setenta':70,'oitenta':80,'noventa':90,'cem':100,'cento':100,'duzentos':200,'duzentas':200,'trezentos':300,'trezentas':300,'quatrocentos':400,'quatrocentas':400,'quinhentos':500,'quinhentas':500,'seiscentos':600,'setecentos':700,'oitocentos':800,'novecentos':900};
+  function parseNumPt(s){
+    // tenta número direto primeiro
+    const direct=s.match(/(\d+(?:[.,]\d+)?)/);
+    if(direct)return parseFloat(direct[1].replace(',','.'));
+    // extenso
+    let total=0,current=0;
+    const words=s.split(/\s+e\s+|\s+/);
+    for(const w of words){
+      if(UNIDADES[w]!==undefined){
+        current+=UNIDADES[w];
+      } else if(w==='mil'){
+        current=current||1;total+=current*1000;current=0;
+      } else if(w==='milhao'||w==='milhoes'){
+        current=current||1;total+=current*1000000;current=0;
+      }
+    }
+    return total+current||0;
   }
+  // extrair valor do texto
+  const reNum=/r?\$?\s*(\d+(?:[.,]\d+)?)/i;
+  const reExt=/((?:(?:zero|um[a]?|dois|duas|tres|quatro|cinco|seis|sete|oito|nove|dez|onze|doze|treze|quatorze|catorze|quinze|dezesseis|dezessete|dezoito|dezenove|vinte|trinta|quarenta|cinquenta|sessenta|setenta|oitenta|noventa|cem|cento|duzentos?|trezentos?|quatrocentos?|quinhentos?|seiscentos?|setecentos?|oitocentos?|novecentos?|mil|milhao|milhoes)(?:\s+e\s+|\s+)?)(?:reais|real)?)/i;
+  let valor=0;
+  const mNum=t.match(reNum);
+  if(mNum){valor=parseFloat(mNum[1].replace(',','.'))}
+  else{const mExt=t.match(reExt);if(mExt)valor=parseNumPt(mExt[0])}
+
+  // ── DATA ───────────────────────────────────────────────
+  let data=today();
+  if(/ontem/.test(t)){const d=new Date();d.setDate(d.getDate()-1);data=d.toISOString().slice(0,10)}
+  else if(/anteontem/.test(t)){const d=new Date();d.setDate(d.getDate()-2);data=d.toISOString().slice(0,10)}
+  else{const mDia=t.match(/dia\s+(\d{1,2})/);if(mDia){const d=new Date();d.setDate(parseInt(mDia[1]));data=d.toISOString().slice(0,10)}}
+
+  // ── FORMA DE PAGAMENTO ─────────────────────────────────
+  let forma='PIX';
+  if(/dinheiro|especie|espécie|caixa/.test(t))forma='Dinheiro';
+  else if(/cartao|credito|debito|maquina|maquinha/.test(t))forma='Cartão';
+  else if(/boleto/.test(t))forma='Boleto';
+  else if(/debito\s*automat|automatico/.test(t))forma='Débito Automático';
+
+  // ── PARCEIROS FINANCEIROS ─────────────────────────────
+  let parceiro=null;
+  if(/\bume\b/.test(t))parceiro='UME';
+  else if(/payjoy|pay\s*joy/.test(t))parceiro='Payjoy';
+  else if(/moeda\s*social/.test(t))parceiro='Moeda Social';
+  else if(/brasilcard|brasil\s*card/.test(t))parceiro='Brasilcard';
+  else if(/parcelex/.test(t))parceiro='Parcelex';
+  else if(/crefaz/.test(t))parceiro='Crefaz';
+
+  // ── MÓDULO ────────────────────────────────────────────
+  const isCustoFixo=/luz|energia|enel|aluguel|internet|agua|condominio|pdvnet|telefon|celular\s*(da\s*loja|corporativo)|conta\s*(de\s*)?(agua|luz|gas|energia)|mensalidade/.test(t);
+  const isFuncionario=/salario|funcionari|vale\s*(transporte|alimentacao|refeicao)|admiti|contrat|demiti/.test(t);
+  const isFinanceira=parceiro!==null;
+  const isEntrada=/entrad|recebi(?!\s*recibo)|faturei|vendeu|vendemos|pix\s*(recebid|entrou)|dinheiro\s*(de\s*venda|da\s*loja|no\s*caixa)|caixa\s*do\s*dia/.test(t);
+  const isSaida=/paguei|pagou|pagamos|sai[ui]d[ao]|despesa|gastei|comprei|compra\s*de|passagem|combustivel|manutencao|erro\s*de\s*caixa|perda|estorno|marketing|anuncio|publicidade|imposto|tributo|simples|das\b|taxa/.test(t);
+
+  // ── CATEGORIA DE SAÍDA ────────────────────────────────
+  let cat='Despesa Operacional';
+  if(/compra\s*(de\s*)?(mercadoria|produto|estoque|capinha|capas|acessorio|fornecedor|korai|atacado)/.test(t))cat='Compra Mercadoria';
+  else if(/marketing|anuncio|publicidade|instagram|face\s*book|google\s*ads|impulsionamento/.test(t))cat='Marketing';
+  else if(/imposto|tributo|simples|das\b|irpj|csll|pis|cofins|iss|icms/.test(t))cat='Tributo';
+  else if(/salario|funcionari|vale/.test(t))cat='Pessoal';
+  else if(/erro\s*de\s*caixa|erro\s*no\s*caixa/.test(t))cat='Erro de Caixa';
+  else if(/perda/.test(t))cat='Perda';
+  else if(/estorno|devolu/.test(t))cat='Estorno';
+
+  // ── TIPO DE ENTRADA ───────────────────────────────────
+  let tipEntrada=null;
+  if(/\bpix\b/.test(t)&&isEntrada)tipEntrada='pix';
+  else if(/dinheiro/.test(t)&&isEntrada)tipEntrada='din';
+  else if(/cartao|maquina/.test(t)&&isEntrada)tipEntrada='cart';
+
+  // ── DESCRIÇÃO ─────────────────────────────────────────
+  let desc=text.trim();
+
+  // ── MONTAR RESULTADO ──────────────────────────────────
+  if(isFinanceira){
+    return{modulo:'financeira',dados:{parceiro,dv:data,vv:valor,dp:'',tx:0,vr:0,dr:''},
+      descricao_humana:`Venda ${parceiro} de ${fmt(valor)}`};
+  }
+  if(isFuncionario){
+    const nomeM=text.match(/(?:de|do|da|para o?a?)\s+([A-ZÀ-Ú][a-zà-ú]+(?:\s+[A-ZÀ-Ú][a-zà-ú]+)*)/);
+    return{modulo:'funcionario',dados:{nome:nomeM?nomeM[1]:'',sal:cat==='Pessoal'?valor:0,adi:0,vale:0},
+      descricao_humana:`Pessoal: ${desc} — ${fmt(valor)}`};
+  }
+  if(isCustoFixo){
+    return{modulo:'custo_fixo',dados:{nome:desc,val:valor,venc:'',forma,obs:''},
+      descricao_humana:`Custo fixo: ${desc} — ${fmt(valor)}`};
+  }
+  if(isEntrada){
+    const d={data,din:0,pix:0,tpix:0,cart:0,tcart:0,ms:0,rend:0,cred:0,obs:desc};
+    if(tipEntrada==='pix')d.pix=valor;
+    else if(tipEntrada==='cart')d.cart=valor;
+    else d.din=valor;
+    return{modulo:'entrada',dados:d,descricao_humana:`Entrada ${tipEntrada||'dinheiro'}: ${fmt(valor)}`};
+  }
+  if(isSaida||valor>0){
+    return{modulo:'saida',dados:{data,cat,forma,val:valor,desc},
+      descricao_humana:`${cat}: ${desc} — ${fmt(valor)}`};
+  }
+  return null;
+}
+
+function processVoice(text){
+  const result=parsePtBR(text);
+  if(!result||!result.modulo){
+    document.getElementById('vp-st').textContent='Não entendi';
+    document.getElementById('vp-txt').textContent='"'+text+'" — tente ser mais específico. Ex: "Paguei luz duzentos reais"';
+    return;
+  }
+  vPending=result;
+  const res=document.getElementById('vp-res');
+  res.textContent='✓ '+result.descricao_humana;
+  res.classList.add('show');
+  document.getElementById('vp-st').textContent='Confirme ou cancele';
 }
 function confirmVoice(){
   if(!vPending){cancelVoice();return}
