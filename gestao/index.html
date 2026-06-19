@@ -246,16 +246,30 @@ function checkAuth(){
 }
 function doLogin(){
   const u=document.getElementById('l-user').value.trim(),p=document.getElementById('l-pass').value;
+  // login admin
   if(u===CREDS.u&&p===CREDS.p){
     sessionStorage.setItem('srcapas_ok','1');
+    sessionStorage.setItem('srcapas_role','admin');
+    sessionStorage.setItem('srcapas_nome','Leandro');
     document.getElementById('login-screen').style.display='none';
     document.getElementById('app').style.display='flex';
     document.getElementById('voice-btn').style.display='flex';
-    initApp();
-  } else {
-    const el=document.getElementById('l-err');el.style.display='block';
-    setTimeout(()=>el.style.display='none',3000);
+    initApp();return;
   }
+  // login funcionário
+  const funs=JSON.parse(localStorage.getItem('srcapas_funcionarios_bacaxa')||'[]');
+  const fun=funs.find(f=>f.user&&f.user===u.toLowerCase()&&f.pwd===p);
+  if(fun){
+    sessionStorage.setItem('srcapas_ok','1');
+    sessionStorage.setItem('srcapas_role','funcionario');
+    sessionStorage.setItem('srcapas_nome',fun.nome);
+    document.getElementById('login-screen').style.display='none';
+    document.getElementById('app').style.display='flex';
+    document.getElementById('voice-btn').style.display='flex';
+    initApp();return;
+  }
+  const el=document.getElementById('l-err');el.style.display='block';
+  setTimeout(()=>el.style.display='none',3000);
 }
 function doLogout(){sessionStorage.removeItem('srcapas_ok');location.reload()}
 document.getElementById('l-pass').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin()});
@@ -545,7 +559,9 @@ function renderVerif(){
   const fmO=FORMAS.map(x=>`<option value="${x}">${x}</option>`).join('');
 
   const fRows=funs.map(f=>`<tr>
-    <td style="text-align:left">${f.nome}</td><td>${fmt(f.sal)}</td><td>${fmt(f.adi)}</td><td>${fmt(f.vale)}</td>
+    <td style="text-align:left">${f.nome}</td>
+    <td style="color:var(--muted);font-size:12px">${f.user?'@'+f.user:'<span style="color:var(--dim)">sem login</span>'}</td>
+    <td>${fmt(f.sal)}</td><td>${fmt(f.adi)}</td><td>${fmt(f.vale)}</td>
     <td class="gold" style="font-family:'Syne',sans-serif;font-weight:700">${fmt((+f.sal||0)+(+f.adi||0)+(+f.vale||0))}</td>
     <td><span class="badge ${f.st==='PAGO'?'b-ok':'b-pend'}">${f.st||'PENDENTE'}</span></td>
     <td><button class="btn-sm" onclick="delVi('f','${f.id}')">×</button></td>
@@ -574,12 +590,14 @@ function renderVerif(){
       <div class="fl"><label>Salário R$</label><input class="fi" type="number" step="0.01" id="fn-s" placeholder="0,00"></div>
       <div class="fl"><label>Adiantamento R$</label><input class="fi" type="number" step="0.01" id="fn-a" placeholder="0,00"></div>
       <div class="fl"><label>Vales R$</label><input class="fi" type="number" step="0.01" id="fn-v" placeholder="0,00"></div>
+      <div class="fl"><label>Usuário (login)</label><input class="fi" type="text" id="fn-user" placeholder="Ex: gerson" autocomplete="off"></div>
+      <div class="fl"><label>Senha de Acesso</label><input class="fi" type="password" id="fn-pwd" placeholder="Senha para entrar no sistema" autocomplete="new-password"></div>
       <div class="fl"><label>Status</label><select class="fi" id="fn-st">${stO}</select></div>
     </div>
     <button class="btn-gold" onclick="addFun()">Salvar Funcionário</button>
   </div>`:''}
   ${funs.length?`<div class="tbl-wrap"><table>
-    <tr><th style="text-align:left">Nome</th><th>Salário</th><th>Adiantamento</th><th>Vales</th><th>Total a Pagar</th><th>Status</th><th></th></tr>
+    <tr><th style="text-align:left">Nome</th><th style="text-align:left">Usuário</th><th>Salário</th><th>Adiantamento</th><th>Vales</th><th>Total a Pagar</th><th>Status</th><th></th></tr>
     ${fRows}
     <tr class="tfoot"><td colspan="4">TOTAL PESSOAL</td><td class="gold">${fmt(totalF)}</td><td></td><td></td></tr>
   </table></div>`:'<div class="empty" style="padding:20px">👤 <div>Nenhum funcionário cadastrado.</div></div>'}
@@ -607,7 +625,12 @@ function renderVerif(){
 function addFun(){
   const v=getVerif();if(!v.f)v.f=[];
   const n=document.getElementById('fn-n').value;if(!n){notify('Informe o nome','err');return}
-  v.f.push({id:uuid(),nome:n,sal:+document.getElementById('fn-s').value||0,adi:+document.getElementById('fn-a').value||0,vale:+document.getElementById('fn-v').value||0,st:document.getElementById('fn-st').value});
+  const user=document.getElementById('fn-user').value.trim().toLowerCase();
+  const pwd=document.getElementById('fn-pwd').value;
+  if(user&&!pwd){notify('Informe a senha para o usuário','err');return}
+  // verificar se usuário já existe
+  if(user&&v.f.find(f=>f.user===user)){notify('Usuário já cadastrado','err');return}
+  v.f.push({id:uuid(),nome:n,user:user||'',pwd:pwd||'',sal:+document.getElementById('fn-s').value||0,adi:+document.getElementById('fn-a').value||0,vale:+document.getElementById('fn-v').value||0,st:document.getElementById('fn-st').value});
   saveVerif(v);showFF=false;renderVerif();notify('Funcionário adicionado!','ok');
 }
 function addCusto(){
