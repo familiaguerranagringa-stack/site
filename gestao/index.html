@@ -893,11 +893,16 @@ function parsePtBR(text){
   }
 
   // FUNCIONÁRIO
-  if(/^funcionari/.test(tClean)){
-    const resto=tClean.replace(/^funcionari[ao]\s*/,'');
-    // nome = primeira(s) palavra(s) antes de "salario", "com", "valor"
-    const nomeM=resto.match(/^([a-zà-ú]+(?:\s+[a-zà-ú]+)?)\s+(?:salario|com|valor|\d)/);
-    const nome=nomeM?nomeM[1].split(' ').map(w=>w[0].toUpperCase()+w.slice(1)).join(' '):'';
+  if(/^funcionari|^adicionar\s+funcionari|^cadastrar\s+funcionari/.test(tClean)){
+    const resto=tClean.replace(/^(?:adicionar|cadastrar)\s+/,'').replace(/^funcionari[ao]\s*/,'');
+    // Extrair nome: palavras iniciais até encontrar palavra de parada ou número
+    const STOP=new Set(['com','de','e','o','a','os','as','um','uma','salario','valor','reais','real','mil','ao','para','no','na','do','da','dos','das','ganha','recebe','tem']);
+    const nomeWords=[];
+    for(const w of resto.split(/\s+/)){
+      if(STOP.has(w)||/^\d/.test(w))break;
+      nomeWords.push(w[0].toUpperCase()+w.slice(1));
+    }
+    const nome=nomeWords.join(' ');
     return{modulo:'funcionario',dados:{nome,sal:valor,adi:0,vale:0,st:'PENDENTE'},
       descricao_humana:`Funcionário ${nome||'novo'} — salário ${fmt(valor)}`};
   }
@@ -966,9 +971,9 @@ function confirmVoice(){
     setTab('financeiras',document.querySelector('[data-tab="financeiras"]'));
   } else if(modulo==='funcionario'){
     const v=getVerif();if(!v.f)v.f=[];
-    if(!dados.nome){notify('Nome não identificado. Tente: "Adicionar funcionário João salário dois mil"','err');cancelVoice();return}
-    v.f.push({id:uuid(),nome:dados.nome,user:'',pwd:'',sal:+dados.sal||0,adi:+dados.adi||0,vale:+dados.vale||0,st:'PENDENTE'});
-    saveVerif(v);notify('Funcionário '+dados.nome+' adicionado! 🎤','ok');
+    const nomeFinal=dados.nome||'Novo Funcionário';
+    v.f.push({id:uuid(),nome:nomeFinal,user:'',pwd:'',sal:+dados.sal||0,adi:+dados.adi||0,vale:+dados.vale||0,st:'PENDENTE'});
+    saveVerif(v);notify('✓ '+nomeFinal+' adicionado! 🎤','ok');
     setTab('verificacao',document.querySelector('[data-tab="verificacao"]'));
   } else {
     notify('Módulo "'+modulo+'" não reconhecido','err');
