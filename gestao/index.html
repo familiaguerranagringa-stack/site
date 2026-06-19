@@ -163,6 +163,8 @@ tr:hover td{background:var(--bg-hover)}
     <button class="sb-item" data-tab="financeiras" onclick="setTab('financeiras',this)">💳 Financeiras</button>
     <div class="sb-section">Gestão</div>
     <button class="sb-item" data-tab="verificacao" onclick="setTab('verificacao',this)">📋 Verificação Mensal</button>
+    <button class="sb-item" data-tab="recompra" onclick="setTab('recompra',this)">🔄 Saldo de Recompra</button>
+    <button class="sb-item" data-tab="markup" onclick="setTab('markup',this)">📐 Markup</button>
     <button class="sb-item" data-tab="dre" onclick="setTab('dre',this)">📊 DRE</button>
     <div class="sb-bottom">
 
@@ -307,7 +309,7 @@ function changePeriod(){
 
 
 // TAB
-const TITLES={dashboard:'Dashboard',entradas:'Entradas',saidas:'Saídas',financeiras:'Financeiras',verificacao:'Verificação Mensal',dre:'DRE — Resultado do Exercício'};
+const TITLES={dashboard:'Dashboard',entradas:'Entradas',saidas:'Saídas',financeiras:'Financeiras',verificacao:'Verificação Mensal',recompra:'Saldo de Recompra',markup:'Markup',dre:'DRE — Resultado do Exercício'};
 function setTab(tab,btn){
   ST.tab=tab;
   document.querySelectorAll('.sb-item').forEach(b=>b.classList.remove('active'));
@@ -318,29 +320,59 @@ function render(){
   const t=document.getElementById('tb-title');
   t.textContent=TITLES[ST.tab]||'';t.dataset.orig=t.textContent;
   document.getElementById('content').innerHTML='';
-  ({dashboard:renderDash,entradas:renderEntradas,saidas:renderSaidas,financeiras:renderFin,verificacao:renderVerif,dre:renderDRE}[ST.tab]||function(){})();
+  ({dashboard:renderDash,entradas:renderEntradas,saidas:renderSaidas,financeiras:renderFin,verificacao:renderVerif,recompra:renderRecompra,markup:renderMarkup,dre:renderDRE}[ST.tab]||function(){})();
 }
 
 // CALCS
 function calcTotais(){
   const en=load('entradas'),sa=load('saidas'),fi=loadO('fin');
-  // Financeiras primeiro (inclui Moeda Social como parceiro)
-  const finTotal=PARCEIROS.reduce((s,p)=>{
+
+  // ── Financeiras: total vendido (aparece na receita) e recebido (caixa real)
+  const finVendas=PARCEIROS.reduce((s,p)=>{
     const k=p.toLowerCase().replace(/\s+/g,'_');
-    // Só conta transações com data de recebimento preenchida
+    return s+(fi[k]||[]).reduce((a,r)=>a+(+r.vv||0),0);
+  },0);
+  const finTaxas=PARCEIROS.reduce((s,p)=>{
+    const k=p.toLowerCase().replace(/\s+/g,'_');
+    return s+(fi[k]||[]).reduce((a,r)=>a+(+r.tx||0),0);
+  },0);
+  const finRecebido=PARCEIROS.reduce((s,p)=>{
+    const k=p.toLowerCase().replace(/\s+/g,'_');
     return s+(fi[k]||[]).filter(r=>r.dr).reduce((a,r)=>a+(+r.vr||0),0);
   },0);
-  // Faturamento bruto = entradas diretas + financeiras
-  const fat=en.reduce((s,r)=>s+(+r.din||0)+(+r.pix||0)+(+r.cart||0)+(+r.rend||0)+(+r.cred||0),0)+finTotal;
+  const finAReceber=finVendas-finTaxas-finRecebido;
+
+  // ── Entradas diretas
+  const din=en.reduce((s,r)=>s+(+r.din||0),0);
+  const pix=en.reduce((s,r)=>s+(+r.pix||0),0);
+  const cart=en.reduce((s,r)=>s+(+r.cart||0),0);
+  const rend=en.reduce((s,r)=>s+(+r.rend||0),0);
+  const cred=en.reduce((s,r)=>s+(+r.cred||0),0);
   const taxas=en.reduce((s,r)=>s+(+r.tpix||0)+(+r.tcart||0),0);
+
+  // ── CMV nas entradas (campo cmv do dia)
+  const cmvEntradas=en.reduce((s,r)=>s+(+r.cmv||0),0);
+
+  // ── Saídas por categoria
   const compras=sa.filter(r=>r.cat==='Compra Mercadoria').reduce((s,r)=>s+(+r.val||0),0);
-  const despOp=sa.filter(r=>!['Compra Mercadoria','Erro de Caixa','Estorno','Perda'].includes(r.cat)).reduce((s,r)=>s+(+r.val||0),0);
   const erros=sa.filter(r=>r.cat==='Erro de Caixa').reduce((s,r)=>s+(+r.val||0),0);
   const perdas=sa.filter(r=>r.cat==='Perda').reduce((s,r)=>s+(+r.val||0),0);
-  const rl=fat-taxas;
-  const lb=rl-compras;
-  const res=lb-despOp+erros-perdas;
-  return{fat,taxas,rl,compras,despOp,erros,perdas,finTotal,lb,res,en,sa};
+  // Despesas operacionais = tudo EXCETO compras, erros, perdas, estorno
+  const despOp=sa.filter(r=>!['Compra Mercadoria','Erro de Caixa','Perda','Estorno'].includes(r.cat)).reduce((s,r)=>s+(+r.val||0),0);
+
+  // ── CMV total = compras da aba saídas + CMV lançado nas entradas
+  const cmvTotal=compras+cmvEntradas;
+
+  // ── Faturamento bruto = entradas + financeiras (total vendido, não só recebido)
+  const fat=din+pix+cart+rend+cred+finVendas;
+  const rl=fat-taxas-finTaxas;
+  const lb=rl-cmvTotal;
+  const ebitda=lb-despOp;
+  const res=ebitda-(erros+perdas);
+
+  return{fat,taxas:taxas+finTaxas,rl,compras,cmvEntradas,cmvTotal,despOp,erros,perdas,
+    finVendas,finTaxas,finRecebido,finAReceber,
+    din,pix,cart,rend,cred,lb,ebitda,res,en,sa,fi};
 }
 
 // DASHBOARD
@@ -350,10 +382,10 @@ function renderDash(){
   let h=`<div class="kpi-grid">
     <div class="kpi"><div class="kpi-accent" style="background:var(--gold)"></div><div class="kpi-label">Faturamento Bruto</div><div class="kpi-value gold">${fmt(t.fat)}</div><div class="kpi-sub">Taxas: ${fmt(t.taxas)}</div></div>
     <div class="kpi"><div class="kpi-accent" style="background:var(--blue)"></div><div class="kpi-label">Receita Líquida</div><div class="kpi-value">${fmt(t.rl)}</div><div class="kpi-sub">Após deduções</div></div>
-    <div class="kpi"><div class="kpi-accent" style="background:var(--red)"></div><div class="kpi-label">Compras (CMV)</div><div class="kpi-value neg">${fmt(t.compras)}</div><div class="kpi-sub">Custo das mercadorias</div></div>
-    <div class="kpi"><div class="kpi-accent" style="background:var(--red)"></div><div class="kpi-label">Despesas Operacionais</div><div class="kpi-value neg">${fmt(t.despOp)}</div><div class="kpi-sub">Sem compras</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--red)"></div><div class="kpi-label">CMV Total</div><div class="kpi-value neg">${fmt(t.cmvTotal)}</div><div class="kpi-sub">Compras + CMV do dia</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--red)"></div><div class="kpi-label">Despesas Operacionais</div><div class="kpi-value neg">${fmt(t.despOp)}</div><div class="kpi-sub">Excl. compras e CMV</div></div>
     <div class="kpi"><div class="kpi-accent" style="background:${t.res>=0?'var(--green)':'var(--red)'}"></div><div class="kpi-label">Resultado do Mês</div><div class="kpi-value ${t.res>=0?'pos':'neg'}">${fmt(t.res)}</div><div class="kpi-sub">${pct(t.res,t.rl)} da receita líq.</div></div>
-    <div class="kpi"><div class="kpi-accent" style="background:var(--amber)"></div><div class="kpi-label">Financeiras Recebidas</div><div class="kpi-value gold">${fmt(t.finTotal)}</div><div class="kpi-sub">UME, Payjoy, etc.</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--amber)"></div><div class="kpi-label">Financeiras a Receber</div><div class="kpi-value" style="color:var(--amber)">${fmt(t.finAReceber)}</div><div class="kpi-sub">Recebido: ${fmt(t.finRecebido)}</div></div>
   </div>`;
 
   if(t.en.length){
@@ -394,33 +426,35 @@ function renderEntradas(){
       <div class="fl"><label>Taxa Cartão R$</label><input class="fi" type="number" step="0.01" id="e-tcart" placeholder="0,00"></div>
       <div class="fl"><label>Rendimento R$</label><input class="fi" type="number" step="0.01" id="e-rend" placeholder="0,00"></div>
       <div class="fl"><label>Crediário Funcionário R$</label><input class="fi" type="number" step="0.01" id="e-cred" placeholder="0,00"></div>
+      <div class="fl" style="grid-column:span 1"><label>CMV do Dia R$ <span style="font-size:9px;color:var(--gold)">custo merc. vendida</span></label><input class="fi" type="number" step="0.01" id="e-cmv" placeholder="0,00"></div>
       <div class="fl"><label>Observação</label><input class="fi" type="text" id="e-obs" placeholder="Opcional"></div>
     </div>
     <button class="btn-gold" onclick="addEntrada()">+ Adicionar Entrada</button>
   </div>`;
 
   if(data.length){
-    let tDin=0,tPix=0,tCart=0,tTp=0,tTc=0,tG=0;
+    let tDin=0,tPix=0,tCart=0,tTp=0,tTc=0,tG=0,tTaxaTotal=0,tCmv=0;
     const rows=data.map(r=>{
       const sub=(+r.din||0)+(+r.pix||0)+(+r.cart||0)+(+r.rend||0)+(+r.cred||0);
-      tDin+=(+r.din||0);tPix+=(+r.pix||0);tCart+=(+r.cart||0);tTp+=(+r.tpix||0);tTc+=(+r.tcart||0);tG+=sub;
+      const taxa=(+r.tpix||0)+(+r.tcart||0);
+      tDin+=(+r.din||0);tPix+=(+r.pix||0);tCart+=(+r.cart||0);tTp+=(+r.tpix||0);tTc+=(+r.tcart||0);tG+=sub;tTaxaTotal+=taxa;tCmv+=(+r.cmv||0);
       const d=new Date(r.data+'T12:00:00');
       return `<tr>
         <td style="font-family:'Syne',sans-serif;font-size:11px;font-weight:600;color:var(--muted)">${d.toLocaleDateString('pt-BR',{weekday:'short',day:'2-digit',month:'2-digit'})}</td>
         <td class="pos">${r.din?fmt(r.din):'—'}</td>
         <td class="pos">${r.pix?fmt(r.pix):'—'}</td>
-        <td class="neg">${r.tpix?fmt(r.tpix):'—'}</td>
         <td class="pos">${r.cart?fmt(r.cart):'—'}</td>
-        <td class="neg">${r.tcart?fmt(r.tcart):'—'}</td>
+        <td class="neg">${taxa?fmt(taxa):'—'}</td>
+        <td class="neg">${r.cmv?fmt(r.cmv):'—'}</td>
         <td class="gold" style="font-family:'Syne',sans-serif;font-weight:700">${fmt(sub)}</td>
         <td><button class="btn-sm" onclick="delE('${r.id}')">×</button></td>
       </tr>`;
     }).join('');
     h+=`<div class="sec-hdr"><h2>Lançamentos — ${MESES[ST.mes-1]} ${ST.ano}</h2><div class="sec-line"></div></div>
     <div class="tbl-wrap"><table>
-      <tr><th>Data</th><th>Dinheiro</th><th>PIX</th><th>Taxa PIX</th><th>Cartão</th><th>Taxa Cartão</th><th>Total Dia</th><th></th></tr>
+      <tr><th>Data</th><th>Dinheiro</th><th>PIX</th><th>Cartão</th><th>Total Taxas</th><th>CMV Dia</th><th>Total Bruto</th><th></th></tr>
       ${rows}
-      <tr class="tfoot"><td>TOTAL</td><td class="pos">${fmt(tDin)}</td><td class="pos">${fmt(tPix)}</td><td class="neg">${fmt(tTp)}</td><td class="pos">${fmt(tCart)}</td><td class="neg">${fmt(tTc)}</td><td class="gold">${fmt(tG)}</td><td></td></tr>
+      <tr class="tfoot"><td>TOTAL</td><td class="pos">${fmt(tDin)}</td><td class="pos">${fmt(tPix)}</td><td class="pos">${fmt(tCart)}</td><td class="neg">${fmt(tTaxaTotal)}</td><td class="neg">${fmt(tCmv)}</td><td class="gold">${fmt(tG)}</td><td></td></tr>
     </table></div>`;
   } else {
     h+=`<div class="empty">📈 <div>Sem entradas lançadas. Use o formulário acima ou o microfone 🎤</div></div>`;
@@ -431,18 +465,27 @@ function addEntrada(){
   const data=load('entradas');
   const dt=document.getElementById('e-dt').value;
   if(!dt){notify('Selecione a data','err');return}
-  data.push({id:uuid(),data:dt,din:+document.getElementById('e-din').value||0,pix:+document.getElementById('e-pix').value||0,tpix:+document.getElementById('e-tpix').value||0,cart:+document.getElementById('e-cart').value||0,tcart:+document.getElementById('e-tcart').value||0,ms:0,rend:+document.getElementById('e-rend').value||0,cred:+document.getElementById('e-cred').value||0,obs:document.getElementById('e-obs').value});
+  data.push({id:uuid(),data:dt,din:+document.getElementById('e-din').value||0,pix:+document.getElementById('e-pix').value||0,tpix:+document.getElementById('e-tpix').value||0,cart:+document.getElementById('e-cart').value||0,tcart:+document.getElementById('e-tcart').value||0,ms:0,rend:+document.getElementById('e-rend').value||0,cred:+document.getElementById('e-cred').value||0,cmv:+document.getElementById('e-cmv').value||0,obs:document.getElementById('e-obs').value});
   data.sort((a,b)=>a.data.localeCompare(b.data));
   save('entradas',data);notify('Entrada registrada!','ok');renderEntradas();
 }
 function delE(id){if(!confirm('Remover?'))return;save('entradas',load('entradas').filter(r=>r.id!==id));renderEntradas()}
 
 // SAIDAS
+let filtroSaida='';
 function renderSaidas(){
-  const data=load('saidas');
+  const todos=load('saidas');
+  const data=filtroSaida?todos.filter(r=>r.cat===filtroSaida):todos;
   const c=document.getElementById('content');
   const catO=CAT_SAIDA.map(x=>`<option value="${x}">${x}</option>`).join('');
   const fmO=FORMAS.map(x=>`<option value="${x}">${x}</option>`).join('');
+
+  // Totais por categoria para os filtros
+  const totCat={};todos.forEach(r=>{totCat[r.cat]=(totCat[r.cat]||0)+(+r.val||0)});
+  const filtros=['',  ...CAT_SAIDA.filter(c=>totCat[c])].map(cat=>
+    `<button onclick="filtroSaida='${cat}';renderSaidas()" style="padding:5px 12px;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;border-radius:20px;cursor:pointer;border:1px solid ${filtroSaida===cat?'var(--gold)':'var(--border)'};background:${filtroSaida===cat?'var(--gold-bg)':'transparent'};color:${filtroSaida===cat?'var(--gold)':'var(--muted)'};font-family:'DM Sans',sans-serif;white-space:nowrap">${cat||'Todos'}</button>`
+  ).join('');
+
   let h=`<div class="form-card">
     <div class="sec-hdr" style="margin-bottom:14px"><h2>Nova Saída</h2><div class="sec-line"></div></div>
     <div class="fg">
@@ -453,7 +496,8 @@ function renderSaidas(){
       <div class="fl" style="grid-column:span 2"><label>Descrição / Fornecedor</label><input class="fi" type="text" id="s-desc" placeholder="Ex: Conta de luz, Passagem Gerson, Compra Korai..."></div>
     </div>
     <button class="btn-gold" onclick="addSaida()">+ Adicionar Saída</button>
-  </div>`;
+  </div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">${filtros}</div>`;
 
   if(data.length){
     let tot=0;
@@ -470,14 +514,14 @@ function renderSaidas(){
         <td><button class="btn-sm" onclick="delS('${r.id}')">×</button></td>
       </tr>`;
     }).join('');
-    h+=`<div class="sec-hdr"><h2>Saídas — ${MESES[ST.mes-1]} ${ST.ano}</h2><div class="sec-line"></div></div>
+    h+=`<div class="sec-hdr"><h2>${filtroSaida||'Todas as Saídas'} — ${MESES[ST.mes-1]} ${ST.ano}</h2><div class="sec-line"></div></div>
     <div class="tbl-wrap"><table>
       <tr><th>Data</th><th>Categoria</th><th style="text-align:left">Descrição</th><th>Forma</th><th>Valor</th><th></th></tr>
       ${rows}
-      <tr class="tfoot"><td colspan="4">TOTAL SAÍDAS</td><td class="neg">${fmt(tot)}</td><td></td></tr>
+      <tr class="tfoot"><td colspan="4">TOTAL ${filtroSaida||'SAÍDAS'}</td><td class="neg">${fmt(tot)}</td><td></td></tr>
     </table></div>`;
   } else {
-    h+=`<div class="empty">📉 <div>Sem saídas lançadas. Use o formulário ou o microfone 🎤</div></div>`;
+    h+=`<div class="empty">📉 <div>${filtroSaida?'Nenhuma saída nessa categoria.':'Sem saídas lançadas.'}</div></div>`;
   }
   c.innerHTML=h;
 }
@@ -708,7 +752,7 @@ function toggleCusto(id){
   saveVerif(v);renderVerif();
 }
 
-// DRE
+// DRE + RECOMPRA + MARKUP
 function renderDRE(){
   const t=calcTotais();
   const v=getVerif();
@@ -719,17 +763,13 @@ function renderDRE(){
   const sOp=sa.filter(r=>r.cat==='Despesa Operacional').reduce((s,r)=>s+(+r.val||0),0);
   const trib=sa.filter(r=>r.cat==='Tributo').reduce((s,r)=>s+(+r.val||0),0);
   const totalDOp=pessoal+custoFixo+mkt+sOp+trib;
-  const lb=t.rl-t.compras;
+  const lb=t.rl-t.cmvTotal;
   const ebitda=lb-totalDOp;
-  const res=ebitda+t.erros-t.perdas;
+  const res=ebitda-(t.erros+t.perdas);
 
-  const en=t.en;
-  const din=en.reduce((s,r)=>s+(+r.din||0),0);
-  const pix=en.reduce((s,r)=>s+(+r.pix||0),0);
-  const cart=en.reduce((s,r)=>s+(+r.cart||0),0);
-  const ms=en.reduce((s,r)=>s+(+r.ms||0),0);
-  const rend=en.reduce((s,r)=>s+(+r.rend||0),0);
-  const cred=en.reduce((s,r)=>s+(+r.cred||0),0);
+  const row=(l,val,cls='')=>`<div class="dre-row"><div class="dre-l">${l}</div><div class="dre-v ${cls}">${fmt(val)}</div></div>`;
+  const hdr=l=>`<div class="dre-row dre-hdr"><div class="dre-l">${l}</div><div class="dre-v"></div></div>`;
+  const sub=(l,val)=>`<div class="dre-row dre-sub"><div class="dre-l">${l}</div><div class="dre-v ${vc(val)}">${fmt(val)}</div></div>`;
 
   const row=(l,val,cls='')=>`<div class="dre-row"><div class="dre-l">${l}</div><div class="dre-v ${cls}">${fmt(val)}</div></div>`;
   const hdr=l=>`<div class="dre-row dre-hdr"><div class="dre-l">${l}</div><div class="dre-v"></div></div>`;
@@ -742,17 +782,18 @@ function renderDRE(){
     </div>
     <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden">
     ${hdr('RECEITA OPERACIONAL BRUTA')}
-    ${row('Dinheiro',din,'pos')}
-    ${row('PIX (bruto)',pix,'pos')}
-    ${row('Cartão PagBank (bruto)',cart,'pos')}
-    ${row('Financeiras (UME, Payjoy, Moeda Social...)',t.finTotal,'pos')}
-    ${row('Rendimentos',rend,'pos')}
+    ${row('Dinheiro',t.din,'pos')}
+    ${row('PIX (bruto)',t.pix,'pos')}
+    ${row('Cartão PagBank (bruto)',t.cart,'pos')}
+    ${row('Financeiras — total vendido (UME, Payjoy...)',t.finVendas,'pos')}
+    ${row('Rendimentos',t.rend,'pos')}
     ${sub('TOTAL FATURAMENTO BRUTO',t.fat)}
     ${hdr('DEDUÇÕES')}
-    ${row('Taxas PIX + Cartão',-t.taxas,'neg')}
+    ${row('Taxas PIX + Cartão + Financeiras',-t.taxas,'neg')}
     ${sub('RECEITA OPERACIONAL LÍQUIDA',t.rl)}
-    ${hdr('CUSTOS')}
-    ${row('CMV — Compra de Mercadorias',-t.compras,'neg')}
+    ${hdr('CMV — CUSTO DAS MERCADORIAS')}
+    ${row('Compras (aba Saídas)',-t.compras,'neg')}
+    ${row('CMV lançado nas Entradas',-t.cmvEntradas,'neg')}
     ${sub('LUCRO BRUTO',lb)}
     ${hdr('DESPESAS OPERACIONAIS')}
     ${row('Pessoal (Salários, Vales, Adiant.)',-pessoal,'neg')}
@@ -762,11 +803,19 @@ function renderDRE(){
     ${row('Tributos',-trib,'neg')}
     ${sub('RESULTADO OPERACIONAL (EBITDA)',ebitda)}
     ${hdr('AJUSTES')}
-    ${row('Erros de Caixa',t.erros,vc(t.erros))}
+    ${row('Erros de Caixa',-t.erros,'neg')}
     ${row('Perdas',-t.perdas,'neg')}
     <div class="dre-row dre-final"><div class="dre-l">RESULTADO LÍQUIDO DO MÊS</div><div class="dre-v ${res>=0?'pos':'neg'}">${fmt(res)}</div></div>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:16px">
+    <div style="margin-top:12px;padding:14px;background:var(--gold-bg);border:1px solid var(--gold-dim);border-radius:8px">
+      <div style="font-size:10px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px">Financeiras — Posição</div>
+      <div style="display:flex;gap:24px;flex-wrap:wrap">
+        <div><div style="font-size:10px;color:var(--dim)">Total Vendido</div><div style="font-family:'Syne',sans-serif;font-size:16px;font-weight:700">${fmt(t.finVendas)}</div></div>
+        <div><div style="font-size:10px;color:var(--dim)">Recebido</div><div style="font-family:'Syne',sans-serif;font-size:16px;font-weight:700;color:var(--green)">${fmt(t.finRecebido)}</div></div>
+        <div><div style="font-size:10px;color:var(--dim)">A Receber</div><div style="font-family:'Syne',sans-serif;font-size:16px;font-weight:700;color:var(--amber)">${fmt(t.finAReceber)}</div></div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:12px">
       <div class="kpi"><div class="kpi-label">Margem Bruta</div><div class="kpi-value">${pct(lb,t.rl)}</div></div>
       <div class="kpi"><div class="kpi-label">Margem EBITDA</div><div class="kpi-value">${pct(ebitda,t.rl)}</div></div>
       <div class="kpi"><div class="kpi-accent" style="background:${res>=0?'var(--green)':'var(--red)'}"></div><div class="kpi-label">Margem Líquida</div><div class="kpi-value ${res>=0?'pos':'neg'}">${pct(res,t.rl)}</div></div>
@@ -775,9 +824,118 @@ function renderDRE(){
   document.getElementById('content').innerHTML=h;
 }
 
-// ═══════════════════════════════════════════════════════
-// SISTEMA DE VOZ — WAKE WORD "MALVADÃO"
-// ═══════════════════════════════════════════════════════
+// SALDO DE RECOMPRA
+function renderRecompra(){
+  const t=calcTotais();
+  const sa=load('saidas');
+  // CMV orçado = o que foi vendido * margem média (user define manualmente)
+  const cmvOrc=loadO('recompra_meta').cmvOrc||0;
+  const jaComprado=t.compras+t.cmvEntradas;
+  const perdas=t.perdas;
+  const saldo=cmvOrc-jaComprado-perdas;
+  const c=document.getElementById('content');
+
+  c.innerHTML=`<div style="max-width:560px">
+    <div class="sec-hdr" style="margin-bottom:20px"><h2>Saldo de Recompra — ${MESES[ST.mes-1]} ${ST.ano}</h2><div class="sec-line"></div></div>
+
+    <div class="form-card" style="margin-bottom:24px">
+      <div class="sec-hdr" style="margin-bottom:12px"><h2>CMV Orçado do Mês</h2><div class="sec-line"></div></div>
+      <div class="fg">
+        <div class="fl"><label>CMV Orçado R$ <span style="font-size:9px;color:var(--muted)">meta de compras do mês</span></label>
+          <input class="fi" type="number" step="0.01" id="rc-orc" value="${cmvOrc||''}" placeholder="0,00"
+            oninput="saveO('recompra_meta',{cmvOrc:+this.value||0});renderRecompra()">
+        </div>
+      </div>
+    </div>
+
+    <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:20px">
+      <div class="dre-row dre-hdr"><div class="dre-l">CÁLCULO DO SALDO</div><div class="dre-v"></div></div>
+      <div class="dre-row"><div class="dre-l">CMV Orçado (meta do mês)</div><div class="dre-v gold">${fmt(cmvOrc)}</div></div>
+      <div class="dre-row"><div class="dre-l">(-) Compras já realizadas</div><div class="dre-v neg">${fmt(t.compras)}</div></div>
+      <div class="dre-row"><div class="dre-l">(-) CMV lançado nas Entradas</div><div class="dre-v neg">${fmt(t.cmvEntradas)}</div></div>
+      <div class="dre-row"><div class="dre-l">(-) Perdas</div><div class="dre-v neg">${fmt(perdas)}</div></div>
+      <div class="dre-row dre-final">
+        <div class="dre-l">SALDO DISPONÍVEL PARA RECOMPRA</div>
+        <div class="dre-v ${saldo>=0?'pos':'neg'}">${fmt(saldo)}</div>
+      </div>
+    </div>
+
+    <div class="kpi-grid">
+      <div class="kpi"><div class="kpi-label">CMV Orçado</div><div class="kpi-value gold">${fmt(cmvOrc)}</div></div>
+      <div class="kpi"><div class="kpi-label">Já Comprado</div><div class="kpi-value neg">${fmt(jaComprado)}</div><div class="kpi-sub">${pct(jaComprado,cmvOrc)} do orçado</div></div>
+      <div class="kpi"><div class="kpi-accent" style="background:${saldo>=0?'var(--green)':'var(--red)'}"></div><div class="kpi-label">Saldo Livre</div><div class="kpi-value ${saldo>=0?'pos':'neg'}">${fmt(saldo)}</div></div>
+    </div>
+  </div>`;
+}
+
+// MARKUP
+function renderMarkup(){
+  const t=calcTotais();
+  const v=getVerif();
+  const pessoal=(v.f||[]).reduce((s,f)=>s+(+f.sal||0)+(+f.adi||0)+(+f.vale||0),0);
+  const custoFixo=(v.c||[]).reduce((s,c)=>s+(+c.val||0),0);
+  const sa=load('saidas');
+  const mkt=sa.filter(r=>r.cat==='Marketing').reduce((s,r)=>s+(+r.val||0),0);
+  const sOp=sa.filter(r=>r.cat==='Despesa Operacional').reduce((s,r)=>s+(+r.val||0),0);
+  const trib=sa.filter(r=>r.cat==='Tributo').reduce((s,r)=>s+(+r.val||0),0);
+  const totalDespesas=pessoal+custoFixo+mkt+sOp+trib+t.taxas+t.erros+t.perdas;
+  const custoTotal=t.cmvTotal+totalDespesas;
+  const markup=t.rl>0&&t.cmvTotal>0?(t.rl/t.cmvTotal):0;
+  const markupMinimo=t.rl>0&&custoTotal>0?(t.rl/custoTotal):0;
+  const lucroSobVenda=t.rl>0?(t.res/t.rl*100):0;
+
+  const c=document.getElementById('content');
+  c.innerHTML=`<div style="max-width:560px">
+    <div class="sec-hdr" style="margin-bottom:20px"><h2>Markup — ${MESES[ST.mes-1]} ${ST.ano}</h2><div class="sec-line"></div></div>
+
+    <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:20px">
+      <div class="dre-row dre-hdr"><div class="dre-l">COMPOSIÇÃO DO CUSTO</div><div class="dre-v"></div></div>
+      <div class="dre-row"><div class="dre-l">Receita Líquida (base)</div><div class="dre-v gold">${fmt(t.rl)}</div></div>
+      <div class="dre-row"><div class="dre-l">CMV Total (mercadoria)</div><div class="dre-v neg">${fmt(t.cmvTotal)}</div></div>
+      <div class="dre-row"><div class="dre-l">Taxas (PIX, Cartão, Financeiras)</div><div class="dre-v neg">${fmt(t.taxas)}</div></div>
+      <div class="dre-row"><div class="dre-l">Despesas Operacionais</div><div class="dre-v neg">${fmt(totalDespesas-t.taxas)}</div></div>
+      <div class="dre-row"><div class="dre-l">Perdas + Erros de Caixa</div><div class="dre-v neg">${fmt(t.erros+t.perdas)}</div></div>
+      <div class="dre-row dre-sub"><div class="dre-l">CUSTO TOTAL</div><div class="dre-v neg">${fmt(custoTotal)}</div></div>
+      <div class="dre-row dre-final"><div class="dre-l">RESULTADO</div><div class="dre-v ${t.res>=0?'pos':'neg'}">${fmt(t.res)}</div></div>
+    </div>
+
+    <div class="kpi-grid">
+      <div class="kpi">
+        <div class="kpi-label">Markup sobre CMV</div>
+        <div class="kpi-value gold">${markup>0?markup.toFixed(2)+'x':'—'}</div>
+        <div class="kpi-sub">Receita ÷ CMV</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Markup Mínimo</div>
+        <div class="kpi-value">${markupMinimo>0?markupMinimo.toFixed(2)+'x':'—'}</div>
+        <div class="kpi-sub">Para cobrir todos os custos</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">% CMV sobre Receita</div>
+        <div class="kpi-value neg">${pct(t.cmvTotal,t.rl)}</div>
+        <div class="kpi-sub">Ideal: abaixo de 50%</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">% Despesas sobre Receita</div>
+        <div class="kpi-value neg">${pct(totalDespesas,t.rl)}</div>
+        <div class="kpi-sub">Overhead total</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Lucro sobre Venda</div>
+        <div class="kpi-value ${lucroSobVenda>=0?'pos':'neg'}">${lucroSobVenda.toFixed(1)}%</div>
+        <div class="kpi-sub">Resultado / Receita</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-accent" style="background:var(--amber)"></div>
+        <div class="kpi-label">Financeiras a Receber</div>
+        <div class="kpi-value" style="color:var(--amber)">${fmt(t.finAReceber)}</div>
+        <div class="kpi-sub">Não incluso no resultado</div>
+      </div>
+    </div>
+  </div>`;
+}
+
+
 let recognition=null,vListening=false,vPending=null;
 let wakeRecog=null,wakeActive=false,wakeArmed=false;
 const WAKE_WORD='malvadao';
