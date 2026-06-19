@@ -317,16 +317,18 @@ function render(){
 // CALCS
 function calcTotais(){
   const en=load('entradas'),sa=load('saidas'),fi=loadO('fin');
-  const fat=en.reduce((s,r)=>s+(+r.din||0)+(+r.pix||0)+(+r.cart||0)+(+r.ms||0)+(+r.rend||0)+(+r.cred||0),0);
+  // Financeiras primeiro (inclui Moeda Social como parceiro)
+  const finTotal=PARCEIROS.reduce((s,p)=>{
+    const k=p.toLowerCase().replace(/\s+/g,'_');
+    return s+(fi[k]||[]).reduce((a,r)=>a+(+r.vr||0),0);
+  },0);
+  // Faturamento bruto = entradas diretas + financeiras
+  const fat=en.reduce((s,r)=>s+(+r.din||0)+(+r.pix||0)+(+r.cart||0)+(+r.rend||0)+(+r.cred||0),0)+finTotal;
   const taxas=en.reduce((s,r)=>s+(+r.tpix||0)+(+r.tcart||0),0);
   const compras=sa.filter(r=>r.cat==='Compra Mercadoria').reduce((s,r)=>s+(+r.val||0),0);
   const despOp=sa.filter(r=>!['Compra Mercadoria','Erro de Caixa','Estorno','Perda'].includes(r.cat)).reduce((s,r)=>s+(+r.val||0),0);
   const erros=sa.filter(r=>r.cat==='Erro de Caixa').reduce((s,r)=>s+(+r.val||0),0);
   const perdas=sa.filter(r=>r.cat==='Perda').reduce((s,r)=>s+(+r.val||0),0);
-  const finTotal=PARCEIROS.reduce((s,p)=>{
-    const k=p.toLowerCase().replace(/\s+/g,'_');
-    return s+(fi[k]||[]).reduce((a,r)=>a+(+r.vr||0),0);
-  },0);
   const rl=fat-taxas;
   const lb=rl-compras;
   const res=lb-despOp+erros-perdas;
@@ -382,7 +384,6 @@ function renderEntradas(){
       <div class="fl"><label>Taxa PIX R$</label><input class="fi" type="number" step="0.01" id="e-tpix" placeholder="0,00"></div>
       <div class="fl"><label>Cartão PagBank R$</label><input class="fi" type="number" step="0.01" id="e-cart" placeholder="0,00"></div>
       <div class="fl"><label>Taxa Cartão R$</label><input class="fi" type="number" step="0.01" id="e-tcart" placeholder="0,00"></div>
-      <div class="fl"><label>Moeda Social R$</label><input class="fi" type="number" step="0.01" id="e-ms" placeholder="0,00"></div>
       <div class="fl"><label>Rendimento R$</label><input class="fi" type="number" step="0.01" id="e-rend" placeholder="0,00"></div>
       <div class="fl"><label>Crediário Funcionário R$</label><input class="fi" type="number" step="0.01" id="e-cred" placeholder="0,00"></div>
       <div class="fl"><label>Observação</label><input class="fi" type="text" id="e-obs" placeholder="Opcional"></div>
@@ -393,7 +394,7 @@ function renderEntradas(){
   if(data.length){
     let tDin=0,tPix=0,tCart=0,tTp=0,tTc=0,tG=0;
     const rows=data.map(r=>{
-      const sub=(+r.din||0)+(+r.pix||0)+(+r.cart||0)+(+r.ms||0)+(+r.rend||0)+(+r.cred||0);
+      const sub=(+r.din||0)+(+r.pix||0)+(+r.cart||0)+(+r.rend||0)+(+r.cred||0);
       tDin+=(+r.din||0);tPix+=(+r.pix||0);tCart+=(+r.cart||0);tTp+=(+r.tpix||0);tTc+=(+r.tcart||0);tG+=sub;
       const d=new Date(r.data+'T12:00:00');
       return `<tr>
@@ -403,16 +404,15 @@ function renderEntradas(){
         <td class="neg">${r.tpix?fmt(r.tpix):'—'}</td>
         <td class="pos">${r.cart?fmt(r.cart):'—'}</td>
         <td class="neg">${r.tcart?fmt(r.tcart):'—'}</td>
-        <td class="pos">${r.ms?fmt(r.ms):'—'}</td>
         <td class="gold" style="font-family:'Syne',sans-serif;font-weight:700">${fmt(sub)}</td>
         <td><button class="btn-sm" onclick="delE('${r.id}')">×</button></td>
       </tr>`;
     }).join('');
     h+=`<div class="sec-hdr"><h2>Lançamentos — ${MESES[ST.mes-1]} ${ST.ano}</h2><div class="sec-line"></div></div>
     <div class="tbl-wrap"><table>
-      <tr><th>Data</th><th>Dinheiro</th><th>PIX</th><th>Taxa PIX</th><th>Cartão</th><th>Taxa Cartão</th><th>Moeda Social</th><th>Total Dia</th><th></th></tr>
+      <tr><th>Data</th><th>Dinheiro</th><th>PIX</th><th>Taxa PIX</th><th>Cartão</th><th>Taxa Cartão</th><th>Total Dia</th><th></th></tr>
       ${rows}
-      <tr class="tfoot"><td>TOTAL</td><td class="pos">${fmt(tDin)}</td><td class="pos">${fmt(tPix)}</td><td class="neg">${fmt(tTp)}</td><td class="pos">${fmt(tCart)}</td><td class="neg">${fmt(tTc)}</td><td>—</td><td class="gold">${fmt(tG)}</td><td></td></tr>
+      <tr class="tfoot"><td>TOTAL</td><td class="pos">${fmt(tDin)}</td><td class="pos">${fmt(tPix)}</td><td class="neg">${fmt(tTp)}</td><td class="pos">${fmt(tCart)}</td><td class="neg">${fmt(tTc)}</td><td class="gold">${fmt(tG)}</td><td></td></tr>
     </table></div>`;
   } else {
     h+=`<div class="empty">📈 <div>Sem entradas lançadas. Use o formulário acima ou o microfone 🎤</div></div>`;
@@ -423,7 +423,7 @@ function addEntrada(){
   const data=load('entradas');
   const dt=document.getElementById('e-dt').value;
   if(!dt){notify('Selecione a data','err');return}
-  data.push({id:uuid(),data:dt,din:+document.getElementById('e-din').value||0,pix:+document.getElementById('e-pix').value||0,tpix:+document.getElementById('e-tpix').value||0,cart:+document.getElementById('e-cart').value||0,tcart:+document.getElementById('e-tcart').value||0,ms:+document.getElementById('e-ms').value||0,rend:+document.getElementById('e-rend').value||0,cred:+document.getElementById('e-cred').value||0,obs:document.getElementById('e-obs').value});
+  data.push({id:uuid(),data:dt,din:+document.getElementById('e-din').value||0,pix:+document.getElementById('e-pix').value||0,tpix:+document.getElementById('e-tpix').value||0,cart:+document.getElementById('e-cart').value||0,tcart:+document.getElementById('e-tcart').value||0,ms:0,rend:+document.getElementById('e-rend').value||0,cred:+document.getElementById('e-cred').value||0,obs:document.getElementById('e-obs').value});
   data.sort((a,b)=>a.data.localeCompare(b.data));
   save('entradas',data);notify('Entrada registrada!','ok');renderEntradas();
 }
@@ -690,8 +690,7 @@ function renderDRE(){
     ${row('Dinheiro',din,'pos')}
     ${row('PIX (bruto)',pix,'pos')}
     ${row('Cartão PagBank (bruto)',cart,'pos')}
-    ${row('Moeda Social',ms,'pos')}
-    ${row('Financeiras (Crediários)',t.finTotal,'pos')}
+    ${row('Financeiras (UME, Payjoy, Moeda Social...)',t.finTotal,'pos')}
     ${row('Rendimentos',rend,'pos')}
     ${sub('TOTAL FATURAMENTO BRUTO',t.fat)}
     ${hdr('DEDUÇÕES')}
