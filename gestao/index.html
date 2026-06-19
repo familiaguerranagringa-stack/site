@@ -1032,8 +1032,10 @@ function renderRecompra(){
 
 // ═══════════════════════════════════════════════════════
 // MARKUP COMPLETO
-// ═══════════════════════════════════════════════════════
-const CAT_PRODUTO=['Celulares','Eletrônicos','Acessórios','Películas','Capas','Outros'];
+const CAT_PRODUTO=['Celulares','Eletrônicos','Acessórios','Películas','Capas'];
+const CAT_PCTS={Celulares:32,'Eletrônicos':17,'Acessórios':13,'Películas':22,Capas:16};
+const CAT_COLORS=['#C9A850','#7FB8C9','#4ADE80','#F5A623','#F87171'];
+const VEND_COLORS=['#C9A850','#7FB8C9','#4ADE80','#F5A623','#F87171','#7FC9A8','#C084FC'];
 
 function mkCfg(){return loadO('mk_cfg')}
 function saveMkCfg(d){saveO('mk_cfg',d);flashSaved()}
@@ -1042,380 +1044,207 @@ function saveMkLeao(d){saveO('mk_leao',d)}
 function mkVend(){return loadO('mk_vend')}
 function saveMkVend(d){saveO('mk_vend',d)}
 
-// Cor do markup por porcentagem
-function mkColor(p){
-  if(!p||p===0)return'var(--dim)';
-  if(p>=1.05)return'#22c55e';
-  if(p>=1.00)return'#4ade80';
-  if(p>=0.95)return'#facc15';
-  if(p>=0.90)return'#fb923c';
-  return'var(--red)';
+function mkPizzaSVG(slices,colors){
+  const total=slices.reduce((s,v)=>s+(+v||0),0);
+  if(!total)return'<circle cx="60" cy="60" r="50" fill="var(--border)"/>';
+  let ang=-90,out='';
+  slices.forEach((v,i)=>{
+    const v2=+v||0; if(!v2)return;
+    const deg=(v2/total)*360;
+    const r=50,cx=60,cy=60;
+    const a1=ang*Math.PI/180, a2=(ang+deg)*Math.PI/180;
+    const x1=(cx+r*Math.cos(a1)).toFixed(2),y1=(cy+r*Math.sin(a1)).toFixed(2);
+    const x2=(cx+r*Math.cos(a2)).toFixed(2),y2=(cy+r*Math.sin(a2)).toFixed(2);
+    const lg=deg>180?1:0;
+    out+=`<path d="M${cx},${cy} L${x1},${y1} A${r},${r} 0 ${lg},1 ${x2},${y2} Z" fill="${colors[i%colors.length]}" opacity=".9"/>`;
+    ang+=deg;
+  });
+  return out;
 }
-function mkBg(p){
-  if(!p||p===0)return'transparent';
-  if(p>=1.05)return'#052010';
-  if(p>=1.00)return'#082A14';
-  if(p>=0.95)return'#2A2000';
-  if(p>=0.90)return'#2A1000';
-  return'#2A0808';
-}
+function mkColor(p){if(!p)return'var(--dim)';if(p>=1.05)return'#22c55e';if(p>=1.00)return'#4ade80';if(p>=0.95)return'#facc15';if(p>=0.90)return'#fb923c';return'var(--red)'}
+function mkBg(p){if(!p)return'transparent';if(p>=1.05)return'#052010';if(p>=1.00)return'#082A14';if(p>=0.95)return'#2A2000';if(p>=0.90)return'#2A1000';return'#2A0808'}
+function saveMkField(k,v){const d=mkCfg();d[k]=v;saveMkCfg(d)}
 
 function renderMarkup(){
-  const cfg=mkCfg();
-  const leao=mkLeao();
-  const vend=mkVend();
-  const en=[...load('entradas')].sort((a,b)=>a.data.localeCompare(b.data));
-  const sa=load('saidas');
-  const funcionarios=(getVerif().f||[]);
-  const nomes=funcionarios.map(f=>f.nome).filter(Boolean);
+  try{
+    const cfg=mkCfg(),leao=mkLeao(),vend=mkVend();
+    const en=[...load('entradas')].sort((a,b)=>a.data.localeCompare(b.data));
+    const sa=load('saidas');
+    const funcionarios=(getVerif().f||[]);
+    const nomes=funcionarios.map(f=>f.nome).filter(Boolean);
+    const metaDigitada=cfg.metaMes||0;
+    const diasAbrir=cfg.diasAbrir||26;
 
-  const metaDigitada=cfg.metaMes||0;
-  const diasAbrir=cfg.diasAbrir||26;
-  // Porcentagem de markup atual (última linha da tabela com dados)
-  const enSortedMk=[...load('entradas')].sort((a,b)=>a.data.localeCompare(b.data)).filter(r=>r.cmv>0||(+r.din+r.pix+r.cart)>0);
-  const lastEn=enSortedMk[enSortedMk.length-1];
-  let pctAtual=1.0;
-  if(lastEn){
+    // Markup atual
     let cAcc=0,vAcc=0;
-    enSortedMk.forEach(r=>{cAcc+=(+r.cmv||0);vAcc+=(+r.din||0)+(+r.pix||0)+(+r.cart||0);});
-    pctAtual=cAcc>0?vAcc/(2*cAcc):1.0;
-  }
-  // Formula: meta = metaDigitada / (pctAtual / (1 + pctAtual))
-  const metaMes=pctAtual>0&&metaDigitada>0?metaDigitada/(pctAtual/(1+pctAtual)):metaDigitada;
-  // Percentuais fixos por categoria
-  const CAT_PCTS_FIXOS={Celulares:32,Eletrônicos:17,Acessórios:13,Películas:22,Capas:16,Outros:0};
+    en.forEach(r=>{cAcc+=(+r.cmv||0);vAcc+=(+r.din||0)+(+r.pix||0)+(+r.cart||0);});
+    const pctAtual=cAcc>0&&vAcc>0?vAcc/(2*cAcc):1.0;
+    const metaMes=metaDigitada>0&&pctAtual>0?metaDigitada/(pctAtual/(1+pctAtual)):metaDigitada;
 
-  // ── Tabela acumulativa ─────────────────────────────
-  let cmvAcc=0,vendaAcc=0,taxasAcc=0,gastosAcc=0;
-  const diasAbertos=[];
-  const rows=[];
-  const gastosDia={};
+    // Tabela acumulativa
+    const diasMes=new Date(ST.ano,ST.mes,0).getDate();
+    const hoje=new Date();
+    const gastosDia={};
+    sa.forEach(r=>{if(r.data&&r.val)gastosDia[r.data]=(gastosDia[r.data]||0)+(+r.val||0)});
+    let cmvAcc2=0,vendaAcc=0,taxasAcc=0,gastosAcc=0;
+    const diasAbertos=[];
+    const tblRows=[];
 
-  // Gastos por dia (das saídas)
-  sa.forEach(r=>{
-    if(r.data&&r.val)gastosDia[r.data]=(gastosDia[r.data]||0)+(+r.val||0);
-  });
-
-  const hoje=new Date();
-  const diasMes=new Date(ST.ano,ST.mes,0).getDate();
-
-  for(let d=1;d<=diasMes;d++){
-    const dt=`${ST.ano}-${String(ST.mes).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-    const dataObj=new Date(dt+'T12:00:00');
-    const dow=dataObj.getDay(); // 0=dom
-    const isSun=dow===0;
-    const enDia=en.find(r=>r.data===dt);
-    const isFuture=dataObj>hoje;
-
-    if(!isSun&&enDia){
-      const cmvDia=(+enDia.cmv||0);
-      const vendaDia=(+enDia.din||0)+(+enDia.pix||0)+(+enDia.cart||0)+(+enDia.rend||0);
-      const taxaDia=(+enDia.tpix||0)+(+enDia.tcart||0);
-      const gastoDia=gastosDia[dt]||0;
-      cmvAcc+=cmvDia;
-      vendaAcc+=vendaDia;
-      taxasAcc+=taxaDia;
-      gastosAcc+=gastoDia;
-      diasAbertos.push(dt);
+    for(let d=1;d<=diasMes;d++){
+      const dt=ST.ano+'-'+String(ST.mes).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+      const dataObj=new Date(dt+'T12:00:00');
+      const isSun=dataObj.getDay()===0;
+      const isFuture=dataObj>hoje;
+      const enDia=en.find(r=>r.data===dt);
+      if(!isSun&&enDia){
+        cmvAcc2+=(+enDia.cmv||0);
+        vendaAcc+=(+enDia.din||0)+(+enDia.pix||0)+(+enDia.cart||0)+(+enDia.rend||0);
+        taxasAcc+=(+enDia.tpix||0)+(+enDia.tcart||0);
+        gastosAcc+=gastosDia[dt]||0;
+        diasAbertos.push(dt);
+      }
+      tblRows.push({d,dt,isSun,isFuture,enDia,cmvAcc:cmvAcc2,vendaAcc,taxasAcc,gastosAcc,imposto:vendaAcc*0.09,pct:cmvAcc2>0&&vendaAcc>0?vendaAcc/(2*cmvAcc2):0});
     }
 
-    const pct_val=vendaAcc>0&&cmvAcc>0?vendaAcc/(2*cmvAcc):0;
-    const imposto=vendaAcc*0.09;
+    const totalVendido=vendaAcc;
+    const nDias=diasAbertos.length;
+    const media=nDias>0?totalVendido/nDias:0;
+    const projecao=media*diasAbrir;
+    const diasRest=Math.max(diasAbrir-nDias,1);
+    const vendaDia=metaMes>0?(metaMes-totalVendido)/diasRest:0;
+    const pctMeta=metaMes>0?Math.min(totalVendido/metaMes,1):0;
+    const nVend=nomes.length||1;
+    const metaVendInd=metaMes/nVend;
 
-    rows.push({d,dt,isSun,isFuture,cmvAcc,vendaAcc,taxasAcc,gastosAcc,imposto,pct_val,enDia,dow});
-  }
-
-  const totalVendido=vendaAcc;
-  const nDiasAbertos=diasAbertos.length;
-  const mediaVenda=nDiasAbertos>0?totalVendido/nDiasAbertos:0;
-  const projecao=mediaVenda*diasAbrir;
-  const diasRestantes=diasAbrir-nDiasAbertos;
-  const vendaPorDia=diasRestantes>0?(metaMes-totalVendido)/Math.max(diasRestantes,1):0;
-  const pctMeta=metaMes>0?totalVendido/metaMes:0;
-
-  // ── Render ─────────────────────────────────────────
-  const c=document.getElementById('content');
-
-  // ── Seção META ─────────────────────────────────────
-  const catPcts=CAT_PCTS_FIXOS; // percentuais fixos
-  const catRows=CAT_PRODUTO.map(cat=>{
-    const pp=catPcts[cat]||0;
-    const metaCat=metaMes*(pp/100);
-    return `<tr>
-      <td>${cat}</td>
-      <td><input type="number" step="0.1" value="${pp}" min="0" max="100"
-        onchange="updCatPct('${cat}',this.value)"
-        style="background:transparent;border:none;border-bottom:1px dashed var(--border);color:var(--gold);width:50px;text-align:right;font-family:'DM Sans',sans-serif;font-size:13px;outline:none">%</td>
-      <td class="gold">${fmt(metaCat)}</td>
-    </tr>`;
-  }).join('');
-
-  // Meta por vendedor
-  const vendNomes=nomes.length>0?nomes:['(sem vendedores)'];
-  const nVend=vendNomes.length||1;
-  const metaVendIndividual=metaMes/nVend; // meta dividida igualmente
-  const vendRows=vendNomes.filter(n=>n!=='(sem vendedores)').map(nome=>{
-    const metaVend=metaVendIndividual;
-    const catCols=CAT_PRODUTO.map(cat=>{
-      const pp=catPcts[cat]||0;
-      const metaVendCat=metaVend*(pp/100);
-      const vendido=((vend[nome]||{})[cat]||0);
-      const falta=metaVendCat-vendido;
-      return `<td style="text-align:right;font-size:11px">
-        <div style="color:var(--gold)">${fmt(metaVendCat)}</div>
-        <div style="color:var(--green)">${fmt(vendido)}</div>
-        <div style="color:${falta>0?'var(--red)':'var(--green)'}">
-          ${falta>0?'Falta '+fmt(falta):'✓ Batido'}
-        </div>
-      </td>`;
+    // Gráficos
+    const vendDiaria=tblRows.filter(r=>!r.isSun&&r.enDia&&r.vendaAcc>0);
+    const maxV=Math.max(...vendDiaria.map(r=>r.vendaAcc-(tblRows[tblRows.indexOf(r)-1]?.vendaAcc||0)),1);
+    const barrasH=tblRows.filter(r=>!r.isSun&&r.enDia).map(r=>{
+      const ant=tblRows.find((x,i)=>i===tblRows.indexOf(r)-1&&!x.isSun&&x.enDia);
+      const diario=(r.vendaAcc)-(ant?ant.vendaAcc:0);
+      if(diario<=0)return'';
+      const h=Math.max(Math.round(diario/maxV*80),2);
+      return'<div style="display:flex;flex-direction:column;align-items:center;gap:3px;flex-shrink:0;min-width:22px"><div style="width:16px;height:'+h+'px;background:var(--gold);border-radius:2px 2px 0 0" title="'+fmt(diario)+'"></div><div style="font-size:9px;color:var(--dim)">'+r.d+'</div></div>';
     }).join('');
-    return `<tr>
-      <td><strong>${nome}</strong><br>
-        <span style="font-size:10px;color:var(--muted)">
-          Meta: <input type="number" step="0.1" value="${pNome}" min="0" max="100"
-            onchange="updVendMeta('${nome}',this.value)"
-            style="background:transparent;border:none;border-bottom:1px dashed var(--border);color:var(--gold);width:40px;text-align:center;font-family:'DM Sans',sans-serif;font-size:10px;outline:none">%
-          = ${fmt(metaVend)}
-        </span>
-      </td>
-      ${catCols}
-    </tr>`;
-  }).join('');
 
-  // ── Corrida do Leão ────────────────────────────────
-  // Organizar por semanas
-  const semanas=[];
-  let semAtual=null;
-  rows.forEach(r=>{
-    if(r.dow===1||(r.d===1&&!semAtual)){ // segunda = nova semana
-      semAtual={num:semanas.length+1,dias:[]};
-      semanas.push(semAtual);
-    }
-    if(!semAtual){semAtual={num:1,dias:[]};semanas.push(semAtual);}
-    semAtual.dias.push(r);
-  });
+    const pizzaCat=mkPizzaSVG(CAT_PRODUTO.map(c=>CAT_PCTS[c]||0),CAT_COLORS);
+    const legCat=CAT_PRODUTO.map((c,i)=>'<div style="display:flex;align-items:center;gap:4px;font-size:10px"><div style="width:8px;height:8px;background:'+CAT_COLORS[i]+';border-radius:2px"></div>'+c+' '+( CAT_PCTS[c]||0)+'%</div>').join('');
+    const vendTotals=nomes.map(n=>Object.values(vend[n]||{}).reduce((s,v2)=>s+(+v2||0),0));
+    const pizzaVend=mkPizzaSVG(vendTotals,VEND_COLORS);
+    const totalVA=vendTotals.reduce((s,v)=>s+v,0);
+    const legVend=nomes.map((n,i)=>'<div style="display:flex;align-items:center;gap:4px;font-size:10px"><div style="width:8px;height:8px;background:'+VEND_COLORS[i%VEND_COLORS.length]+';border-radius:2px"></div>'+n+' '+(totalVA>0?(vendTotals[i]/totalVA*100).toFixed(0):0)+'%</div>').join('');
 
-  const leaoRows=vendNomes.filter(n=>n!=='(sem vendedores)').map(nome=>{
-    const pontos=rows.filter(r=>leao[r.dt]===nome&&!r.isSun).length;
-    const cells=rows.map(r=>{
-      if(r.isSun)return`<td style="background:#1a0808;color:var(--dim);text-align:center;font-size:9px;padding:4px">D</td>`;
-      const venceu=leao[r.dt]===nome;
-      return`<td onclick="toggleLeao('${r.dt}','${nome}')" title="Dia ${r.d}"
-        style="background:${venceu?'#052010':'transparent'};color:${venceu?'#22c55e':'var(--dim)'};
-        text-align:center;font-size:11px;cursor:pointer;padding:4px;transition:background .15s;
-        ${r.isFuture?'opacity:.4':''}">
-        ${venceu?'★':'·'}
-      </td>`;
+    // HTML da tabela de markup
+    const mkTblRows=tblRows.filter(r=>!r.isFuture&&r.vendaAcc>0&&!r.isSun).map(r=>{
+      const p=r.pct;
+      return'<tr style="background:'+mkBg(p)+'"><td style="font-family:\'Syne\',sans-serif;font-size:11px;color:var(--muted)">'+r.d+'/'+String(ST.mes).padStart(2,'0')+'</td><td>'+fmt(r.cmvAcc)+'</td><td>'+fmt(r.vendaAcc)+'</td><td class="neg">'+fmt(r.taxasAcc)+'</td><td class="neg">'+fmt(r.gastosAcc)+'</td><td class="neg">'+fmt(r.imposto)+'</td><td style="font-family:\'Syne\',sans-serif;font-weight:700;color:'+mkColor(p)+'">'+(p>0?(p*100).toFixed(1)+'%':'—')+'</td></tr>';
     }).join('');
-    return`<tr>
-      <td style="white-space:nowrap;font-size:12px;padding:6px 10px">${nome}</td>
-      ${cells}
-      <td style="text-align:center;font-family:'Syne',sans-serif;font-weight:700;color:var(--gold);padding:4px 10px">${pontos}</td>
-    </tr>`;
-  }).join('');
 
-  const dayHeaders=rows.map(r=>`<th style="padding:2px 4px;font-size:9px;font-weight:600;color:${r.isSun?'var(--red)':'var(--muted)'};text-align:center">${r.d}</th>`).join('');
+    // HTML corrida do leão
+    const dayHdrs=tblRows.map(r=>'<th style="padding:2px 4px;font-size:9px;color:'+(r.isSun?'var(--red)':'var(--muted)')+';text-align:center">'+r.d+'</th>').join('');
+    const leaoTbody=nomes.map(nome=>{
+      const pontos=tblRows.filter(r=>!r.isSun&&leao[r.dt]===nome).length;
+      const cells=tblRows.map(r=>{
+        if(r.isSun)return'<td style="background:#1a0808;color:var(--dim);text-align:center;font-size:9px;padding:3px 2px">D</td>';
+        const w=leao[r.dt]===nome;
+        return'<td onclick="toggleLeao(\''+r.dt+'\',\''+nome+'\')" style="background:'+(w?'#052010':'transparent')+';color:'+(w?'#22c55e':'var(--dim)')+';text-align:center;font-size:12px;cursor:pointer;padding:3px 4px">'+(w?'★':'·')+'</td>';
+      }).join('');
+      return'<tr><td style="white-space:nowrap;font-size:12px;padding:5px 10px;min-width:100px">'+nome+'</td>'+cells+'<td style="text-align:center;font-family:\'Syne\',sans-serif;font-weight:700;color:var(--gold);padding:4px 10px">'+pontos+'</td></tr>';
+    }).join('');
 
-  // ── Tabela de markup ─────────────────────────────
-  const mkRows=rows.filter(r=>!r.isFuture&&(r.vendaAcc>0||r.r===rows.length)).map(r=>{
-    if(r.isSun)return'';
-    const p=r.pct_val;
-    const pStr=p>0?(p*100).toFixed(1)+'%':'—';
-    return`<tr style="background:${mkBg(p)}">
-      <td style="font-family:'Syne',sans-serif;font-size:11px;color:var(--muted)">${r.d}/${String(ST.mes).padStart(2,'0')}</td>
-      <td>${fmt(r.cmvAcc)}</td>
-      <td>${fmt(r.vendaAcc)}</td>
-      <td class="neg">${fmt(r.taxasAcc)}</td>
-      <td class="neg">${fmt(r.gastosAcc)}</td>
-      <td class="neg">${fmt(r.imposto)}</td>
-      <td style="font-family:'Syne',sans-serif;font-weight:700;color:${mkColor(p)}">${pStr}</td>
-    </tr>`;
-  }).join('');
+    // HTML meta por vendedor
+    const vendTblRows=nomes.map(nome=>{
+      const catCols=CAT_PRODUTO.map(cat=>{
+        const pp=CAT_PCTS[cat]||0;
+        const metaVendCat=metaVendInd*(pp/100);
+        const vendido=(vend[nome]||{})[cat]||0;
+        const falta=metaVendCat-vendido;
+        return'<td style="text-align:right;font-size:11px"><div style="color:var(--gold)">'+fmt(metaVendCat)+'</div><div style="color:var(--green)">'+fmt(vendido)+'</div><div style="color:'+(falta>0?'var(--red)':'var(--green)')+'">'+( falta>0?'Falta '+fmt(falta):'✓ Batido')+'</div></td>';
+      }).join('');
+      return'<tr><td><strong>'+nome+'</strong><br><span style="font-size:10px;color:var(--gold)">'+fmt(metaVendInd)+'</span></td>'+catCols+'</tr>';
+    }).join('');
 
-  // ── Gráfico de barras (venda diária) ───────────────
-  const vendasDiarias=rows.map(r=>{
-    if(r.isSun||!r.enDia)return{d:r.d,v:0,isSun:r.isSun};
-    const v=(+r.enDia.din||0)+(+r.enDia.pix||0)+(+r.enDia.cart||0);
-    return{d:r.d,v,isSun:r.isSun};
-  }).filter(r=>!r.isSun);
-  const maxV=Math.max(...vendasDiarias.map(r=>r.v),1);
-  const barras=vendasDiarias.filter(r=>r.v>0).map(r=>{
-    const h=Math.round(r.v/maxV*80);
-    return`<div style="display:flex;flex-direction:column;align-items:center;gap:3px;flex-shrink:0;min-width:22px">
-      <div style="width:16px;height:${h}px;background:var(--gold);border-radius:2px 2px 0 0;cursor:pointer" title="${fmt(r.v)}"></div>
-      <div style="font-size:9px;color:var(--dim)">${r.d}</div>
-    </div>`;
-  }).join('');
+    // Render final
+    const c=document.getElementById('content');
+    let h='';
 
-  // ── Gráfico pizza categorias ────────────────────────
-  const catColors=['#C9A850','#7FB8C9','#4ADE80','#F5A623','#F87171','#7FC9A8'];
-  function makePizza(slices,colors){
-    let angle=-90,arcs='';
-    const total=slices.reduce((s,v)=>s+v,0);
-    if(!total)return'<circle cx="60" cy="60" r="50" fill="var(--border)"/>';
-    slices.forEach((v,i)=>{
-      if(!v)return;
-      const deg=(v/total)*360;
-      const r=50,cx=60,cy=60;
-      const start=angle,end=angle+deg;
-      const x1=cx+r*Math.cos(start*Math.PI/180);
-      const y1=cy+r*Math.sin(start*Math.PI/180);
-      const x2=cx+r*Math.cos(end*Math.PI/180);
-      const y2=cy+r*Math.sin(end*Math.PI/180);
-      const large=deg>180?1:0;
-      arcs+=`<path d="M${cx},${cy} L${x1.toFixed(1)},${y1.toFixed(1)} A${r},${r} 0 ${large},1 ${x2.toFixed(1)},${y2.toFixed(1)} Z" fill="${colors[i%colors.length]}" opacity=".85"/>`;
-      angle+=deg;
+    // Bloco META
+    h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">';
+    h+='<div class="form-card"><div class="sec-hdr" style="margin-bottom:12px"><h2>Meta do Mês</h2><div class="sec-line"></div></div>';
+    h+='<div class="fg" style="grid-template-columns:1fr 1fr">';
+    h+='<div class="fl"><label>Meta Base R$</label><input class="fi" type="number" step="0.01" value="'+(metaDigitada||'')+'" placeholder="0,00" onchange="saveMkField(\'metaMes\',+this.value);renderMarkup()"></div>';
+    h+='<div class="fl"><label>Dias a Abrir</label><input class="fi" type="number" value="'+diasAbrir+'" min="1" max="31" onchange="saveMkField(\'diasAbrir\',+this.value);renderMarkup()"></div></div>';
+    h+='<div style="margin:8px 0;padding:8px 10px;background:var(--gold-bg);border:1px solid var(--gold-dim);border-radius:6px;font-size:11px"><span style="color:var(--muted)">Meta ajustada (markup '+( pctAtual*100).toFixed(1)+'%):</span><span style="font-family:\'Syne\',sans-serif;font-weight:700;color:var(--gold);margin-left:8px">'+fmt(metaMes)+'</span></div>';
+    h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
+    h+='<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px"><div style="font-size:9px;color:var(--muted);text-transform:uppercase;margin-bottom:4px">Total Vendido</div><div style="font-family:\'Syne\',sans-serif;font-size:15px;font-weight:700;color:var(--green)">'+fmt(totalVendido)+'</div></div>';
+    h+='<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px"><div style="font-size:9px;color:var(--muted);text-transform:uppercase;margin-bottom:4px">Média de Venda</div><div style="font-family:\'Syne\',sans-serif;font-size:15px;font-weight:700;color:var(--text)">'+fmt(media)+'</div></div>';
+    h+='<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px"><div style="font-size:9px;color:var(--muted);text-transform:uppercase;margin-bottom:4px">Projeção de Venda</div><div style="font-family:\'Syne\',sans-serif;font-size:15px;font-weight:700;color:var(--blue)">'+fmt(projecao)+'</div></div>';
+    h+='<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px"><div style="font-size:9px;color:var(--muted);text-transform:uppercase;margin-bottom:4px">Venda p/ o Dia</div><div style="font-family:\'Syne\',sans-serif;font-size:15px;font-weight:700;color:var(--amber)">'+fmt(vendaDia)+'</div></div>';
+    h+='</div>';
+    h+='<div style="margin-top:8px;background:var(--bg);border-radius:6px;overflow:hidden"><div style="height:5px;background:var(--border)"><div style="height:100%;background:'+(pctMeta>=1?'var(--green)':'var(--gold)')+';width:'+Math.min(pctMeta*100,100).toFixed(1)+'%"></div></div>';
+    h+='<div style="font-size:10px;color:var(--muted);padding:3px 6px">'+(pctMeta*100).toFixed(1)+'% da meta</div></div></div>';
+
+    // Meta por categoria
+    h+='<div class="form-card"><div class="sec-hdr" style="margin-bottom:12px"><h2>Meta por Categoria</h2><div class="sec-line"></div></div>';
+    h+='<div class="tbl-wrap"><table style="min-width:0"><tr><th style="text-align:left">Categoria</th><th>%</th><th>Meta R$</th></tr>';
+    CAT_PRODUTO.forEach(cat=>{
+      const pp=CAT_PCTS[cat]||0;
+      h+='<tr><td>'+cat+'</td><td class="gold" style="text-align:right">'+pp+'%</td><td class="gold" style="font-family:\'Syne\',sans-serif;font-weight:700">'+fmt(metaMes*(pp/100))+'</td></tr>';
     });
-    return arcs;
+    h+='</table></div></div></div>';
+
+    // Meta por vendedor
+    if(nomes.length>0){
+      h+='<div class="sec-hdr" style="margin-bottom:10px"><h2>Meta por Vendedor</h2><div class="sec-line"></div></div>';
+      h+='<div style="font-size:11px;color:var(--muted);margin-bottom:8px">Meta individual: '+fmt(metaVendInd)+' ('+fmt(metaMes)+' ÷ '+nVend+' vendedor'+(nVend>1?'es':'')+')</div>';
+      h+='<div class="tbl-wrap" style="margin-bottom:16px"><table><tr><th style="text-align:left">Vendedor</th>';
+      CAT_PRODUTO.forEach(cat=>{h+='<th>'+cat+'</th>';});
+      h+='</tr>'+vendTblRows+'</table></div>';
+      h+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">';
+      nomes.forEach(nome=>{h+='<button class="btn-ghost" onclick="editVendCats(\''+nome+'\')" style="font-size:11px">✏ '+nome+'</button>';});
+      h+='</div><div id="vend-cat-editor"></div>';
+    }
+
+    // Corrida do Leão
+    h+='<div class="sec-hdr" style="margin:20px 0 10px"><h2>🦁 Corrida do Leão — '+MESES[ST.mes-1]+' '+ST.ano+'</h2><div class="sec-line"></div></div>';
+    h+='<div style="font-size:11px;color:var(--muted);margin-bottom:8px">Clique no ★ do dia para marcar vencedor. Domingos em vermelho.</div>';
+    if(nomes.length>0){
+      h+='<div class="tbl-wrap" style="margin-bottom:16px"><table style="min-width:0"><tr><th style="text-align:left;min-width:90px">Vendedor</th>'+dayHdrs+'<th>★</th></tr>'+leaoTbody+'</table></div>';
+    } else {
+      h+='<div class="empty">👥 Adicione funcionários na Verificação Mensal.</div>';
+    }
+
+    // Informativos
+    h+='<div class="sec-hdr" style="margin-bottom:10px"><h2>Informativos</h2><div class="sec-line"></div></div>';
+    h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px">';
+    [
+      ['💰 Vendedor Olhando de Cima','R$5.000 no dia → R$50 no dia seguinte. R$7.000 → R$100.'],
+      ['⭐ Mais Avaliado','Mais avaliações positivas no Google → R$200 (mín. 20 avaliações).'],
+      ['💳 Bônus UME','R$10 por contrato. Pago no 8º do mês seguinte. Sem preço promocional.'],
+      ['💳 Bônus Payjoy','R$10 por contrato + película Hidrogel. Pago no 8º do mês seguinte.'],
+    ].forEach(([t,d])=>{
+      h+='<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:12px"><div style="font-family:\'Syne\',sans-serif;font-size:10px;font-weight:700;color:var(--gold);margin-bottom:5px">'+t+'</div><div style="font-size:11px;color:var(--muted);line-height:1.5">'+d+'</div></div>';
+    });
+    h+='</div>';
+
+    // Tabela Markup Acumulativo
+    h+='<div class="sec-hdr" style="margin-bottom:10px"><h2>Markup Acumulativo — '+MESES[ST.mes-1]+' '+ST.ano+'</h2><div class="sec-line"></div></div>';
+    h+='<div class="tbl-wrap" style="margin-bottom:20px"><table><tr><th>Data</th><th>CMV Acum.</th><th>Venda Acum.</th><th>Taxas Acum.</th><th>Gastos Acum.</th><th>Imposto 9%</th><th>%</th></tr>';
+    h+=mkTblRows||'<tr><td colspan="7" class="dim" style="padding:20px;text-align:center">Sem dados de CMV. Lance o CMV do dia nas Entradas.</td></tr>';
+    h+='</table></div>';
+
+    // Gráficos
+    h+='<div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:14px;margin-bottom:24px">';
+    h+='<div class="chart-block"><div class="chart-lbl">Vendas Diárias</div><div style="display:flex;align-items:flex-end;gap:3px;height:90px;overflow-x:auto;padding-bottom:18px">'+(barrasH||'<div style="color:var(--dim);font-size:12px">Sem dados</div>')+'</div></div>';
+    h+='<div class="chart-block"><div class="chart-lbl">Categorias</div><div style="display:flex;flex-direction:column;align-items:center;gap:8px"><svg viewBox="0 0 120 120" width="100" height="100">'+pizzaCat+'</svg><div style="display:flex;flex-direction:column;gap:3px">'+legCat+'</div></div></div>';
+    h+='<div class="chart-block"><div class="chart-lbl">Por Vendedor</div><div style="display:flex;flex-direction:column;align-items:center;gap:8px"><svg viewBox="0 0 120 120" width="100" height="100">'+pizzaVend+'</svg><div style="display:flex;flex-direction:column;gap:3px">'+(legVend||'<div style="font-size:11px;color:var(--dim)">Sem dados</div>')+'</div></div></div>';
+    h+='</div>';
+
+    c.innerHTML=h;
+  } catch(err){
+    document.getElementById('content').innerHTML='<div class="empty" style="color:var(--red)">Erro no Markup: '+err.message+'</div>';
+    console.error('renderMarkup error:',err);
   }
-
-  // Pizza categorias (por % da meta)
-  const catSlices=CAT_PRODUTO.map(cat=>catPcts[cat]||0);
-  const pizzaCat=makePizza(catSlices,catColors);
-  const legendCat=CAT_PRODUTO.map((cat,i)=>`<div style="display:flex;align-items:center;gap:5px;font-size:10px"><div style="width:9px;height:9px;background:${catColors[i]};border-radius:2px;flex-shrink:0"></div>${cat} ${catPcts[cat]||0}%</div>`).join('');
-
-  // Pizza vendedores (por total vendido)
-  const vendTotals=vendNomes.filter(n=>n!=='(sem vendedores)').map(nome=>{
-    return Object.values(vend[nome]||{}).reduce((s,v)=>s+(+v||0),0);
-  });
-  const vendColors=['#C9A850','#7FB8C9','#4ADE80','#F5A623','#F87171','#7FC9A8','#C084FC'];
-  const pizzaVend=makePizza(vendTotals,vendColors);
-  const totalVendAll=vendTotals.reduce((s,v)=>s+v,0);
-  const legendVend=vendNomes.filter(n=>n!=='(sem vendedores)').map((nome,i)=>{
-    const v=vendTotals[i]||0;
-    const pp=totalVendAll>0?(v/totalVendAll*100).toFixed(0):'0';
-    return`<div style="display:flex;align-items:center;gap:5px;font-size:10px"><div style="width:9px;height:9px;background:${vendColors[i%vendColors.length]};border-radius:2px;flex-shrink:0"></div>${nome} ${pp}%</div>`;
-  }).join('');
-
-  c.innerHTML=`
-  <!-- META DO MÊS -->
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px">
-    <div class="form-card">
-      <div class="sec-hdr" style="margin-bottom:12px"><h2>Meta do Mês</h2><div class="sec-line"></div></div>
-      <div class="fg" style="grid-template-columns:1fr 1fr">
-        <div class="fl"><label>Meta Base R$ <span style="font-size:9px;color:var(--dim)">(valor alvo)</span></label>
-          <input class="fi" type="number" step="0.01" id="mk-meta" value="${metaDigitada||''}" placeholder="0,00"
-            onchange="saveMkField('metaMes',+this.value);renderMarkup()">
-        </div>
-        <div class="fl"><label>Dias a Abrir</label>
-          <input class="fi" type="number" id="mk-dias" value="${diasAbrir}" min="1" max="31"
-            onchange="saveMkField('diasAbrir',+this.value);renderMarkup()">
-        </div>
-      </div>
-      <div style="margin-top:8px;padding:8px 10px;background:var(--gold-bg);border:1px solid var(--gold-dim);border-radius:6px;font-size:11px">
-        <span style="color:var(--muted)">Meta ajustada pelo markup (${(pctAtual*100).toFixed(1)}%):</span>
-        <span style="font-family:'Syne',sans-serif;font-weight:700;color:var(--gold);margin-left:8px">${fmt(metaMes)}</span>
-      </div>
-      <div style="margin-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        ${[
-          ['Total Vendido',fmt(totalVendido),(pctMeta*100).toFixed(1)+'%','var(--green)'],
-          ['Média de Venda',fmt(mediaVenda),'por dia abertura','var(--muted)'],
-          ['Projeção de Venda',fmt(projecao),diasAbrir+' dias','var(--blue)'],
-          ['Venda p/ o Dia',fmt(vendaPorDia),diasRestantes+' dias restantes','var(--amber)'],
-        ].map(([l,v,s,cor])=>`<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px">
-          <div style="font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:4px">${l}</div>
-          <div style="font-family:'Syne',sans-serif;font-size:16px;font-weight:700;color:${cor}">${v}</div>
-          <div style="font-size:10px;color:var(--dim)">${s}</div>
-        </div>`).join('')}
-      </div>
-      <div style="margin-top:10px;background:var(--bg);border-radius:6px;overflow:hidden">
-        <div style="height:6px;background:var(--border)">
-          <div style="height:100%;background:${pctMeta>=1?'var(--green)':'var(--gold)'};width:${Math.min(pctMeta*100,100).toFixed(1)}%;transition:width .4s"></div>
-        </div>
-        <div style="font-size:10px;color:var(--muted);padding:4px 6px">${(pctMeta*100).toFixed(1)}% da meta atingida</div>
-      </div>
-    </div>
-
-    <!-- META POR CATEGORIA -->
-    <div class="form-card">
-      <div class="sec-hdr" style="margin-bottom:12px"><h2>Meta por Categoria</h2><div class="sec-line"></div></div>
-      <div class="tbl-wrap">
-        <table style="min-width:0">
-          <tr><th style="text-align:left">Categoria</th><th>%</th><th>Meta R$</th></tr>
-          ${catRows}
-        </table>
-      </div>
-    </div>
-  </div>
-
-  <!-- META POR VENDEDOR -->
-  ${nomes.length>0?`<div class="sec-hdr" style="margin-bottom:12px"><h2>Meta por Vendedor</h2><div class="sec-line"></div></div>
-  <div class="tbl-wrap" style="margin-bottom:24px">
-    <table>
-      <tr><th style="text-align:left">Vendedor / %Meta</th>
-        ${CAT_PRODUTO.map(cat=>`<th>${cat}</th>`).join('')}
-      </tr>
-      ${vendRows}
-    </table>
-  </div>
-  <div style="font-size:11px;color:var(--dim);margin-bottom:4px">Total vendido por categoria (editar por vendedor):</div>
-  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:24px">
-    ${nomes.map(nome=>`<button class="btn-ghost" onclick="editVendCats('${nome}')" style="font-size:11px">${nome}</button>`).join('')}
-  </div>
-  <div id="vend-cat-editor"></div>`:'<div class="empty">👤 Adicione funcionários na aba Verificação Mensal para ver metas por vendedor.</div>'}
-
-  <!-- CORRIDA DO LEÃO -->
-  <div class="sec-hdr" style="margin:24px 0 12px"><h2>🦁 Corrida do Leão</h2><div class="sec-line"></div></div>
-  <div style="font-size:11px;color:var(--muted);margin-bottom:8px">Clique no dia de um vendedor para marcar como vencedor. Domingos em vermelho. ★ = venceu o dia.</div>
-  <div class="tbl-wrap" style="margin-bottom:8px">
-    <table style="min-width:0">
-      <tr><th style="text-align:left;min-width:100px">Vendedor</th>${dayHeaders}<th>Pontos</th></tr>
-      ${leaoRows||'<tr><td colspan="33" class="empty">Adicione vendedores na Verificação Mensal.</td></tr>'}
-    </table>
-  </div>
-  <div style="font-size:10px;color:var(--dim);margin-bottom:24px">Total de pontos ao final do mês define o ranking.</div>
-
-  <!-- INFORMATIVOS -->
-  <div class="sec-hdr" style="margin-bottom:12px"><h2>Informativos</h2><div class="sec-line"></div></div>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:24px">
-    ${[
-      ['💰 Vendedor Olhando de Cima','Vender R$5.000 no dia → R$50 no dia seguinte. Vender R$7.000 → R$100 no dia seguinte.'],
-      ['⭐ Mais Avaliado','Vendedor com mais avaliações positivas no Google → R$200,00 (mínimo 20 avaliações com compra cadastrada).'],
-      ['💳 Bonificação UME','R$10,00 por contrato finalizado. Pago no 8º dia do mês seguinte. Proibido vender em preço promocional.'],
-      ['💳 Bonificação Payjoy','R$10,00 por contrato + película Hidrogel obrigatória. Pago no 8º dia do mês seguinte.'],
-    ].map(([t,d])=>`<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:14px">
-      <div style="font-family:'Syne',sans-serif;font-size:10px;font-weight:700;letter-spacing:.1em;color:var(--gold);margin-bottom:6px">${t}</div>
-      <div style="font-size:12px;color:var(--muted);line-height:1.5">${d}</div>
-    </div>`).join('')}
-  </div>
-
-  <!-- TABELA MARKUP ACUMULATIVO -->
-  <div class="sec-hdr" style="margin-bottom:12px"><h2>Markup Acumulativo — ${MESES[ST.mes-1]} ${ST.ano}</h2><div class="sec-line"></div></div>
-  <div class="tbl-wrap" style="margin-bottom:24px">
-    <table>
-      <tr><th>Data</th><th>CMV Acum.</th><th>Venda Acum.</th><th>Taxas Acum.</th><th>Gastos Acum.</th><th>Imposto (9%)</th><th>Porcentagem</th></tr>
-      ${mkRows||'<tr><td colspan="7" class="empty">Sem dados. Lance CMV nas Entradas.</td></tr>'}
-    </table>
-  </div>
-
-  <!-- GRÁFICOS -->
-  <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:14px;margin-bottom:24px">
-    <div class="chart-block">
-      <div class="chart-lbl">Vendas Diárias — ${MESES[ST.mes-1]}</div>
-      <div style="display:flex;align-items:flex-end;gap:4px;height:100px;overflow-x:auto;padding-bottom:20px">
-        ${barras||'<div style="color:var(--dim);font-size:12px">Sem dados</div>'}
-      </div>
-    </div>
-    <div class="chart-block">
-      <div class="chart-lbl">Por Categoria (% meta)</div>
-      <div style="display:flex;flex-direction:column;align-items:center;gap:10px">
-        <svg viewBox="0 0 120 120" width="100" height="100">
-          ${pizzaCat}
-        </svg>
-        <div style="display:flex;flex-direction:column;gap:3px">${legendCat}</div>
-      </div>
-    </div>
-    <div class="chart-block">
-      <div class="chart-lbl">Por Vendedor (total vendido)</div>
-      <div style="display:flex;flex-direction:column;align-items:center;gap:10px">
-        <svg viewBox="0 0 120 120" width="100" height="100">
-          ${pizzaVend||'<circle cx="60" cy="60" r="50" fill="var(--border)"/>'}
-        </svg>
-        <div style="display:flex;flex-direction:column;gap:3px">${legendVend||'<div style="font-size:11px;color:var(--dim)">Sem dados</div>'}</div>
-      </div>
-    </div>
-  </div>
-  `;
 }
 
 function saveMkField(k,v){const d=mkCfg();d[k]=v;saveMkCfg(d)}
