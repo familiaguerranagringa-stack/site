@@ -535,6 +535,7 @@ function editEntrada(id){
     {id:'tcart',label:'Taxa Cartão R$',type:'number',value:r.tcart||''},
     {id:'rend',label:'Rendimento R$',type:'number',value:r.rend||''},
     {id:'cred',label:'Crediário Funcionário R$',type:'number',value:r.cred||''},
+    {id:'cmv',label:'CMV do Dia R$',type:'number',value:r.cmv||''},
     {id:'obs',label:'Observação',type:'text',value:r.obs||''},
   ],vals=>{
     Object.assign(r,vals);
@@ -783,13 +784,28 @@ function saveVerif(v){
   if(v.c!==undefined) localStorage.setItem(sk('verif_custos'), JSON.stringify(v.c));
   flashSaved();
 }
-let showFF=false,showFC=false;
+let showFF=false,showFC=false,filtroCusto='';
 function renderVerif(){
   const v=getVerif();
-  const funs=v.f||[],custos=v.c||[];
+  const funs=v.f||[];
+  const todosC=v.c||[];
+  // Filtro de custos
+  const custos=filtroCusto?todosC.filter(cu=>cu.st===filtroCusto):todosC;
   const c=document.getElementById('content');
   const stO=['PENDENTE','PAGO','VENCIDO'].map(x=>`<option value="${x}">${x}</option>`).join('');
   const fmO=FORMAS.map(x=>`<option value="${x}">${x}</option>`).join('');
+
+  // Verificar vencimentos
+  const hj=new Date();hj.setHours(0,0,0,0);
+  const amanha=new Date(hj);amanha.setDate(amanha.getDate()+1);
+  function vencBadge(cu){
+    if(cu.st==='PAGO'||!cu.venc)return'';
+    const vd=new Date(cu.venc+'T12:00:00');vd.setHours(0,0,0,0);
+    if(vd.getTime()===hj.getTime())return'<span class="badge" style="background:#2A0808;color:var(--red);border-color:#3A0F0F;margin-left:6px">🔴 VENCE HOJE</span>';
+    if(vd.getTime()===amanha.getTime())return'<span class="badge" style="background:#2A2000;color:var(--amber);border-color:#3A2800;margin-left:6px">⚠ VENCE AMANHÃ</span>';
+    if(vd<hj&&cu.st!=='PAGO')return'<span class="badge b-late" style="margin-left:6px">VENCIDO</span>';
+    return'';
+  }
 
   const fRows=funs.map(f=>`<tr>
     <td style="text-align:left">${f.nome}</td>
@@ -802,7 +818,7 @@ function renderVerif(){
   const totalF=funs.reduce((s,f)=>s+(+f.sal||0)+(+f.adi||0)+(+f.vale||0),0);
 
   const cRows=custos.map(cu=>`<tr>
-    <td style="text-align:left">${cu.nome}</td><td>${fmt(cu.val)}</td>
+    <td style="text-align:left">${cu.nome}${vencBadge(cu)}</td><td>${fmt(cu.val)}</td>
     <td style="font-family:'Syne',sans-serif;font-size:11px;color:var(--muted)">${cu.venc?new Date(cu.venc+'T12:00:00').toLocaleDateString('pt-BR'):'—'}</td>
     <td>${cu.forma||'—'}</td>
     <td><span class="badge ${cu.st==='PAGO'?'b-ok':cu.st==='VENCIDO'?'b-late':'b-pend'}">${cu.st||'PENDENTE'}</span></td>
@@ -813,7 +829,11 @@ function renderVerif(){
       <button class="btn-sm" onclick="delVi('c','${cu.id}')">×</button>
     </td>
   </tr>`).join('');
-  const totalC=custos.reduce((s,cu)=>s+(+cu.val||0),0);
+  const totalC=todosC.reduce((s,cu)=>s+(+cu.val||0),0);
+  const pagosC=todosC.filter(cu=>cu.st==='PAGO').reduce((s,cu)=>s+(+cu.val||0),0);
+  const pendentesC=todosC.filter(cu=>cu.st!=='PAGO').reduce((s,cu)=>s+(+cu.val||0),0);
+  // Filtros de custos
+  const filtrosBtns=['','PENDENTE','PAGO','VENCIDO'].map(f=>`<button onclick="filtroCusto='${f}';renderVerif()" style="padding:5px 12px;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;border-radius:20px;cursor:pointer;border:1px solid ${filtroCusto===f?'var(--gold)':'var(--border)'};background:${filtroCusto===f?'var(--gold-bg)':'transparent'};color:${filtroCusto===f?'var(--gold)':'var(--muted)'};font-family:'DM Sans',sans-serif">${f||'Todos'}</button>`).join('');
   const pagos=custos.filter(cu=>cu.st==='PAGO').reduce((s,cu)=>s+(+cu.val||0),0);
 
   const h=`
@@ -837,6 +857,10 @@ function renderVerif(){
   </table></div>`:'<div class="empty" style="padding:20px">👤 <div>Nenhum funcionário cadastrado.</div></div>'}
 
   <div class="sec-hdr" style="margin-top:8px"><h2>Custos Fixos</h2><div class="sec-line"></div><button class="btn-ghost" onclick="showFC=!showFC;renderVerif()">${showFC?'− Fechar':'+ Custo Fixo'}</button></div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center">
+    ${filtrosBtns}
+    <span style="font-size:11px;color:var(--muted);margin-left:8px">Pago: <span style="color:var(--green)">${fmt(pagosC)}</span> | Pendente: <span style="color:var(--amber)">${fmt(pendentesC)}</span></span>
+  </div>
   ${showFC?`<div class="form-card">
     <div class="fg">
       <div class="fl" style="grid-column:span 2"><label>Descrição</label><input class="fi" type="text" id="cu-n" placeholder="Ex: Luz Enel, Aluguel Paulo César, Internet OKVirtual..."></div>
@@ -1119,20 +1143,43 @@ function renderMarkup(){
     // Gráficos
     const vendDiaria=tblRows.filter(r=>!r.isSun&&r.enDia&&r.vendaAcc>0);
     const maxV=Math.max(...vendDiaria.map(r=>r.vendaAcc-(tblRows[tblRows.indexOf(r)-1]?.vendaAcc||0)),1);
-    const barrasH=tblRows.filter(r=>!r.isSun&&r.enDia).map(r=>{
-      const ant=tblRows.find((x,i)=>i===tblRows.indexOf(r)-1&&!x.isSun&&x.enDia);
-      const diario=(r.vendaAcc)-(ant?ant.vendaAcc:0);
-      if(diario<=0)return'';
-      const h=Math.max(Math.round(diario/maxV*80),2);
-      return'<div style="display:flex;flex-direction:column;align-items:center;gap:3px;flex-shrink:0;min-width:22px"><div style="width:16px;height:'+h+'px;background:var(--gold);border-radius:2px 2px 0 0" title="'+fmt(diario)+'"></div><div style="font-size:9px;color:var(--dim)">'+r.d+'</div></div>';
+    // Barras com valor exibido
+    const vendasDiariaArr=[];
+    tblRows.forEach((r,idx)=>{
+      if(r.isSun||!r.enDia)return;
+      const ant=idx>0?tblRows[idx-1]:null;
+      const diario=r.vendaAcc-(ant&&!ant.isSun&&ant.enDia?ant.vendaAcc:0);
+      if(diario>0)vendasDiariaArr.push({d:r.d,v:diario});
+    });
+    const maxV2=Math.max(...vendasDiariaArr.map(r=>r.v),1);
+    const barrasH=vendasDiariaArr.map(r=>{
+      const h2=Math.max(Math.round(r.v/maxV2*80),2);
+      const vFmt=r.v>=1000?(r.v/1000).toFixed(1)+'k':r.v.toFixed(0);
+      return'<div style="display:flex;flex-direction:column;align-items:center;gap:1px;flex-shrink:0;min-width:28px">'
+        +'<div style="font-size:8px;color:var(--muted);white-space:nowrap">'+vFmt+'</div>'
+        +'<div style="width:18px;height:'+h2+'px;background:var(--gold);border-radius:2px 2px 0 0;cursor:pointer" title="'+fmt(r.v)+'"></div>'
+        +'<div style="font-size:9px;color:var(--dim)">'+r.d+'</div>'
+        +'</div>';
     }).join('');
 
-    const pizzaCat=mkPizzaSVG(CAT_PRODUTO.map(c=>CAT_PCTS[c]||0),CAT_COLORS);
-    const legCat=CAT_PRODUTO.map((c,i)=>'<div style="display:flex;align-items:center;gap:4px;font-size:10px"><div style="width:8px;height:8px;background:'+CAT_COLORS[i]+';border-radius:2px"></div>'+c+' '+( CAT_PCTS[c]||0)+'%</div>').join('');
+    // Pizza categorias: soma real dos vendidos
+    const catTotaisVend={};
+    CAT_PRODUTO.forEach(cat=>{catTotaisVend[cat]=0;});
+    nomes.forEach(nome=>{CAT_PRODUTO.forEach(cat=>{catTotaisVend[cat]+=((vend[nome]||{})[cat]||0);});});
+    const totalVendCats=CAT_PRODUTO.reduce((s,c)=>s+catTotaisVend[c],0);
+    const catSlicesVend=CAT_PRODUTO.map(c=>catTotaisVend[c]);
+    // Fallback para % da meta se não há dados
+    const catSlicesFinal=totalVendCats>0?catSlicesVend:CAT_PRODUTO.map(c=>CAT_PCTS[c]||0);
+    const pizzaCat=mkPizzaSVG(catSlicesFinal,CAT_COLORS);
+    const legCat=CAT_PRODUTO.map((c,i)=>{
+      const v=catTotaisVend[c];
+      const pp=totalVendCats>0?(v/totalVendCats*100).toFixed(0):(CAT_PCTS[c]||0);
+      return'<div style="display:flex;align-items:center;gap:4px;font-size:10px"><div style="width:8px;height:8px;background:'+CAT_COLORS[i]+';border-radius:2px"></div>'+c+' '+pp+'%'+(totalVendCats>0?' ('+fmt(v)+')':'')+'</div>';
+    }).join('');
     const vendTotals=nomes.map(n=>Object.values(vend[n]||{}).reduce((s,v2)=>s+(+v2||0),0));
     const pizzaVend=mkPizzaSVG(vendTotals,VEND_COLORS);
     const totalVA=vendTotals.reduce((s,v)=>s+v,0);
-    const legVend=nomes.map((n,i)=>'<div style="display:flex;align-items:center;gap:4px;font-size:10px"><div style="width:8px;height:8px;background:'+VEND_COLORS[i%VEND_COLORS.length]+';border-radius:2px"></div>'+n+' '+(totalVA>0?(vendTotals[i]/totalVA*100).toFixed(0):0)+'%</div>').join('');
+    const legVend=nomes.map((n,i)=>{const vt=vendTotals[i]||0;const pp=totalVA>0?(vt/totalVA*100).toFixed(0):0;return'<div style="display:flex;align-items:center;gap:4px;font-size:10px"><div style="width:8px;height:8px;background:'+VEND_COLORS[i%VEND_COLORS.length]+';border-radius:2px"></div>'+n+'<span style="color:var(--gold);margin-left:2px">'+pp+'%</span></div><div style="font-size:9px;color:var(--muted);margin-left:12px">'+fmt(vt)+'</div>';}).join('');
 
     // HTML da tabela de markup
     const mkTblRows=tblRows.filter(r=>!r.isFuture&&r.vendaAcc>0&&!r.isSun).map(r=>{
@@ -1160,7 +1207,7 @@ function renderMarkup(){
         dias.forEach(r=>{
           if(r.isSun){cells+='<td style="background:#1a0808;color:var(--dim);text-align:center;font-size:9px;padding:3px 2px">D</td>';return;}
           const w=leao[r.dt]===nome;
-          cells+='<td onclick="toggleLeao(\"'+r.dt+'\",\"'+nome+'\")'+'" style="background:'+(w?'#052010':'transparent')+';color:'+(w?'#22c55e':'var(--dim)')+';text-align:center;font-size:12px;cursor:pointer;padding:3px 4px">'+(w?'★':'·')+'</td>';
+          cells+='<td data-dt="'+r.dt+'" data-nome="'+nome+'" onclick="leaoClick(this)" style="background:'+(w?'#052010':'transparent')+';color:'+(w?'#22c55e':'var(--dim)')+';text-align:center;font-size:12px;cursor:pointer;padding:3px 4px;user-select:none">'+(w?'★':'·')+'</td>';
         });
         semRows+='<tr><td style="white-space:nowrap;font-size:12px;padding:5px 10px;min-width:90px">'+nome+'</td>'+cells+'<td style="text-align:center;font-weight:700;color:var(--gold);padding:4px 10px;border-left:1px solid var(--border)">'+pontosSem+'</td></tr>';
       });
@@ -1191,7 +1238,7 @@ function renderMarkup(){
     h+='<div class="fg" style="grid-template-columns:1fr 1fr">';
     h+='<div class="fl"><label>Meta Base R$</label><input class="fi" type="number" step="0.01" value="'+(metaDigitada||'')+'" placeholder="0,00" onchange="saveMkField(\'metaMes\',+this.value);renderMarkup()"></div>';
     h+='<div class="fl"><label>Dias a Abrir</label><input class="fi" type="number" value="'+diasAbrir+'" min="1" max="31" onchange="saveMkField(\'diasAbrir\',+this.value);renderMarkup()"></div></div>';
-    h+='<div style="margin:8px 0;padding:8px 10px;background:var(--gold-bg);border:1px solid var(--gold-dim);border-radius:6px;font-size:11px"><span style="color:var(--muted)">Meta ajustada (markup '+( pctAtual*100).toFixed(1)+'%):</span><span style="font-family:\'Syne\',sans-serif;font-weight:700;color:var(--gold);margin-left:8px">'+fmt(metaMes)+'</span></div>';
+    h+='<div style="margin:8px 0;background:var(--gold-bg);border:1px solid var(--gold-dim);border-radius:8px;padding:12px 14px"><div style="font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:4px">META DO MÊS (markup '+(pctAtual*100).toFixed(1)+'%)</div><div style="font-family:\'Syne\',sans-serif;font-size:28px;font-weight:800;color:var(--gold)">'+fmt(metaMes)+'</div><div style="font-size:10px;color:var(--dim);margin-top:2px">Base: '+fmt(metaDigitada)+'</div></div>';
     h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
     h+='<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px"><div style="font-size:9px;color:var(--muted);text-transform:uppercase;margin-bottom:4px">Total Vendido</div><div style="font-family:\'Syne\',sans-serif;font-size:15px;font-weight:700;color:var(--green)">'+fmt(totalVendido)+'</div></div>';
     h+='<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px"><div style="font-size:9px;color:var(--muted);text-transform:uppercase;margin-bottom:4px">Média de Venda</div><div style="font-family:\'Syne\',sans-serif;font-size:15px;font-weight:700;color:var(--text)">'+fmt(media)+'</div></div>';
@@ -1210,6 +1257,16 @@ function renderMarkup(){
     });
     h+='</table></div></div></div>';
 
+    // Corrida do Leão
+    h+='<div class="sec-hdr" style="margin:20px 0 10px"><h2>🦁 Corrida do Leão — '+MESES[ST.mes-1]+' '+ST.ano+'</h2><div class="sec-line"></div></div>';
+    h+='<div style="font-size:11px;color:var(--muted);margin-bottom:12px">Clique no dia de um vendedor para marcar ★ vencedor. Domingos em vermelho (D). Pontos por semana ao lado.</div>';
+    if(nomes.length>0){
+      h+=leaoHtml;
+
+    } else {
+      h+='<div class="empty">👥 Adicione funcionários na Verificação Mensal.</div>';
+    }
+
     // Meta por vendedor
     if(nomes.length>0){
       h+='<div class="sec-hdr" style="margin-bottom:10px"><h2>Meta por Vendedor</h2><div class="sec-line"></div></div>';
@@ -1220,16 +1277,6 @@ function renderMarkup(){
       h+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">';
       nomes.forEach(nome=>{h+='<button class="btn-ghost" onclick="editVendCats(\''+nome+'\')" style="font-size:11px">✏ '+nome+'</button>';});
       h+='</div><div id="vend-cat-editor"></div>';
-    }
-
-    // Corrida do Leão
-    h+='<div class="sec-hdr" style="margin:20px 0 10px"><h2>🦁 Corrida do Leão — '+MESES[ST.mes-1]+' '+ST.ano+'</h2><div class="sec-line"></div></div>';
-    h+='<div style="font-size:11px;color:var(--muted);margin-bottom:12px">Clique no dia de um vendedor para marcar ★ vencedor. Domingos em vermelho (D). Pontos por semana ao lado.</div>';
-    if(nomes.length>0){
-      h+=leaoHtml;
-      h+='<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:16px"><div style="font-family:\'Syne\',sans-serif;font-size:10px;font-weight:700;letter-spacing:.16em;color:var(--gold);text-transform:uppercase;margin-bottom:10px">🏆 Total Geral do Mês</div>'+leaoTotalRows+'</div>';
-    } else {
-      h+='<div class="empty">👥 Adicione funcionários na Verificação Mensal.</div>';
     }
 
     // Informativos
@@ -1277,6 +1324,11 @@ function updVendMeta(nome,v){
   if(!d.vendMeta)d.vendMeta={};
   d.vendMeta[nome]=parseFloat(v)||0;
   saveMkCfg(d);
+}
+function leaoClick(el){
+  const dt=el.dataset.dt;
+  const nome=el.dataset.nome;
+  toggleLeao(dt,nome);
 }
 function toggleLeao(dt,nome){
   const d=mkLeao();
