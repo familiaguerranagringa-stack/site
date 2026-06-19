@@ -841,9 +841,13 @@ function parsePtBR(text){
       descricao_humana:`Venda ${parceiro} de ${fmt(valor)}`};
   }
   if(isFuncionario){
-    const nomeM=text.match(/(?:de|do|da|para o?a?)\s+([A-ZÀ-Ú][a-zà-ú]+(?:\s+[A-ZÀ-Ú][a-zà-ú]+)*)/);
-    return{modulo:'funcionario',dados:{nome:nomeM?nomeM[1]:'',sal:cat==='Pessoal'?valor:0,adi:0,vale:0},
-      descricao_humana:`Pessoal: ${desc} — ${fmt(valor)}`};
+    // extrair nome: palavras após "funcionario" ou "funcionária" antes de "com"/"salario"/"vale"
+    const nomeM=t.match(/funcionari[ao]\s+([a-zà-ú]+(?:\s+[a-zà-ú]+)?)\s+(?:com|salario|vale|adiantamento)/i)
+              ||t.match(/(?:adicionar|cadastrar|registrar)\s+([a-zà-ú]+(?:\s+[a-zà-ú]+)?)\s+(?:com|salario|funcionari)/i)
+              ||t.match(/(?:de|do|da|para)\s+([A-Za-zÀ-ú]{3,}(?:\s+[A-Za-zÀ-ú]{3,})?)\s/);
+    const nome=nomeM?nomeM[1].split(' ').map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' '):'';
+    return{modulo:'funcionario',dados:{nome,sal:valor,adi:0,vale:0,st:'PENDENTE'},
+      descricao_humana:`Funcionário ${nome||'novo'} — salário ${fmt(valor)}`};
   }
   if(isCustoFixo){
     return{modulo:'custo_fixo',dados:{nome:desc,val:valor,venc:'',forma,obs:''},
@@ -902,6 +906,12 @@ function confirmVoice(){
     arr.push({id:uuid(),dv:dados.dv||today(),vv:+dados.vv||0,dp:dados.dp||'',tx:+dados.tx||0,vr:+dados.vr||0,dr:dados.dr||''});
     fi[k]=arr;saveO('fin',fi);notify('Financeira registrada por voz! 🎤','ok');
     setTab('financeiras',document.querySelector('[data-tab="financeiras"]'));
+  } else if(modulo==='funcionario'){
+    const v=getVerif();if(!v.f)v.f=[];
+    if(!dados.nome){notify('Nome não identificado. Tente: "Adicionar funcionário João salário dois mil"','err');cancelVoice();return}
+    v.f.push({id:uuid(),nome:dados.nome,user:'',pwd:'',sal:+dados.sal||0,adi:+dados.adi||0,vale:+dados.vale||0,st:'PENDENTE'});
+    saveVerif(v);notify('Funcionário '+dados.nome+' adicionado! 🎤','ok');
+    setTab('verificacao',document.querySelector('[data-tab="verificacao"]'));
   } else {
     notify('Módulo "'+modulo+'" não reconhecido','err');
   }
