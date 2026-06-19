@@ -105,7 +105,12 @@ tr:hover td{background:var(--bg-hover)}
 #voice-btn{position:fixed;bottom:26px;right:26px;width:56px;height:56px;border-radius:50%;background:var(--gold);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 20px rgba(201,168,80,.35);transition:all .2s;z-index:200}
 #voice-btn:hover{background:var(--gold-lt);transform:scale(1.06)}
 #voice-btn.listening{background:var(--red);animation:pulse 1.2s infinite}
+#voice-btn.wake-on{background:var(--gold);animation:wake-idle 2.5s ease-in-out infinite}
+#voice-btn.wake-triggered{background:var(--green);animation:pulse .6s infinite}
 #voice-btn svg{width:22px;height:22px;stroke:#000;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+#wake-label{position:fixed;bottom:92px;right:26px;background:var(--bg-card);border:1px solid var(--border);border-radius:20px;padding:4px 12px;font-size:10px;font-weight:600;letter-spacing:.08em;color:var(--muted);z-index:200;display:none;white-space:nowrap}
+#wake-label.show{display:block}
+@keyframes wake-idle{0%,100%{box-shadow:0 4px 20px rgba(201,168,80,.35)}50%{box-shadow:0 4px 28px rgba(201,168,80,.7)}}
 @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(248,113,113,.6)}70%{box-shadow:0 0 0 14px rgba(248,113,113,0)}100%{box-shadow:0 0 0 0 rgba(248,113,113,0)}}
 #vp{position:fixed;bottom:96px;right:26px;width:330px;background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:18px;z-index:200;display:none;box-shadow:0 8px 40px rgba(0,0,0,.6)}
 #vp.show{display:block}
@@ -161,6 +166,7 @@ tr:hover td{background:var(--bg-hover)}
     <button class="sb-item" data-tab="dre" onclick="setTab('dre',this)">📊 DRE</button>
     <div class="sb-bottom">
 
+      <button class="sb-item" id="wake-toggle-btn" onclick="toggleWakeMode()" style="width:100%;margin:0">🔇 Modo Alexa: OFF</button>
       <button class="sb-item" onclick="doLogout()" style="width:100%;margin:4px 0 0;color:var(--dim)">↩ Sair</button>
     </div>
   </aside>
@@ -189,6 +195,7 @@ tr:hover td{background:var(--bg-hover)}
     <button class="cancel" onclick="cancelVoice()">✕ Cancelar</button>
   </div>
 </div>
+<div id="wake-label">🎤 diga "Malvadão"...</div>
 <button id="voice-btn" onclick="toggleVoice()" title="IA por Voz — Clique e fale">
   <svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
 </button>
@@ -765,18 +772,103 @@ function renderDRE(){
   document.getElementById('content').innerHTML=h;
 }
 
-// VOICE — processamento local sem API externa
+// ═══════════════════════════════════════════════════════
+// SISTEMA DE VOZ — WAKE WORD "MALVADÃO"
+// ═══════════════════════════════════════════════════════
 let recognition=null,vListening=false,vPending=null;
+let wakeRecog=null,wakeActive=false,wakeArmed=false;
+const WAKE_WORD='malvadao';
+
+// Beep duplo de ativação
+function beep(freq=880,dur=120,vol=0.3){
+  try{const ctx=new(window.AudioContext||window.webkitAudioContext)();
+    const o=ctx.createOscillator(),g=ctx.createGain();
+    o.connect(g);g.connect(ctx.destination);o.frequency.value=freq;
+    g.gain.setValueAtTime(vol,ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+dur/1000);
+    o.start(ctx.currentTime);o.stop(ctx.currentTime+dur/1000);
+  }catch(e){}
+}
+
+function toggleWakeMode(){if(!wakeActive)startWakeMode();else stopWakeMode()}
+
+function startWakeMode(){
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){notify('Use o Google Chrome.','err');return}
+  wakeActive=true;
+  document.getElementById('wake-toggle-btn').textContent='🎤 Modo Alexa: ON';
+  document.getElementById('wake-toggle-btn').style.color='var(--green)';
+  document.getElementById('wake-label').classList.add('show');
+  document.getElementById('voice-btn').classList.add('wake-on');
+  notify('Modo Alexa ativado — diga "Malvadão"! 🤙','ok');
+  _startWakeRecog();
+}
+
+function _startWakeRecog(){
+  if(!wakeActive||vListening)return;
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  wakeRecog=new SR();
+  wakeRecog.lang='pt-BR';
+  wakeRecog.continuous=true;
+  wakeRecog.interimResults=true;
+  wakeRecog.maxAlternatives=5;
+
+  wakeRecog.onresult=(e)=>{
+    if(wakeArmed||vListening)return;
+    let allText='';
+    for(let i=e.resultIndex;i<e.results.length;i++)
+      for(let j=0;j<e.results[i].length;j++)
+        allText+=e.results[i][j].transcript+' ';
+    const norm=allText.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    if(norm.includes(WAKE_WORD)||norm.includes('malvadao')){
+      wakeArmed=true;
+      try{wakeRecog.stop()}catch(e){}
+      beep(660,80);setTimeout(()=>beep(1100,150),100);
+      document.getElementById('voice-btn').classList.remove('wake-on');
+      document.getElementById('voice-btn').classList.add('wake-triggered');
+      document.getElementById('wake-label').textContent='🎤 Ouvindo...';
+      setTimeout(()=>startVoice(),250);
+    }
+  };
+  wakeRecog.onend=()=>{if(wakeActive&&!vListening)setTimeout(()=>_startWakeRecog(),800)};
+  wakeRecog.onerror=()=>{if(wakeActive&&!vListening)setTimeout(()=>_startWakeRecog(),1500)};
+  try{wakeRecog.start()}catch(e){}
+}
+
+function stopWakeMode(){
+  wakeActive=false;wakeArmed=false;
+  try{if(wakeRecog)wakeRecog.stop()}catch(e){}
+  document.getElementById('wake-toggle-btn').textContent='🔇 Modo Alexa: OFF';
+  document.getElementById('wake-toggle-btn').style.color='';
+  document.getElementById('wake-label').classList.remove('show');
+  document.getElementById('voice-btn').classList.remove('wake-on','wake-triggered');
+  notify('Modo Alexa desativado','info');
+}
+
+function _voltarAoWake(){
+  wakeArmed=false;
+  if(wakeActive){
+    document.getElementById('voice-btn').classList.remove('listening','wake-triggered');
+    document.getElementById('voice-btn').classList.add('wake-on');
+    document.getElementById('wake-label').textContent='🎤 diga "Malvadão"...';
+    setTimeout(()=>_startWakeRecog(),700);
+  }
+}
+
 function toggleVoice(){if(!vListening)startVoice();else stopVoice()}
+
 function startVoice(){
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   if(!SR){notify('Use o Google Chrome para reconhecimento de voz.','err');return}
+  try{if(wakeRecog)wakeRecog.stop()}catch(e){}
   recognition=new SR();
   recognition.lang='pt-BR';
   recognition.interimResults=true;
   recognition.continuous=false;
+  recognition.maxAlternatives=3;
   recognition.onstart=()=>{
     vListening=true;
+    document.getElementById('voice-btn').classList.remove('wake-on','wake-triggered');
     document.getElementById('voice-btn').classList.add('listening');
     document.getElementById('vp').classList.add('show');
     document.getElementById('vp-txt').textContent='Ouvindo... fale agora!';
@@ -793,11 +885,16 @@ function startVoice(){
     document.getElementById('voice-btn').classList.remove('listening');
     document.getElementById('vp-st').textContent='Interpretando...';
   };
-  recognition.onerror=e=>{stopVoice();notify('Erro no microfone: '+e.error,'err')};
+  recognition.onerror=e=>{
+    stopVoice();
+    if(e.error!=='no-speech')notify('Erro no microfone: '+e.error,'err');
+    _voltarAoWake();
+  };
   recognition.start();
 }
+
 function stopVoice(){
-  if(recognition)recognition.stop();
+  try{if(recognition)recognition.stop()}catch(e){}
   vListening=false;
   document.getElementById('voice-btn').classList.remove('listening');
 }
@@ -1038,6 +1135,7 @@ function cancelVoice(){
   document.getElementById('vp-res').classList.remove('show');
   document.getElementById('vp-txt').textContent='Fale o lançamento...';
   document.getElementById('vp-st').textContent='Ouvindo...';
+  _voltarAoWake();
 }
 
 checkAuth();
