@@ -424,7 +424,8 @@ function renderEntradas(){
       <div class="fl"><label>Cartão PagBank R$</label><input class="fi" type="number" step="0.01" id="e-cart" placeholder="0,00" onkeydown="enterNext(event,'e-tcart')"></div>
       <div class="fl"><label>Taxa Cartão R$</label><input class="fi" type="number" step="0.01" id="e-tcart" placeholder="0,00" onkeydown="enterNext(event,'e-rend')"></div>
       <div class="fl"><label>Rendimento R$</label><input class="fi" type="number" step="0.01" id="e-rend" placeholder="0,00" onkeydown="enterNext(event,'e-cred')"></div>
-      <div class="fl"><label>Crediário Funcionário R$</label><input class="fi" type="number" step="0.01" id="e-cred" placeholder="0,00" onkeydown="enterNext(event,'e-obs')"></div>
+      <div class="fl"><label>Crediário Funcionário R$</label><input class="fi" type="number" step="0.01" id="e-cred" placeholder="0,00" onkeydown="enterNext(event,'e-cmv')"></div>
+      <div class="fl"><label>CMV do Dia R$ <span style="font-size:9px;color:var(--gold)">custo merc. vendida</span></label><input class="fi" type="number" step="0.01" id="e-cmv" placeholder="0,00" onkeydown="enterNext(event,'e-obs')"></div>
       <div class="fl"><label>Observação</label><input class="fi" type="text" id="e-obs" placeholder="Opcional" onkeydown="if(event.key==='Enter'){event.preventDefault();addEntrada()}"></div>
     </div>
     <button class="btn-gold" onclick="addEntrada()">+ Adicionar Entrada</button>
@@ -901,7 +902,7 @@ function renderDRE(){
   // Saldo de Recompra
   const cfgRc=loadO('recompra_meta');
   const cmvOrc=cfgRc.cmvOrc||0;
-  const saldoRc=cmvOrc-cmvCompras-t.perdas;
+  const saldoRc=cmvOrc-cmvCompras-cmvDiario-t.perdas;
 
   const row=(l,val,cls='')=>`<div class="dre-row"><div class="dre-l">${l}</div><div class="dre-v ${cls}">${fmt(val)}</div></div>`;
   const hdr=l=>`<div class="dre-row dre-hdr"><div class="dre-l">${l}</div><div class="dre-v"></div></div>`;
@@ -968,7 +969,8 @@ function renderDRE(){
       <div style="border-top:1px solid var(--border-lite);padding-top:10px">
         ${[
           ['Orçado',fmt(cmvOrc),'var(--gold)'],
-          ['(-) Compras',fmt(cmvCompras),'var(--red)'],
+          ['(-) Compras (Saídas)',fmt(cmvCompras),'var(--red)'],
+          ['(-) CMV Diário (Entradas)',fmt(cmvDiario),'var(--red)'],
           ['(-) Perdas',fmt(t.perdas),'var(--red)'],
         ].map(([l,v,c])=>`<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px">
           <span style="color:var(--muted)">${l}</span>
