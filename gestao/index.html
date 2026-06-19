@@ -432,7 +432,7 @@ function renderEntradas(){
   </div>`;
 
   if(data.length){
-    let tDin=0,tPix=0,tCart=0,tTp=0,tTc=0,tG=0,tTaxaTotal=0;
+    let tDin=0,tPix=0,tCart=0,tTp=0,tTc=0,tG=0,tTaxaTotal=0,tCmvTotal=0;
     // Financeiras por data para somar no total bruto
     const fi=loadO('fin');
     const finPorData={};
@@ -445,7 +445,8 @@ function renderEntradas(){
       const finDia=finPorData[r.data]||0;
       const totalBruto=sub+finDia;
       const taxa=(+r.tpix||0)+(+r.tcart||0);
-      tDin+=(+r.din||0);tPix+=(+r.pix||0);tCart+=(+r.cart||0);tTp+=(+r.tpix||0);tTc+=(+r.tcart||0);tG+=totalBruto;tTaxaTotal+=taxa;
+      const cmvDia=+r.cmv||0;
+      tDin+=(+r.din||0);tPix+=(+r.pix||0);tCart+=(+r.cart||0);tTp+=(+r.tpix||0);tTc+=(+r.tcart||0);tG+=totalBruto;tTaxaTotal+=taxa;tCmvTotal+=cmvDia;
       const d=new Date(r.data+'T12:00:00');
       return `<tr>
         <td style="font-family:'Syne',sans-serif;font-size:11px;font-weight:600;color:var(--muted)">${d.toLocaleDateString('pt-BR',{weekday:'short',day:'2-digit',month:'2-digit'})}</td>
@@ -453,7 +454,8 @@ function renderEntradas(){
         <td class="pos">${r.pix?fmt(r.pix):'—'}</td>
         <td class="pos">${r.cart?fmt(r.cart):'—'}</td>
         <td class="neg">${taxa?fmt(taxa):'—'}</td>
-        <td class="dim" style="font-size:11px">${r.obs||'—'}</td>
+        <td class="neg" style="font-family:'Syne',sans-serif;font-size:12px">${cmvDia?fmt(cmvDia):'—'}</td>
+        <td class="dim" style="font-size:11px;text-align:left">${r.obs||'—'}</td>
         <td class="gold" style="font-family:'Syne',sans-serif;font-weight:700">${fmt(totalBruto)}${finDia>0?'<span style="font-size:9px;color:var(--muted);margin-left:4px">+fin</span>':''}</td>
         <td style="white-space:nowrap">
           <button class="btn-sm btn-ok" onclick="editEntrada('${r.id}')" style="margin-right:4px">✏</button>
@@ -463,9 +465,9 @@ function renderEntradas(){
     }).join('');
     h+=`<div class="sec-hdr"><h2>Lançamentos — ${MESES[ST.mes-1]} ${ST.ano}</h2><div class="sec-line"></div></div>
     <div class="tbl-wrap"><table>
-      <tr><th>Data</th><th>Dinheiro</th><th>PIX</th><th>Cartão</th><th>Total Taxas</th><th style="text-align:left">Obs.</th><th>Total Bruto</th><th></th></tr>
+      <tr><th>Data</th><th>Dinheiro</th><th>PIX</th><th>Cartão</th><th>Total Taxas</th><th>CMV Dia</th><th style="text-align:left">Obs.</th><th>Total Bruto</th><th></th></tr>
       ${rows}
-      <tr class="tfoot"><td>TOTAL</td><td class="pos">${fmt(tDin)}</td><td class="pos">${fmt(tPix)}</td><td class="pos">${fmt(tCart)}</td><td class="neg">${fmt(tTaxaTotal)}</td><td></td><td class="gold">${fmt(tG)}</td><td></td></tr>
+      <tr class="tfoot"><td>TOTAL</td><td class="pos">${fmt(tDin)}</td><td class="pos">${fmt(tPix)}</td><td class="pos">${fmt(tCart)}</td><td class="neg">${fmt(tTaxaTotal)}</td><td class="neg">${fmt(tCmvTotal)}</td><td></td><td class="gold">${fmt(tG)}</td><td></td></tr>
     </table></div>`;
   } else {
     h+=`<div class="empty">📈 <div>Sem entradas lançadas. Use o formulário acima ou o microfone 🎤</div></div>`;
@@ -900,9 +902,7 @@ function renderDRE(){
   const ebitda=lb-totalDOp;
   const res=ebitda-(t.erros+t.perdas);
   // Saldo de Recompra
-  const cfgRc=loadO('recompra_meta');
-  const cmvOrc=cfgRc.cmvOrc||0;
-  const saldoRc=cmvOrc-cmvCompras-cmvDiario-t.perdas;
+  const saldoRc=cmvDiario-cmvCompras+t.perdas;
 
   const row=(l,val,cls='')=>`<div class="dre-row"><div class="dre-l">${l}</div><div class="dre-v ${cls}">${fmt(val)}</div></div>`;
   const hdr=l=>`<div class="dre-row dre-hdr"><div class="dre-l">${l}</div><div class="dre-v"></div></div>`;
@@ -958,29 +958,27 @@ function renderDRE(){
 
   <!-- SALDO DE RECOMPRA (coluna direita) -->
   <div>
-    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:18px;margin-top:52px">
+          <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:18px;margin-top:52px">
       <div style="font-family:'Syne',sans-serif;font-size:10px;font-weight:700;letter-spacing:.18em;color:var(--gold);text-transform:uppercase;margin-bottom:14px">🔄 Saldo de Recompra</div>
-      <div style="margin-bottom:10px">
-        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">CMV Orçado do Mês</div>
-        <input type="number" step="0.01" value="${cmvOrc||''}" placeholder="R$ 0,00"
-          onchange="saveO('recompra_meta',{cmvOrc:+this.value||0})"
-          style="background:var(--bg);border:1px solid var(--border);border-radius:5px;color:var(--gold);font-family:'Syne',sans-serif;font-size:14px;font-weight:700;padding:6px 10px;outline:none;width:100%;font-variant-numeric:tabular-nums">
-      </div>
       <div style="border-top:1px solid var(--border-lite);padding-top:10px">
-        ${[
-          ['Orçado',fmt(cmvOrc),'var(--gold)'],
-          ['(-) Compras (Saídas)',fmt(cmvCompras),'var(--red)'],
-          ['(-) CMV Diário (Entradas)',fmt(cmvDiario),'var(--red)'],
-          ['(-) Perdas',fmt(t.perdas),'var(--red)'],
-        ].map(([l,v,c])=>`<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px">
-          <span style="color:var(--muted)">${l}</span>
-          <span style="color:${c};font-variant-numeric:tabular-nums">${v}</span>
-        </div>`).join('')}
+        <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px">
+          <span style="color:var(--muted)">CMV Diário</span>
+          <span style="color:var(--gold);font-variant-numeric:tabular-nums">${fmt(cmvDiario)}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px">
+          <span style="color:var(--muted)">(-) Compras</span>
+          <span style="color:var(--red);font-variant-numeric:tabular-nums">${fmt(cmvCompras)}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px">
+          <span style="color:var(--muted)">(+) Perdas</span>
+          <span style="color:var(--muted);font-variant-numeric:tabular-nums">${fmt(t.perdas)}</span>
+        </div>
         <div style="border-top:1px solid var(--border);margin-top:8px;padding-top:8px;display:flex;justify-content:space-between">
           <span style="font-family:'Syne',sans-serif;font-size:11px;font-weight:700;color:var(--text)">SALDO LIVRE</span>
           <span style="font-family:'Syne',sans-serif;font-size:16px;font-weight:800;color:${saldoRc>=0?'var(--green)':'var(--red)'}">${fmt(saldoRc)}</span>
         </div>
       </div>
+    </div>
     </div>
   </div>
 
@@ -1142,17 +1140,34 @@ function renderMarkup(){
       return'<tr style="background:'+mkBg(p)+'"><td style="font-family:\'Syne\',sans-serif;font-size:11px;color:var(--muted)">'+r.d+'/'+String(ST.mes).padStart(2,'0')+'</td><td>'+fmt(r.cmvAcc)+'</td><td>'+fmt(r.vendaAcc)+'</td><td class="neg">'+fmt(r.taxasAcc)+'</td><td class="neg">'+fmt(r.gastosAcc)+'</td><td class="neg">'+fmt(r.imposto)+'</td><td style="font-family:\'Syne\',sans-serif;font-weight:700;color:'+mkColor(p)+'">'+(p>0?(p*100).toFixed(1)+'%':'—')+'</td></tr>';
     }).join('');
 
-    // HTML corrida do leão
-    const dayHdrs=tblRows.map(r=>'<th style="padding:2px 4px;font-size:9px;color:'+(r.isSun?'var(--red)':'var(--muted)')+';text-align:center">'+r.d+'</th>').join('');
-    const leaoTbody=nomes.map(nome=>{
-      const pontos=tblRows.filter(r=>!r.isSun&&leao[r.dt]===nome).length;
-      const cells=tblRows.map(r=>{
-        if(r.isSun)return'<td style="background:#1a0808;color:var(--dim);text-align:center;font-size:9px;padding:3px 2px">D</td>';
-        const w=leao[r.dt]===nome;
-        return'<td onclick="toggleLeao(\''+r.dt+'\',\''+nome+'\')" style="background:'+(w?'#052010':'transparent')+';color:'+(w?'#22c55e':'var(--dim)')+';text-align:center;font-size:12px;cursor:pointer;padding:3px 4px">'+(w?'★':'·')+'</td>';
-      }).join('');
-      return'<tr><td style="white-space:nowrap;font-size:12px;padding:5px 10px;min-width:100px">'+nome+'</td>'+cells+'<td style="text-align:center;font-family:\'Syne\',sans-serif;font-weight:700;color:var(--gold);padding:4px 10px">'+pontos+'</td></tr>';
-    }).join('');
+    // HTML corrida do leão — Semanas: S1:1-8, S2:9-16, S3:17-23, S4:24-fim
+    const semDias=[
+      tblRows.filter(r=>r.d>=1&&r.d<=8),
+      tblRows.filter(r=>r.d>=9&&r.d<=16),
+      tblRows.filter(r=>r.d>=17&&r.d<=23),
+      tblRows.filter(r=>r.d>=24),
+    ];
+    const semNomesL=['Semana 1 (dias 1-8)','Semana 2 (dias 9-16)','Semana 3 (dias 17-23)','Semana 4 (dias 24-fim)'];
+    let leaoHtml='';
+    semDias.forEach((dias,si)=>{
+      if(!dias.length)return;
+      let dHdrs='';
+      dias.forEach(r=>{dHdrs+='<th style="padding:2px 4px;font-size:9px;color:'+(r.isSun?'var(--red)':'var(--muted)')+';text-align:center">'+r.d+'</th>';});
+      let semRows='';
+      nomes.forEach(nome=>{
+        const pontosSem=dias.filter(r=>!r.isSun&&leao[r.dt]===nome).length;
+        let cells='';
+        dias.forEach(r=>{
+          if(r.isSun){cells+='<td style="background:#1a0808;color:var(--dim);text-align:center;font-size:9px;padding:3px 2px">D</td>';return;}
+          const w=leao[r.dt]===nome;
+          cells+='<td onclick="toggleLeao(\"'+r.dt+'\",\"'+nome+'\")'+'" style="background:'+(w?'#052010':'transparent')+';color:'+(w?'#22c55e':'var(--dim)')+';text-align:center;font-size:12px;cursor:pointer;padding:3px 4px">'+(w?'★':'·')+'</td>';
+        });
+        semRows+='<tr><td style="white-space:nowrap;font-size:12px;padding:5px 10px;min-width:90px">'+nome+'</td>'+cells+'<td style="text-align:center;font-weight:700;color:var(--gold);padding:4px 10px;border-left:1px solid var(--border)">'+pontosSem+'</td></tr>';
+      });
+      leaoHtml+='<div style="margin-bottom:14px"><div style="font-size:9px;font-weight:700;letter-spacing:.14em;color:var(--gold);text-transform:uppercase;margin-bottom:6px">'+semNomesL[si]+'</div><div class="tbl-wrap"><table style="min-width:0"><tr><th style="text-align:left;min-width:90px">Vendedor</th>'+dHdrs+'<th style="border-left:1px solid var(--border)">★</th></tr>'+semRows+'</table></div></div>';
+    });
+    let leaoTotalRows='';
+    nomes.forEach(nome=>{const total=tblRows.filter(r=>!r.isSun&&leao[r.dt]===nome).length;leaoTotalRows+='<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border-lite)"><span style="font-size:13px">'+nome+'</span><span style="font-size:18px;font-weight:800;color:var(--gold)">'+total+' ★</span></div>';});
 
     // HTML meta por vendedor
     const vendTblRows=nomes.map(nome=>{
@@ -1209,9 +1224,10 @@ function renderMarkup(){
 
     // Corrida do Leão
     h+='<div class="sec-hdr" style="margin:20px 0 10px"><h2>🦁 Corrida do Leão — '+MESES[ST.mes-1]+' '+ST.ano+'</h2><div class="sec-line"></div></div>';
-    h+='<div style="font-size:11px;color:var(--muted);margin-bottom:8px">Clique no ★ do dia para marcar vencedor. Domingos em vermelho.</div>';
+    h+='<div style="font-size:11px;color:var(--muted);margin-bottom:12px">Clique no dia de um vendedor para marcar ★ vencedor. Domingos em vermelho (D). Pontos por semana ao lado.</div>';
     if(nomes.length>0){
-      h+='<div class="tbl-wrap" style="margin-bottom:16px"><table style="min-width:0"><tr><th style="text-align:left;min-width:90px">Vendedor</th>'+dayHdrs+'<th>★</th></tr>'+leaoTbody+'</table></div>';
+      h+=leaoHtml;
+      h+='<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:16px"><div style="font-family:\'Syne\',sans-serif;font-size:10px;font-weight:700;letter-spacing:.16em;color:var(--gold);text-transform:uppercase;margin-bottom:10px">🏆 Total Geral do Mês</div>'+leaoTotalRows+'</div>';
     } else {
       h+='<div class="empty">👥 Adicione funcionários na Verificação Mensal.</div>';
     }
