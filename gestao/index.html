@@ -525,8 +525,17 @@ function delFi(key,id){
 }
 
 // VERIFICAÇÃO
-function getVerif(){return loadO('verif')}
-function saveVerif(v){saveO('verif',v)}
+function getVerif(){
+  // custos fixos = por mês; funcionários = global (não mudam com o mês)
+  const custos=JSON.parse(localStorage.getItem(sk('verif_custos'))||'[]');
+  const funs=JSON.parse(localStorage.getItem('srcapas_funcionarios_'+ST.empresa)||'[]');
+  return{f:funs,c:custos};
+}
+function saveVerif(v){
+  if(v.f!==undefined) localStorage.setItem('srcapas_funcionarios_'+ST.empresa, JSON.stringify(v.f));
+  if(v.c!==undefined) localStorage.setItem(sk('verif_custos'), JSON.stringify(v.c));
+  flashSaved();
+}
 let showFF=false,showFC=false;
 function renderVerif(){
   const v=getVerif();
