@@ -485,6 +485,19 @@ function addSaida(){
 }
 function delS(id){if(!confirm('Remover?'))return;save('saidas',load('saidas').filter(r=>r.id!==id));renderSaidas()}
 
+// Dias úteis
+function addDiasUteis(dataStr,dias){
+  const d=new Date((dataStr||today())+'T12:00:00');
+  let count=0;
+  while(count<dias){d.setDate(d.getDate()+1);const dow=d.getDay();if(dow!==0&&dow!==6)count++;}
+  return d.toISOString().slice(0,10);
+}
+function calcDataPrevista(dv){
+  const dp=document.getElementById('f-dp');
+  if(!dp)return;
+  if(finTab===0)dp.value=addDiasUteis(dv,2); // UME = 2 dias úteis
+}
+
 // FINANCEIRAS
 let finTab=0;
 function renderFin(){
@@ -507,9 +520,9 @@ function renderFin(){
   <div class="form-card">
     <div class="sec-hdr" style="margin-bottom:14px"><h2>Nova Transação — ${p}</h2><div class="sec-line"></div></div>
     <div class="fg">
-      <div class="fl"><label>Data da Venda</label><input class="fi" type="date" id="f-dv" value="${today()}"></div>
+      <div class="fl"><label>Data da Venda</label><input class="fi" type="date" id="f-dv" value="${today()}" onchange="calcDataPrevista(this.value)"></div>
       <div class="fl"><label>Valor da Venda R$</label><input class="fi" type="number" step="0.01" id="f-vv" placeholder="0,00"></div>
-      <div class="fl"><label>Data Prev. Recebimento</label><input class="fi" type="date" id="f-dp"></div>
+      <div class="fl"><label>Data Prev. Recebimento ${finTab===0?'<span style="color:var(--gold);font-size:9px">AUTO — 2 dias úteis</span>':''}</label><input class="fi" type="date" id="f-dp" value="${finTab===0?addDiasUteis(today(),2):''}"></div>
       <div class="fl"><label>Taxa R$</label><input class="fi" type="number" step="0.01" id="f-tx" placeholder="0,00"></div>
       <div class="fl"><label>Valor Recebido R$</label><input class="fi" type="number" step="0.01" id="f-vr" placeholder="0,00"></div>
       <div class="fl"><label>Dia Recebido</label><input class="fi" type="date" id="f-dr"></div>
