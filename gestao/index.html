@@ -179,7 +179,10 @@ tr:hover td{background:var(--bg-hover)}
 
 <div id="vp">
   <div class="vp-title"><span class="vp-dot" id="vp-dot"></span><span id="vp-st">Ouvindo...</span></div>
-  <div class="vp-txt" id="vp-txt">Fale o lançamento. Ex: "Entrada PIX trezentos reais" ou "Paguei a luz duzentos e cinquenta"</div>
+  <div class="vp-txt" id="vp-txt">Comece com a palavra-chave:<br>
+<span style="color:var(--gold);font-size:11px">
+"custo fixo" · "entrada" · "saída" · "compra" · "funcionário" · "UME" · "Payjoy"
+</span></div>
   <div class="vp-res" id="vp-res"></div>
   <div class="vp-acts">
     <button class="confirm" onclick="confirmVoice()">✓ Confirmar</button>
@@ -755,115 +758,168 @@ function stopVoice(){
   document.getElementById('voice-btn').classList.remove('listening');
 }
 
-// Parser de linguagem natural em português — sem API externa
+// Parser de voz — palavras-chave no início + dicionário de descrições
 function parsePtBR(text){
-  const t=text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  const raw=text.trim();
+  const t=raw.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
 
-  // ── VALOR ──────────────────────────────────────────────
-  const UNIDADES={'zero':0,'um':1,'uma':1,'dois':2,'duas':2,'tres':3,'quatro':4,'cinco':5,'seis':6,'sete':7,'oito':8,'nove':9,'dez':10,'onze':11,'doze':12,'treze':13,'quatorze':14,'catorze':14,'quinze':15,'dezesseis':16,'dezessete':17,'dezoito':18,'dezenove':19,'vinte':20,'trinta':30,'quarenta':40,'cinquenta':50,'sessenta':60,'setenta':70,'oitenta':80,'noventa':90,'cem':100,'cento':100,'duzentos':200,'duzentas':200,'trezentos':300,'trezentas':300,'quatrocentos':400,'quatrocentas':400,'quinhentos':500,'quinhentas':500,'seiscentos':600,'setecentos':700,'oitocentos':800,'novecentos':900};
-  function parseNumPt(s){
-    // tenta número direto primeiro
-    const direct=s.match(/(\d+(?:[.,]\d+)?)/);
-    if(direct)return parseFloat(direct[1].replace(',','.'));
-    // extenso
-    let total=0,current=0;
-    const words=s.split(/\s+e\s+|\s+/);
-    for(const w of words){
-      if(UNIDADES[w]!==undefined){
-        current+=UNIDADES[w];
-      } else if(w==='mil'){
-        current=current||1;total+=current*1000;current=0;
-      } else if(w==='milhao'||w==='milhoes'){
-        current=current||1;total+=current*1000000;current=0;
-      }
+  // ── DICIONÁRIO DE DESCRIÇÕES PADRÃO ──────────────────
+  // Mapeamento: palavra detectada → descrição final limpa
+  const DESC={
+    'agua':'Água Juturnaiba',
+    'juturnaiba':'Água Juturnaiba',
+    'luz':'Luz Enel',
+    'energia':'Luz Enel',
+    'enel':'Luz Enel',
+    'internet':'Internet',
+    'okvirtual':'Internet OKVirtual',
+    'okv':'Internet OKVirtual',
+    'aluguel':'Aluguel',
+    'pdvnet':'PDVNET',
+    'pdv net':'PDVNET',
+    'telefone':'Telefone',
+    'celular':'Telefone Corporativo',
+    'contabilidade':'Contabilidade',
+    'contador':'Contabilidade',
+    'condominio':'Condomínio',
+    'seguro':'Seguro',
+    'gas':'Gás',
+    'manutencao':'Manutenção',
+    'limpeza':'Limpeza',
+    'marketing':'Marketing',
+    'instagram':'Instagram Ads',
+    'facebook':'Facebook Ads',
+    'google':'Google Ads',
+    'ume':'UME',
+    'payjoy':'Payjoy',
+    'moeda social':'Moeda Social',
+    'brasilcard':'Brasilcard',
+    'parcelex':'Parcelex',
+    'crefaz':'Crefaz',
+  };
+
+  // ── EXTRATOR DE VALOR ─────────────────────────────────
+  const NUMS={'zero':0,'um':1,'uma':1,'dois':2,'duas':2,'tres':3,'quatro':4,'cinco':5,'seis':6,'sete':7,'oito':8,'nove':9,'dez':10,'onze':11,'doze':12,'treze':13,'quatorze':14,'catorze':14,'quinze':15,'dezesseis':16,'dezessete':17,'dezoito':18,'dezenove':19,'vinte':20,'trinta':30,'quarenta':40,'cinquenta':50,'sessenta':60,'setenta':70,'oitenta':80,'noventa':90,'cem':100,'cento':100,'duzentos':200,'duzentas':200,'trezentos':300,'trezentas':300,'quatrocentos':400,'quatrocentas':400,'quinhentos':500,'quinhentas':500,'seiscentos':600,'setecentos':700,'oitocentos':800,'novecentos':900};
+  function parseVal(s){
+    const n=s.match(/(\d+(?:[.,]\d+)?)/);
+    if(n)return parseFloat(n[1].replace(',','.'));
+    let tot=0,cur=0;
+    for(const w of s.split(/\s+e\s+|\s+/)){
+      if(NUMS[w]!==undefined)cur+=NUMS[w];
+      else if(w==='mil'){tot+=(cur||1)*1000;cur=0;}
     }
-    return total+current||0;
+    return tot+cur||0;
   }
-  // extrair valor do texto
-  const reNum=/r?\$?\s*(\d+(?:[.,]\d+)?)/i;
-  const reExt=/((?:(?:zero|um[a]?|dois|duas|tres|quatro|cinco|seis|sete|oito|nove|dez|onze|doze|treze|quatorze|catorze|quinze|dezesseis|dezessete|dezoito|dezenove|vinte|trinta|quarenta|cinquenta|sessenta|setenta|oitenta|noventa|cem|cento|duzentos?|trezentos?|quatrocentos?|quinhentos?|seiscentos?|setecentos?|oitocentos?|novecentos?|mil|milhao|milhoes)(?:\s+e\s+|\s+)?)(?:reais|real)?)/i;
-  let valor=0;
-  const mNum=t.match(reNum);
-  if(mNum){valor=parseFloat(mNum[1].replace(',','.'))}
-  else{const mExt=t.match(reExt);if(mExt)valor=parseNumPt(mExt[0])}
 
-  // ── DATA ───────────────────────────────────────────────
-  let data=today();
-  if(/ontem/.test(t)){const d=new Date();d.setDate(d.getDate()-1);data=d.toISOString().slice(0,10)}
-  else if(/anteontem/.test(t)){const d=new Date();d.setDate(d.getDate()-2);data=d.toISOString().slice(0,10)}
-  else{const mDia=t.match(/dia\s+(\d{1,2})/);if(mDia){const d=new Date();d.setDate(parseInt(mDia[1]));data=d.toISOString().slice(0,10)}}
-
-  // ── FORMA DE PAGAMENTO ─────────────────────────────────
-  let forma='PIX';
-  if(/dinheiro|especie|espécie|caixa/.test(t))forma='Dinheiro';
-  else if(/cartao|credito|debito|maquina|maquinha/.test(t))forma='Cartão';
-  else if(/boleto/.test(t))forma='Boleto';
-  else if(/debito\s*automat|automatico/.test(t))forma='Débito Automático';
-
-  // ── PARCEIROS FINANCEIROS ─────────────────────────────
-  let parceiro=null;
-  if(/\bume\b/.test(t))parceiro='UME';
-  else if(/payjoy|pay\s*joy/.test(t))parceiro='Payjoy';
-  else if(/moeda\s*social/.test(t))parceiro='Moeda Social';
-  else if(/brasilcard|brasil\s*card/.test(t))parceiro='Brasilcard';
-  else if(/parcelex/.test(t))parceiro='Parcelex';
-  else if(/crefaz/.test(t))parceiro='Crefaz';
-
-  // ── MÓDULO ────────────────────────────────────────────
-  const isCustoFixo=/luz|energia|enel|aluguel|internet|agua|condominio|pdvnet|telefon|celular\s*(da\s*loja|corporativo)|conta\s*(de\s*)?(agua|luz|gas|energia)|mensalidade/.test(t);
-  const isFuncionario=/salario|funcionari|vale\s*(transporte|alimentacao|refeicao)|admiti|contrat|demiti/.test(t);
-  const isFinanceira=parceiro!==null;
-  const isEntrada=/entrad|recebi(?!\s*recibo)|faturei|vendeu|vendemos|pix\s*(recebid|entrou)|dinheiro\s*(de\s*venda|da\s*loja|no\s*caixa)|caixa\s*do\s*dia/.test(t);
-  const isSaida=/paguei|pagou|pagamos|sai[ui]d[ao]|despesa|gastei|comprei|compra\s*de|passagem|combustivel|manutencao|erro\s*de\s*caixa|perda|estorno|marketing|anuncio|publicidade|imposto|tributo|simples|das\b|taxa/.test(t);
-
-  // ── CATEGORIA DE SAÍDA ────────────────────────────────
-  let cat='Despesa Operacional';
-  if(/compra\s*(de\s*)?(mercadoria|produto|estoque|capinha|capas|acessorio|fornecedor|korai|atacado)/.test(t))cat='Compra Mercadoria';
-  else if(/marketing|anuncio|publicidade|instagram|face\s*book|google\s*ads|impulsionamento/.test(t))cat='Marketing';
-  else if(/imposto|tributo|simples|das\b|irpj|csll|pis|cofins|iss|icms/.test(t))cat='Tributo';
-  else if(/salario|funcionari|vale/.test(t))cat='Pessoal';
-  else if(/erro\s*de\s*caixa|erro\s*no\s*caixa/.test(t))cat='Erro de Caixa';
-  else if(/perda/.test(t))cat='Perda';
-  else if(/estorno|devolu/.test(t))cat='Estorno';
-
-  // ── TIPO DE ENTRADA ───────────────────────────────────
-  let tipEntrada=null;
-  if(/\bpix\b/.test(t)&&isEntrada)tipEntrada='pix';
-  else if(/dinheiro/.test(t)&&isEntrada)tipEntrada='din';
-  else if(/cartao|maquina/.test(t)&&isEntrada)tipEntrada='cart';
-
-  // ── DESCRIÇÃO ─────────────────────────────────────────
-  let desc=text.trim();
-
-  // ── MONTAR RESULTADO ──────────────────────────────────
-  if(isFinanceira){
-    return{modulo:'financeira',dados:{parceiro,dv:data,vv:valor,dp:'',tx:0,vr:0,dr:''},
-      descricao_humana:`Venda ${parceiro} de ${fmt(valor)}`};
+  // ── EXTRATOR DE DATA ──────────────────────────────────
+  function parseData(s){
+    if(/ontem/.test(s)){const d=new Date();d.setDate(d.getDate()-1);return d.toISOString().slice(0,10)}
+    const dia=s.match(/(?:dia|vencimento\s+dia|venc\s+dia)\s+(\d{1,2})/);
+    if(dia){const d=new Date();d.setDate(parseInt(dia[1]));return d.toISOString().slice(0,10)}
+    return today();
   }
-  if(isFuncionario){
-    // extrair nome: palavras após "funcionario" ou "funcionária" antes de "com"/"salario"/"vale"
-    const nomeM=t.match(/funcionari[ao]\s+([a-zà-ú]+(?:\s+[a-zà-ú]+)?)\s+(?:com|salario|vale|adiantamento)/i)
-              ||t.match(/(?:adicionar|cadastrar|registrar)\s+([a-zà-ú]+(?:\s+[a-zà-ú]+)?)\s+(?:com|salario|funcionari)/i)
-              ||t.match(/(?:de|do|da|para)\s+([A-Za-zÀ-ú]{3,}(?:\s+[A-Za-zÀ-ú]{3,})?)\s/);
-    const nome=nomeM?nomeM[1].split(' ').map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' '):'';
-    return{modulo:'funcionario',dados:{nome,sal:valor,adi:0,vale:0,st:'PENDENTE'},
-      descricao_humana:`Funcionário ${nome||'novo'} — salário ${fmt(valor)}`};
+
+  // ── EXTRATOR DE FORMA ─────────────────────────────────
+  function parseForma(s){
+    if(/dinheiro|especie/.test(s))return'Dinheiro';
+    if(/cartao|credito|debito/.test(s))return'Cartão';
+    if(/boleto/.test(s))return'Boleto';
+    if(/debito\s*automat|automatico/.test(s))return'Débito Automático';
+    if(/pix/.test(s))return'PIX';
+    return'PIX'; // padrão
   }
-  if(isCustoFixo){
-    return{modulo:'custo_fixo',dados:{nome:desc,val:valor,venc:'',forma,obs:''},
-      descricao_humana:`Custo fixo: ${desc} — ${fmt(valor)}`};
+
+  // ── LOOKUP DE DESCRIÇÃO ────────────────────────────────
+  function lookupDesc(s){
+    // tenta match direto primeiro (palavra a palavra)
+    for(const [key,val] of Object.entries(DESC)){
+      if(s.includes(key))return val;
+    }
+    // se não achou, capitaliza a primeira palavra encontrada
+    const words=s.split(/\s+/).filter(w=>w.length>2&&!['com','para','uma','uns','que','por','mas','nao','sim','seu','sua'].includes(w));
+    if(words.length>0)return words[0].charAt(0).toUpperCase()+words[0].slice(1);
+    return s;
   }
-  if(isEntrada){
-    const d={data,din:0,pix:0,tpix:0,cart:0,tcart:0,ms:0,rend:0,cred:0,obs:desc};
-    if(tipEntrada==='pix')d.pix=valor;
-    else if(tipEntrada==='cart')d.cart=valor;
+
+  const valor=parseVal(t);
+  const data=parseData(t);
+  const forma=parseForma(t);
+
+  // ── DETECÇÃO DO MÓDULO PELA PALAVRA-CHAVE INICIAL ────
+  // Remove pontuação e detecta o início da frase
+  const tClean=t.replace(/[,;.!?]/g,' ').replace(/\s+/g,' ').trim();
+
+  // CUSTO FIXO
+  if(/^custo\s*fixo/.test(tClean)){
+    const resto=tClean.replace(/^custo\s*fixo\s*/,'');
+    const desc=lookupDesc(resto);
+    return{modulo:'custo_fixo',dados:{nome:desc,val:valor,venc:data,forma,obs:''},
+      descricao_humana:`Custo fixo: ${desc} — ${fmt(valor)} via ${forma}`};
+  }
+
+  // ENTRADA
+  if(/^entrada/.test(tClean)){
+    const resto=tClean.replace(/^entrada\s*/,'');
+    const d={data,din:0,pix:0,tpix:0,cart:0,tcart:0,ms:0,rend:0,cred:0,obs:''};
+    if(/pix/.test(resto))d.pix=valor;
+    else if(/cartao|maquina/.test(resto))d.cart=valor;
+    else if(/dinheiro/.test(resto))d.din=valor;
     else d.din=valor;
-    return{modulo:'entrada',dados:d,descricao_humana:`Entrada ${tipEntrada||'dinheiro'}: ${fmt(valor)}`};
+    const tipo=d.pix?'PIX':d.cart?'Cartão':'Dinheiro';
+    return{modulo:'entrada',dados:d,descricao_humana:`Entrada ${tipo}: ${fmt(valor)}`};
   }
-  if(isSaida||valor>0){
+
+  // SAÍDA
+  if(/^saida|^despesa/.test(tClean)){
+    const resto=tClean.replace(/^saida\s*|^despesa\s*/,'');
+    const desc=lookupDesc(resto);
+    let cat='Despesa Operacional';
+    if(/compra|mercadoria|estoque|produto|fornecedor|korai/.test(resto))cat='Compra Mercadoria';
+    else if(/marketing|anuncio|publicidade|instagram|facebook|google/.test(resto))cat='Marketing';
+    else if(/imposto|tributo|simples|das\b/.test(resto))cat='Tributo';
+    else if(/salario|funcionari|vale/.test(resto))cat='Pessoal';
+    else if(/erro/.test(resto))cat='Erro de Caixa';
+    else if(/perda/.test(resto))cat='Perda';
     return{modulo:'saida',dados:{data,cat,forma,val:valor,desc},
       descricao_humana:`${cat}: ${desc} — ${fmt(valor)}`};
   }
+
+  // COMPRA (atalho para saída Compra Mercadoria)
+  if(/^compra/.test(tClean)){
+    const resto=tClean.replace(/^compra\s*/,'');
+    const desc=lookupDesc(resto)||'Compra';
+    return{modulo:'saida',dados:{data,cat:'Compra Mercadoria',forma,val:valor,desc},
+      descricao_humana:`Compra Mercadoria: ${desc} — ${fmt(valor)}`};
+  }
+
+  // FUNCIONÁRIO
+  if(/^funcionari/.test(tClean)){
+    const resto=tClean.replace(/^funcionari[ao]\s*/,'');
+    // nome = primeira(s) palavra(s) antes de "salario", "com", "valor"
+    const nomeM=resto.match(/^([a-zà-ú]+(?:\s+[a-zà-ú]+)?)\s+(?:salario|com|valor|\d)/);
+    const nome=nomeM?nomeM[1].split(' ').map(w=>w[0].toUpperCase()+w.slice(1)).join(' '):'';
+    return{modulo:'funcionario',dados:{nome,sal:valor,adi:0,vale:0,st:'PENDENTE'},
+      descricao_humana:`Funcionário ${nome||'novo'} — salário ${fmt(valor)}`};
+  }
+
+  // FINANCEIRAS — nome do parceiro no início
+  for(const p of PARCEIROS){
+    if(tClean.startsWith(p.toLowerCase())||tClean.startsWith(p.toLowerCase().replace(/\s/,''))){
+      return{modulo:'financeira',dados:{parceiro:p,dv:data,vv:valor,dp:'',tx:0,vr:0,dr:''},
+        descricao_humana:`Venda ${p}: ${fmt(valor)}`};
+    }
+  }
+
+  // PIX / DINHEIRO / CARTÃO sem prefixo = entrada rápida
+  if(/^pix\s+\d|^pix\s+[a-z]/.test(tClean)){
+    return{modulo:'entrada',dados:{data,din:0,pix:valor,tpix:0,cart:0,tcart:0,ms:0,rend:0,cred:0,obs:''},
+      descricao_humana:`Entrada PIX: ${fmt(valor)}`};
+  }
+  if(/^dinheiro/.test(tClean)){
+    return{modulo:'entrada',dados:{data,din:valor,pix:0,tpix:0,cart:0,tcart:0,ms:0,rend:0,cred:0,obs:''},
+      descricao_humana:`Entrada Dinheiro: ${fmt(valor)}`};
+  }
+
   return null;
 }
 
@@ -871,7 +927,9 @@ function processVoice(text){
   const result=parsePtBR(text);
   if(!result||!result.modulo){
     document.getElementById('vp-st').textContent='Não entendi';
-    document.getElementById('vp-txt').textContent='"'+text+'" — tente ser mais específico. Ex: "Paguei luz duzentos reais"';
+    document.getElementById('vp-txt').textContent='"'+text+'"';
+    document.getElementById('vp-res').textContent='Dica: comece com a palavra-chave. Ex: "custo fixo", "entrada", "saída", "funcionário", "UME"...';
+    document.getElementById('vp-res').classList.add('show');
     return;
   }
   vPending=result;
