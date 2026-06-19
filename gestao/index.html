@@ -771,10 +771,6 @@ function renderDRE(){
   const hdr=l=>`<div class="dre-row dre-hdr"><div class="dre-l">${l}</div><div class="dre-v"></div></div>`;
   const sub=(l,val)=>`<div class="dre-row dre-sub"><div class="dre-l">${l}</div><div class="dre-v ${vc(val)}">${fmt(val)}</div></div>`;
 
-  const row=(l,val,cls='')=>`<div class="dre-row"><div class="dre-l">${l}</div><div class="dre-v ${cls}">${fmt(val)}</div></div>`;
-  const hdr=l=>`<div class="dre-row dre-hdr"><div class="dre-l">${l}</div><div class="dre-v"></div></div>`;
-  const sub=(l,val)=>`<div class="dre-row dre-sub"><div class="dre-l">${l}</div><div class="dre-v ${vc(val)}">${fmt(val)}</div></div>`;
-
   const h=`<div style="max-width:640px">
     <div style="margin-bottom:20px">
       <div style="font-size:10px;letter-spacing:.15em;text-transform:uppercase;color:var(--gold);margin-bottom:4px">SR. CAPAS · ${ST.empresa==='bacaxa'?'Bacaxá / Saquarema':'Saquarema'}</div>
