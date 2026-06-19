@@ -163,7 +163,6 @@ tr:hover td{background:var(--bg-hover)}
     <button class="sb-item" data-tab="financeiras" onclick="setTab('financeiras',this)">💳 Financeiras</button>
     <div class="sb-section">Gestão</div>
     <button class="sb-item" data-tab="verificacao" onclick="setTab('verificacao',this)">📋 Verificação Mensal</button>
-    <button class="sb-item" data-tab="recompra" onclick="setTab('recompra',this)">🔄 Saldo de Recompra</button>
     <button class="sb-item" data-tab="markup" onclick="setTab('markup',this)">📐 Markup</button>
     <button class="sb-item" data-tab="dre" onclick="setTab('dre',this)">📊 DRE</button>
     <div class="sb-bottom">
@@ -309,7 +308,7 @@ function changePeriod(){
 
 
 // TAB
-const TITLES={dashboard:'Dashboard',entradas:'Entradas',saidas:'Saídas',financeiras:'Financeiras',verificacao:'Verificação Mensal',recompra:'Saldo de Recompra',markup:'Markup',dre:'DRE — Resultado do Exercício'};
+const TITLES={dashboard:'Dashboard',entradas:'Entradas',saidas:'Saídas',financeiras:'Financeiras',verificacao:'Verificação Mensal',markup:'Markup',dre:'DRE — Resultado do Exercício'};
 function setTab(tab,btn){
   ST.tab=tab;
   document.querySelectorAll('.sb-item').forEach(b=>b.classList.remove('active'));
@@ -320,7 +319,7 @@ function render(){
   const t=document.getElementById('tb-title');
   t.textContent=TITLES[ST.tab]||'';t.dataset.orig=t.textContent;
   document.getElementById('content').innerHTML='';
-  ({dashboard:renderDash,entradas:renderEntradas,saidas:renderSaidas,financeiras:renderFin,verificacao:renderVerif,recompra:renderRecompra,markup:renderMarkup,dre:renderDRE}[ST.tab]||function(){})();
+  ({dashboard:renderDash,entradas:renderEntradas,saidas:renderSaidas,financeiras:renderFin,verificacao:renderVerif,markup:renderMarkup,dre:renderDRE}[ST.tab]||function(){})();
 }
 
 // CALCS
@@ -418,26 +417,34 @@ function renderEntradas(){
   let h=`<div class="form-card">
     <div class="sec-hdr" style="margin-bottom:14px"><h2>Novo Lançamento Diário</h2><div class="sec-line"></div></div>
     <div class="fg">
-      <div class="fl"><label>Data</label><input class="fi" type="date" id="e-dt" value="${today()}"></div>
-      <div class="fl"><label>Dinheiro R$</label><input class="fi" type="number" step="0.01" id="e-din" placeholder="0,00"></div>
-      <div class="fl"><label>PIX (bruto) R$</label><input class="fi" type="number" step="0.01" id="e-pix" placeholder="0,00"></div>
-      <div class="fl"><label>Taxa PIX R$</label><input class="fi" type="number" step="0.01" id="e-tpix" placeholder="0,00"></div>
-      <div class="fl"><label>Cartão PagBank R$</label><input class="fi" type="number" step="0.01" id="e-cart" placeholder="0,00"></div>
-      <div class="fl"><label>Taxa Cartão R$</label><input class="fi" type="number" step="0.01" id="e-tcart" placeholder="0,00"></div>
-      <div class="fl"><label>Rendimento R$</label><input class="fi" type="number" step="0.01" id="e-rend" placeholder="0,00"></div>
-      <div class="fl"><label>Crediário Funcionário R$</label><input class="fi" type="number" step="0.01" id="e-cred" placeholder="0,00"></div>
-      <div class="fl" style="grid-column:span 1"><label>CMV do Dia R$ <span style="font-size:9px;color:var(--gold)">custo merc. vendida</span></label><input class="fi" type="number" step="0.01" id="e-cmv" placeholder="0,00"></div>
-      <div class="fl"><label>Observação</label><input class="fi" type="text" id="e-obs" placeholder="Opcional"></div>
+      <div class="fl"><label>Data</label><input class="fi" type="date" id="e-dt" onkeydown="enterNext(event,'e-din')"></div>
+      <div class="fl"><label>Dinheiro R$</label><input class="fi" type="number" step="0.01" id="e-din" placeholder="0,00" onkeydown="enterNext(event,'e-pix')"></div>
+      <div class="fl"><label>PIX (bruto) R$</label><input class="fi" type="number" step="0.01" id="e-pix" placeholder="0,00" onkeydown="enterNext(event,'e-tpix')"></div>
+      <div class="fl"><label>Taxa PIX R$</label><input class="fi" type="number" step="0.01" id="e-tpix" placeholder="0,00" onkeydown="enterNext(event,'e-cart')"></div>
+      <div class="fl"><label>Cartão PagBank R$</label><input class="fi" type="number" step="0.01" id="e-cart" placeholder="0,00" onkeydown="enterNext(event,'e-tcart')"></div>
+      <div class="fl"><label>Taxa Cartão R$</label><input class="fi" type="number" step="0.01" id="e-tcart" placeholder="0,00" onkeydown="enterNext(event,'e-rend')"></div>
+      <div class="fl"><label>Rendimento R$</label><input class="fi" type="number" step="0.01" id="e-rend" placeholder="0,00" onkeydown="enterNext(event,'e-cred')"></div>
+      <div class="fl"><label>Crediário Funcionário R$</label><input class="fi" type="number" step="0.01" id="e-cred" placeholder="0,00" onkeydown="enterNext(event,'e-obs')"></div>
+      <div class="fl"><label>Observação</label><input class="fi" type="text" id="e-obs" placeholder="Opcional" onkeydown="if(event.key==='Enter'){event.preventDefault();addEntrada()}"></div>
     </div>
     <button class="btn-gold" onclick="addEntrada()">+ Adicionar Entrada</button>
   </div>`;
 
   if(data.length){
-    let tDin=0,tPix=0,tCart=0,tTp=0,tTc=0,tG=0,tTaxaTotal=0,tCmv=0;
+    let tDin=0,tPix=0,tCart=0,tTp=0,tTc=0,tG=0,tTaxaTotal=0;
+    // Financeiras por data para somar no total bruto
+    const fi=loadO('fin');
+    const finPorData={};
+    PARCEIROS.forEach(p=>{
+      const k=p.toLowerCase().replace(/\s+/g,'_');
+      (fi[k]||[]).forEach(r=>{if(r.dv)finPorData[r.dv]=(finPorData[r.dv]||0)+(+r.vv||0)});
+    });
     const rows=data.map(r=>{
       const sub=(+r.din||0)+(+r.pix||0)+(+r.cart||0)+(+r.rend||0)+(+r.cred||0);
+      const finDia=finPorData[r.data]||0;
+      const totalBruto=sub+finDia;
       const taxa=(+r.tpix||0)+(+r.tcart||0);
-      tDin+=(+r.din||0);tPix+=(+r.pix||0);tCart+=(+r.cart||0);tTp+=(+r.tpix||0);tTc+=(+r.tcart||0);tG+=sub;tTaxaTotal+=taxa;tCmv+=(+r.cmv||0);
+      tDin+=(+r.din||0);tPix+=(+r.pix||0);tCart+=(+r.cart||0);tTp+=(+r.tpix||0);tTc+=(+r.tcart||0);tG+=totalBruto;tTaxaTotal+=taxa;
       const d=new Date(r.data+'T12:00:00');
       return `<tr>
         <td style="font-family:'Syne',sans-serif;font-size:11px;font-weight:600;color:var(--muted)">${d.toLocaleDateString('pt-BR',{weekday:'short',day:'2-digit',month:'2-digit'})}</td>
@@ -445,16 +452,19 @@ function renderEntradas(){
         <td class="pos">${r.pix?fmt(r.pix):'—'}</td>
         <td class="pos">${r.cart?fmt(r.cart):'—'}</td>
         <td class="neg">${taxa?fmt(taxa):'—'}</td>
-        <td class="neg">${r.cmv?fmt(r.cmv):'—'}</td>
-        <td class="gold" style="font-family:'Syne',sans-serif;font-weight:700">${fmt(sub)}</td>
-        <td><button class="btn-sm" onclick="delE('${r.id}')">×</button></td>
+        <td class="dim" style="font-size:11px">${r.obs||'—'}</td>
+        <td class="gold" style="font-family:'Syne',sans-serif;font-weight:700">${fmt(totalBruto)}${finDia>0?'<span style="font-size:9px;color:var(--muted);margin-left:4px">+fin</span>':''}</td>
+        <td style="white-space:nowrap">
+          <button class="btn-sm btn-ok" onclick="editEntrada('${r.id}')" style="margin-right:4px">✏</button>
+          <button class="btn-sm" onclick="delE('${r.id}')">×</button>
+        </td>
       </tr>`;
     }).join('');
     h+=`<div class="sec-hdr"><h2>Lançamentos — ${MESES[ST.mes-1]} ${ST.ano}</h2><div class="sec-line"></div></div>
     <div class="tbl-wrap"><table>
-      <tr><th>Data</th><th>Dinheiro</th><th>PIX</th><th>Cartão</th><th>Total Taxas</th><th>CMV Dia</th><th>Total Bruto</th><th></th></tr>
+      <tr><th>Data</th><th>Dinheiro</th><th>PIX</th><th>Cartão</th><th>Total Taxas</th><th style="text-align:left">Obs.</th><th>Total Bruto</th><th></th></tr>
       ${rows}
-      <tr class="tfoot"><td>TOTAL</td><td class="pos">${fmt(tDin)}</td><td class="pos">${fmt(tPix)}</td><td class="pos">${fmt(tCart)}</td><td class="neg">${fmt(tTaxaTotal)}</td><td class="neg">${fmt(tCmv)}</td><td class="gold">${fmt(tG)}</td><td></td></tr>
+      <tr class="tfoot"><td>TOTAL</td><td class="pos">${fmt(tDin)}</td><td class="pos">${fmt(tPix)}</td><td class="pos">${fmt(tCart)}</td><td class="neg">${fmt(tTaxaTotal)}</td><td></td><td class="gold">${fmt(tG)}</td><td></td></tr>
     </table></div>`;
   } else {
     h+=`<div class="empty">📈 <div>Sem entradas lançadas. Use o formulário acima ou o microfone 🎤</div></div>`;
@@ -470,6 +480,120 @@ function addEntrada(){
   save('entradas',data);notify('Entrada registrada!','ok');renderEntradas();
 }
 function delE(id){if(!confirm('Remover?'))return;save('entradas',load('entradas').filter(r=>r.id!==id));renderEntradas()}
+
+// Enter key navigation
+function enterNext(e,nextId){
+  if(e.key==='Enter'){e.preventDefault();const n=document.getElementById(nextId);if(n){n.focus();n.select&&n.select();}}
+}
+
+// ── EDIÇÃO MODAL ──────────────────────────────────────
+function showEditModal(title,fields,onSave){
+  const existing=document.getElementById('edit-modal');
+  if(existing)existing.remove();
+  const inputs=fields.map(f=>`<div class="fl" style="margin-bottom:10px">
+    <label style="font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">${f.label}</label>
+    ${f.type==='select'
+      ?`<select class="fi" id="em-${f.id}">${f.options.map(o=>`<option value="${o.v||o}"${(f.value===o||f.value===(o.v||o))?'selected':''}>${o.l||o}</option>`).join('')}</select>`
+      :`<input class="fi" type="${f.type||'text'}" id="em-${f.id}" value="${f.value||''}" placeholder="${f.placeholder||''}">`
+    }
+  </div>`).join('');
+  const modal=document.createElement('div');
+  modal.id='edit-modal';
+  modal.className='modal-bg';
+  modal.innerHTML=`<div class="modal" style="width:480px;max-height:80vh;overflow-y:auto">
+    <h2 style="font-size:16px;margin-bottom:18px">${title}</h2>
+    ${inputs}
+    <div style="display:flex;gap:10px;margin-top:16px">
+      <button class="btn-gold" style="flex:1" onclick="document.getElementById('edit-modal')._save()">Salvar</button>
+      <button class="btn-ghost" onclick="document.getElementById('edit-modal').remove()">Cancelar</button>
+    </div>
+  </div>`;
+  modal._save=()=>{
+    const vals={};
+    fields.forEach(f=>{const el=document.getElementById('em-'+f.id);if(el)vals[f.id]=f.type==='number'?+el.value||0:el.value;});
+    onSave(vals);
+    modal.remove();
+  };
+  document.body.appendChild(modal);
+  // Focus no primeiro campo
+  setTimeout(()=>{const first=document.getElementById('em-'+fields[0]?.id);if(first)first.focus();},100);
+}
+
+function editEntrada(id){
+  const data=load('entradas');
+  const r=data.find(x=>x.id===id);
+  if(!r)return;
+  showEditModal('Editar Entrada',[
+    {id:'data',label:'Data',type:'date',value:r.data},
+    {id:'din',label:'Dinheiro R$',type:'number',value:r.din||''},
+    {id:'pix',label:'PIX (bruto) R$',type:'number',value:r.pix||''},
+    {id:'tpix',label:'Taxa PIX R$',type:'number',value:r.tpix||''},
+    {id:'cart',label:'Cartão PagBank R$',type:'number',value:r.cart||''},
+    {id:'tcart',label:'Taxa Cartão R$',type:'number',value:r.tcart||''},
+    {id:'rend',label:'Rendimento R$',type:'number',value:r.rend||''},
+    {id:'cred',label:'Crediário Funcionário R$',type:'number',value:r.cred||''},
+    {id:'obs',label:'Observação',type:'text',value:r.obs||''},
+  ],vals=>{
+    Object.assign(r,vals);
+    data.sort((a,b)=>a.data.localeCompare(b.data));
+    save('entradas',data);notify('Entrada atualizada!','ok');renderEntradas();
+  });
+}
+
+function editSaida(id){
+  const data=load('saidas');
+  const r=data.find(x=>x.id===id);
+  if(!r)return;
+  const catO=CAT_SAIDA.map(x=>({v:x,l:x}));
+  const fmO=FORMAS.map(x=>({v:x,l:x}));
+  showEditModal('Editar Saída',[
+    {id:'data',label:'Data',type:'date',value:r.data},
+    {id:'cat',label:'Categoria',type:'select',value:r.cat,options:catO},
+    {id:'forma',label:'Forma de Pagamento',type:'select',value:r.forma,options:fmO},
+    {id:'val',label:'Valor R$',type:'number',value:r.val},
+    {id:'desc',label:'Descrição',type:'text',value:r.desc||''},
+  ],vals=>{
+    r.data=vals.data;r.cat=vals.cat;r.forma=vals.forma;r.val=vals.val;r.desc=vals.desc;
+    data.sort((a,b)=>a.data.localeCompare(b.data));
+    save('saidas',data);notify('Saída atualizada!','ok');renderSaidas();
+  });
+}
+
+function editFin(key,id){
+  const fi=loadO('fin');
+  const r=(fi[key]||[]).find(x=>x.id===id);
+  if(!r)return;
+  showEditModal('Editar Financeira',[
+    {id:'dv',label:'Data da Venda',type:'date',value:r.dv||''},
+    {id:'vv',label:'Valor da Venda R$',type:'number',value:r.vv||''},
+    {id:'dp',label:'Data Prev. Recebimento',type:'date',value:r.dp||''},
+    {id:'tx',label:'Taxa R$',type:'number',value:r.tx||''},
+    {id:'vr',label:'Valor Recebido R$',type:'number',value:r.vr||''},
+    {id:'dr',label:'Dia Recebido',type:'date',value:r.dr||''},
+  ],vals=>{
+    Object.assign(r,vals);
+    saveO('fin',fi);notify('Financeira atualizada!','ok');renderFin();
+  });
+}
+
+function editCusto(id){
+  const v=getVerif();
+  const cu=(v.c||[]).find(x=>x.id===id);
+  if(!cu)return;
+  const fmO=FORMAS.map(x=>({v:x,l:x}));
+  const stO=['PENDENTE','PAGO','VENCIDO'].map(x=>({v:x,l:x}));
+  showEditModal('Editar Custo Fixo',[
+    {id:'nome',label:'Descrição',type:'text',value:cu.nome||''},
+    {id:'val',label:'Valor R$',type:'number',value:cu.val||''},
+    {id:'venc',label:'Vencimento',type:'date',value:cu.venc||''},
+    {id:'forma',label:'Forma Pagamento',type:'select',value:cu.forma,options:fmO},
+    {id:'st',label:'Status',type:'select',value:cu.st,options:stO},
+    {id:'obs',label:'Observação',type:'text',value:cu.obs||''},
+  ],vals=>{
+    Object.assign(cu,vals);
+    saveVerif(v);notify('Custo atualizado!','ok');renderVerif();
+  });
+}
 
 // SAIDAS
 let filtroSaida='';
@@ -492,8 +616,8 @@ function renderSaidas(){
       <div class="fl"><label>Data</label><input class="fi" type="date" id="s-dt" value="${today()}"></div>
       <div class="fl"><label>Categoria</label><select class="fi" id="s-cat">${catO}</select></div>
       <div class="fl"><label>Forma de Pagamento</label><select class="fi" id="s-forma">${fmO}</select></div>
-      <div class="fl"><label>Valor R$</label><input class="fi" type="number" step="0.01" id="s-val" placeholder="0,00"></div>
-      <div class="fl" style="grid-column:span 2"><label>Descrição / Fornecedor</label><input class="fi" type="text" id="s-desc" placeholder="Ex: Conta de luz, Passagem Gerson, Compra Korai..."></div>
+      <div class="fl"><label>Valor R$</label><input class="fi" type="number" step="0.01" id="s-val" placeholder="0,00" onkeydown="enterNext(event,'s-desc')"></div>
+      <div class="fl" style="grid-column:span 2"><label>Descrição / Fornecedor</label><input class="fi" type="text" id="s-desc" placeholder="Ex: Conta de luz, Passagem Gerson, Compra Korai..." onkeydown="if(event.key==='Enter'){event.preventDefault();addSaida()}"></div>
     </div>
     <button class="btn-gold" onclick="addSaida()">+ Adicionar Saída</button>
   </div>
@@ -511,7 +635,10 @@ function renderSaidas(){
         <td style="text-align:left">${r.desc||'—'}</td>
         <td>${r.forma}</td>
         <td class="neg" style="font-family:'Syne',sans-serif;font-weight:700">${fmt(r.val)}</td>
-        <td><button class="btn-sm" onclick="delS('${r.id}')">×</button></td>
+        <td style="white-space:nowrap">
+          <button class="btn-sm btn-ok" onclick="editSaida('${r.id}')" style="margin-right:4px">✏</button>
+          <button class="btn-sm" onclick="delS('${r.id}')">×</button>
+        </td>
       </tr>`;
     }).join('');
     h+=`<div class="sec-hdr"><h2>${filtroSaida||'Todas as Saídas'} — ${MESES[ST.mes-1]} ${ST.ano}</h2><div class="sec-line"></div></div>
@@ -576,6 +703,7 @@ function renderFin(){
       <td class="${recebido?'pos':'amber'}">${recebido?fmt(r.vr):'<span class="badge b-pend">A Receber</span>'}</td>
       <td class="dim">${dr}</td>
       <td style="text-align:right;white-space:nowrap">
+        <button class="btn-sm btn-ok" onclick="editFin('${key}','${r.id}')" style="margin-right:4px" title="Editar">✏</button>
         ${!recebido?`<button class="btn-sm btn-ok" onclick="marcarRecebido('${key}','${r.id}')" style="margin-right:4px;white-space:nowrap">✓ Recebido</button>`:`<span class="badge b-ok">✓ Recebido</span>`}
         <button class="btn-sm" onclick="delFi('${key}','${r.id}')">×</button>
       </td>
@@ -677,6 +805,7 @@ function renderVerif(){
     <td><span class="badge ${cu.st==='PAGO'?'b-ok':cu.st==='VENCIDO'?'b-late':'b-pend'}">${cu.st||'PENDENTE'}</span></td>
     <td style="font-size:11px;color:var(--dim);text-align:left">${cu.obs||''}</td>
     <td>
+      <button class="btn-sm btn-ok" onclick="editCusto('${cu.id}')" style="margin-right:4px" title="Editar">✏</button>
       <button class="btn-sm btn-ok" onclick="toggleCusto('${cu.id}')" style="margin-right:4px">${cu.st==='PAGO'?'↩ Desfazer':'✓ Pago'}</button>
       <button class="btn-sm" onclick="delVi('c','${cu.id}')">×</button>
     </td>
@@ -763,17 +892,25 @@ function renderDRE(){
   const sOp=sa.filter(r=>r.cat==='Despesa Operacional').reduce((s,r)=>s+(+r.val||0),0);
   const trib=sa.filter(r=>r.cat==='Tributo').reduce((s,r)=>s+(+r.val||0),0);
   const totalDOp=pessoal+custoFixo+mkt+sOp+trib;
-  const lb=t.rl-t.cmvTotal;
+  // CMV diário das entradas separado de compras
+  const cmvDiario=load('entradas').reduce((s,r)=>s+(+r.cmv||0),0);
+  const cmvCompras=t.compras; // só compras da aba saídas
+  const lb=t.fat-t.taxas-cmvDiario-cmvCompras;
   const ebitda=lb-totalDOp;
   const res=ebitda-(t.erros+t.perdas);
+  // Saldo de Recompra
+  const cfgRc=loadO('recompra_meta');
+  const cmvOrc=cfgRc.cmvOrc||0;
+  const saldoRc=cmvOrc-cmvCompras-t.perdas;
 
   const row=(l,val,cls='')=>`<div class="dre-row"><div class="dre-l">${l}</div><div class="dre-v ${cls}">${fmt(val)}</div></div>`;
   const hdr=l=>`<div class="dre-row dre-hdr"><div class="dre-l">${l}</div><div class="dre-v"></div></div>`;
   const sub=(l,val)=>`<div class="dre-row dre-sub"><div class="dre-l">${l}</div><div class="dre-v ${vc(val)}">${fmt(val)}</div></div>`;
 
-  const h=`<div style="max-width:640px">
-    <div style="margin-bottom:20px">
-      <div style="font-size:10px;letter-spacing:.15em;text-transform:uppercase;color:var(--gold);margin-bottom:4px">SR. CAPAS · ${ST.empresa==='bacaxa'?'Bacaxá / Saquarema':'Saquarema'}</div>
+  const h=`<div style="display:grid;grid-template-columns:1fr 260px;gap:16px;align-items:start">
+  <div>
+    <div style="margin-bottom:16px">
+      <div style="font-size:10px;letter-spacing:.15em;text-transform:uppercase;color:var(--gold);margin-bottom:4px">SR. CAPAS · Bacaxá / Saquarema</div>
       <div style="font-family:'Syne',sans-serif;font-size:22px;font-weight:800">${MESES[ST.mes-1]} ${ST.ano}</div>
     </div>
     <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden">
@@ -781,15 +918,15 @@ function renderDRE(){
     ${row('Dinheiro',t.din,'pos')}
     ${row('PIX (bruto)',t.pix,'pos')}
     ${row('Cartão PagBank (bruto)',t.cart,'pos')}
-    ${row('Financeiras — total vendido (UME, Payjoy...)',t.finVendas,'pos')}
+    ${row('Financeiras — total vendido',t.finVendas,'pos')}
     ${row('Rendimentos',t.rend,'pos')}
     ${sub('TOTAL FATURAMENTO BRUTO',t.fat)}
     ${hdr('DEDUÇÕES')}
     ${row('Taxas PIX + Cartão + Financeiras',-t.taxas,'neg')}
-    ${sub('RECEITA OPERACIONAL LÍQUIDA',t.rl)}
-    ${hdr('CMV — CUSTO DAS MERCADORIAS')}
-    ${row('Compras (aba Saídas)',-t.compras,'neg')}
-    ${row('CMV lançado nas Entradas',-t.cmvEntradas,'neg')}
+    ${row('CMV Diário (Entradas)',-cmvDiario,'neg')}
+    ${sub('RECEITA APÓS DEDUÇÕES',t.fat-t.taxas-cmvDiario)}
+    ${hdr('CMV — COMPRAS')}
+    ${row('Compras registradas (Saídas)',-cmvCompras,'neg')}
     ${sub('LUCRO BRUTO',lb)}
     ${hdr('DESPESAS OPERACIONAIS')}
     ${row('Pessoal (Salários, Vales, Adiant.)',-pessoal,'neg')}
@@ -803,19 +940,48 @@ function renderDRE(){
     ${row('Perdas',-t.perdas,'neg')}
     <div class="dre-row dre-final"><div class="dre-l">RESULTADO LÍQUIDO DO MÊS</div><div class="dre-v ${res>=0?'pos':'neg'}">${fmt(res)}</div></div>
     </div>
-    <div style="margin-top:12px;padding:14px;background:var(--gold-bg);border:1px solid var(--gold-dim);border-radius:8px">
+    <div style="margin-top:10px;padding:12px;background:var(--gold-bg);border:1px solid var(--gold-dim);border-radius:8px">
       <div style="font-size:10px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px">Financeiras — Posição</div>
-      <div style="display:flex;gap:24px;flex-wrap:wrap">
-        <div><div style="font-size:10px;color:var(--dim)">Total Vendido</div><div style="font-family:'Syne',sans-serif;font-size:16px;font-weight:700">${fmt(t.finVendas)}</div></div>
-        <div><div style="font-size:10px;color:var(--dim)">Recebido</div><div style="font-family:'Syne',sans-serif;font-size:16px;font-weight:700;color:var(--green)">${fmt(t.finRecebido)}</div></div>
-        <div><div style="font-size:10px;color:var(--dim)">A Receber</div><div style="font-family:'Syne',sans-serif;font-size:16px;font-weight:700;color:var(--amber)">${fmt(t.finAReceber)}</div></div>
+      <div style="display:flex;gap:16px;flex-wrap:wrap">
+        <div><div style="font-size:9px;color:var(--dim)">Vendido</div><div style="font-family:'Syne',sans-serif;font-size:14px;font-weight:700">${fmt(t.finVendas)}</div></div>
+        <div><div style="font-size:9px;color:var(--dim)">Recebido</div><div style="font-family:'Syne',sans-serif;font-size:14px;font-weight:700;color:var(--green)">${fmt(t.finRecebido)}</div></div>
+        <div><div style="font-size:9px;color:var(--dim)">A Receber</div><div style="font-family:'Syne',sans-serif;font-size:14px;font-weight:700;color:var(--amber)">${fmt(t.finAReceber)}</div></div>
       </div>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:12px">
-      <div class="kpi"><div class="kpi-label">Margem Bruta</div><div class="kpi-value">${pct(lb,t.rl)}</div></div>
-      <div class="kpi"><div class="kpi-label">Margem EBITDA</div><div class="kpi-value">${pct(ebitda,t.rl)}</div></div>
-      <div class="kpi"><div class="kpi-accent" style="background:${res>=0?'var(--green)':'var(--red)'}"></div><div class="kpi-label">Margem Líquida</div><div class="kpi-value ${res>=0?'pos':'neg'}">${pct(res,t.rl)}</div></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:10px">
+      <div class="kpi"><div class="kpi-label">Margem Bruta</div><div class="kpi-value">${pct(lb,t.fat-t.taxas-cmvDiario)}</div></div>
+      <div class="kpi"><div class="kpi-label">Margem EBITDA</div><div class="kpi-value">${pct(ebitda,t.fat-t.taxas-cmvDiario)}</div></div>
+      <div class="kpi"><div class="kpi-accent" style="background:${res>=0?'var(--green)':'var(--red)'}"></div><div class="kpi-label">Margem Líquida</div><div class="kpi-value ${res>=0?'pos':'neg'}">${pct(res,t.fat-t.taxas-cmvDiario)}</div></div>
     </div>
+  </div>
+
+  <!-- SALDO DE RECOMPRA (coluna direita) -->
+  <div>
+    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:18px;margin-top:52px">
+      <div style="font-family:'Syne',sans-serif;font-size:10px;font-weight:700;letter-spacing:.18em;color:var(--gold);text-transform:uppercase;margin-bottom:14px">🔄 Saldo de Recompra</div>
+      <div style="margin-bottom:10px">
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">CMV Orçado do Mês</div>
+        <input type="number" step="0.01" value="${cmvOrc||''}" placeholder="R$ 0,00"
+          onchange="saveO('recompra_meta',{cmvOrc:+this.value||0})"
+          style="background:var(--bg);border:1px solid var(--border);border-radius:5px;color:var(--gold);font-family:'Syne',sans-serif;font-size:14px;font-weight:700;padding:6px 10px;outline:none;width:100%;font-variant-numeric:tabular-nums">
+      </div>
+      <div style="border-top:1px solid var(--border-lite);padding-top:10px">
+        ${[
+          ['Orçado',fmt(cmvOrc),'var(--gold)'],
+          ['(-) Compras',fmt(cmvCompras),'var(--red)'],
+          ['(-) Perdas',fmt(t.perdas),'var(--red)'],
+        ].map(([l,v,c])=>`<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px">
+          <span style="color:var(--muted)">${l}</span>
+          <span style="color:${c};font-variant-numeric:tabular-nums">${v}</span>
+        </div>`).join('')}
+        <div style="border-top:1px solid var(--border);margin-top:8px;padding-top:8px;display:flex;justify-content:space-between">
+          <span style="font-family:'Syne',sans-serif;font-size:11px;font-weight:700;color:var(--text)">SALDO LIVRE</span>
+          <span style="font-family:'Syne',sans-serif;font-size:16px;font-weight:800;color:${saldoRc>=0?'var(--green)':'var(--red)'}">${fmt(saldoRc)}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
   </div>`;
   document.getElementById('content').innerHTML=h;
 }
@@ -903,8 +1069,21 @@ function renderMarkup(){
   const funcionarios=(getVerif().f||[]);
   const nomes=funcionarios.map(f=>f.nome).filter(Boolean);
 
-  const metaMes=cfg.metaMes||0;
+  const metaDigitada=cfg.metaMes||0;
   const diasAbrir=cfg.diasAbrir||26;
+  // Porcentagem de markup atual (última linha da tabela com dados)
+  const enSortedMk=[...load('entradas')].sort((a,b)=>a.data.localeCompare(b.data)).filter(r=>r.cmv>0||(+r.din+r.pix+r.cart)>0);
+  const lastEn=enSortedMk[enSortedMk.length-1];
+  let pctAtual=1.0;
+  if(lastEn){
+    let cAcc=0,vAcc=0;
+    enSortedMk.forEach(r=>{cAcc+=(+r.cmv||0);vAcc+=(+r.din||0)+(+r.pix||0)+(+r.cart||0);});
+    pctAtual=cAcc>0?vAcc/(2*cAcc):1.0;
+  }
+  // Formula: meta = metaDigitada / (pctAtual / (1 + pctAtual))
+  const metaMes=pctAtual>0&&metaDigitada>0?metaDigitada/(pctAtual/(1+pctAtual)):metaDigitada;
+  // Percentuais fixos por categoria
+  const CAT_PCTS_FIXOS={Celulares:32,Eletrônicos:17,Acessórios:13,Películas:22,Capas:16,Outros:0};
 
   // ── Tabela acumulativa ─────────────────────────────
   let cmvAcc=0,vendaAcc=0,taxasAcc=0,gastosAcc=0;
@@ -958,7 +1137,7 @@ function renderMarkup(){
   const c=document.getElementById('content');
 
   // ── Seção META ─────────────────────────────────────
-  const catPcts=cfg.catPcts||{Celulares:32,Eletrônicos:17,Acessórios:13,'Películas':22,Capas:16};
+  const catPcts=CAT_PCTS_FIXOS; // percentuais fixos
   const catRows=CAT_PRODUTO.map(cat=>{
     const pp=catPcts[cat]||0;
     const metaCat=metaMes*(pp/100);
@@ -973,10 +1152,10 @@ function renderMarkup(){
 
   // Meta por vendedor
   const vendNomes=nomes.length>0?nomes:['(sem vendedores)'];
+  const nVend=vendNomes.length||1;
+  const metaVendIndividual=metaMes/nVend; // meta dividida igualmente
   const vendRows=vendNomes.filter(n=>n!=='(sem vendedores)').map(nome=>{
-    const vmCfg=cfg.vendMeta||{};
-    const pNome=vmCfg[nome]||0;
-    const metaVend=metaMes*(pNome/100);
+    const metaVend=metaVendIndividual;
     const catCols=CAT_PRODUTO.map(cat=>{
       const pp=catPcts[cat]||0;
       const metaVendCat=metaVend*(pp/100);
@@ -1070,23 +1249,43 @@ function renderMarkup(){
 
   // ── Gráfico pizza categorias ────────────────────────
   const catColors=['#C9A850','#7FB8C9','#4ADE80','#F5A623','#F87171','#7FC9A8'];
-  const total360=360;
-  let angle=0;
-  const pizzaArcs=CAT_PRODUTO.map((cat,i)=>{
-    const pp=catPcts[cat]||0;
-    const deg=pp*3.6;
-    const r=50,cx=60,cy=60;
-    const start=angle,end=angle+deg;
-    const x1=cx+r*Math.cos(start*Math.PI/180);
-    const y1=cy+r*Math.sin(start*Math.PI/180);
-    const x2=cx+r*Math.cos(end*Math.PI/180);
-    const y2=cy+r*Math.sin(end*Math.PI/180);
-    const large=deg>180?1:0;
-    const path=`M${cx},${cy} L${x1.toFixed(1)},${y1.toFixed(1)} A${r},${r} 0 ${large},1 ${x2.toFixed(1)},${y2.toFixed(1)} Z`;
-    angle+=deg;
-    return`<path d="${path}" fill="${catColors[i]}" opacity=".85"/>`;
+  function makePizza(slices,colors){
+    let angle=-90,arcs='';
+    const total=slices.reduce((s,v)=>s+v,0);
+    if(!total)return'<circle cx="60" cy="60" r="50" fill="var(--border)"/>';
+    slices.forEach((v,i)=>{
+      if(!v)return;
+      const deg=(v/total)*360;
+      const r=50,cx=60,cy=60;
+      const start=angle,end=angle+deg;
+      const x1=cx+r*Math.cos(start*Math.PI/180);
+      const y1=cy+r*Math.sin(start*Math.PI/180);
+      const x2=cx+r*Math.cos(end*Math.PI/180);
+      const y2=cy+r*Math.sin(end*Math.PI/180);
+      const large=deg>180?1:0;
+      arcs+=`<path d="M${cx},${cy} L${x1.toFixed(1)},${y1.toFixed(1)} A${r},${r} 0 ${large},1 ${x2.toFixed(1)},${y2.toFixed(1)} Z" fill="${colors[i%colors.length]}" opacity=".85"/>`;
+      angle+=deg;
+    });
+    return arcs;
+  }
+
+  // Pizza categorias (por % da meta)
+  const catSlices=CAT_PRODUTO.map(cat=>catPcts[cat]||0);
+  const pizzaCat=makePizza(catSlices,catColors);
+  const legendCat=CAT_PRODUTO.map((cat,i)=>`<div style="display:flex;align-items:center;gap:5px;font-size:10px"><div style="width:9px;height:9px;background:${catColors[i]};border-radius:2px;flex-shrink:0"></div>${cat} ${catPcts[cat]||0}%</div>`).join('');
+
+  // Pizza vendedores (por total vendido)
+  const vendTotals=vendNomes.filter(n=>n!=='(sem vendedores)').map(nome=>{
+    return Object.values(vend[nome]||{}).reduce((s,v)=>s+(+v||0),0);
+  });
+  const vendColors=['#C9A850','#7FB8C9','#4ADE80','#F5A623','#F87171','#7FC9A8','#C084FC'];
+  const pizzaVend=makePizza(vendTotals,vendColors);
+  const totalVendAll=vendTotals.reduce((s,v)=>s+v,0);
+  const legendVend=vendNomes.filter(n=>n!=='(sem vendedores)').map((nome,i)=>{
+    const v=vendTotals[i]||0;
+    const pp=totalVendAll>0?(v/totalVendAll*100).toFixed(0):'0';
+    return`<div style="display:flex;align-items:center;gap:5px;font-size:10px"><div style="width:9px;height:9px;background:${vendColors[i%vendColors.length]};border-radius:2px;flex-shrink:0"></div>${nome} ${pp}%</div>`;
   }).join('');
-  const legend=CAT_PRODUTO.map((cat,i)=>`<div style="display:flex;align-items:center;gap:6px;font-size:11px"><div style="width:10px;height:10px;background:${catColors[i]};border-radius:2px;flex-shrink:0"></div>${cat} ${catPcts[cat]||0}%</div>`).join('');
 
   c.innerHTML=`
   <!-- META DO MÊS -->
@@ -1094,14 +1293,18 @@ function renderMarkup(){
     <div class="form-card">
       <div class="sec-hdr" style="margin-bottom:12px"><h2>Meta do Mês</h2><div class="sec-line"></div></div>
       <div class="fg" style="grid-template-columns:1fr 1fr">
-        <div class="fl"><label>Meta Base R$</label>
-          <input class="fi" type="number" step="0.01" id="mk-meta" value="${metaMes||''}" placeholder="0,00"
+        <div class="fl"><label>Meta Base R$ <span style="font-size:9px;color:var(--dim)">(valor alvo)</span></label>
+          <input class="fi" type="number" step="0.01" id="mk-meta" value="${metaDigitada||''}" placeholder="0,00"
             onchange="saveMkField('metaMes',+this.value);renderMarkup()">
         </div>
         <div class="fl"><label>Dias a Abrir</label>
           <input class="fi" type="number" id="mk-dias" value="${diasAbrir}" min="1" max="31"
             onchange="saveMkField('diasAbrir',+this.value);renderMarkup()">
         </div>
+      </div>
+      <div style="margin-top:8px;padding:8px 10px;background:var(--gold-bg);border:1px solid var(--gold-dim);border-radius:6px;font-size:11px">
+        <span style="color:var(--muted)">Meta ajustada pelo markup (${(pctAtual*100).toFixed(1)}%):</span>
+        <span style="font-family:'Syne',sans-serif;font-weight:700;color:var(--gold);margin-left:8px">${fmt(metaMes)}</span>
       </div>
       <div style="margin-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:8px">
         ${[
@@ -1186,7 +1389,7 @@ function renderMarkup(){
   </div>
 
   <!-- GRÁFICOS -->
-  <div style="display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-bottom:24px">
+  <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:14px;margin-bottom:24px">
     <div class="chart-block">
       <div class="chart-lbl">Vendas Diárias — ${MESES[ST.mes-1]}</div>
       <div style="display:flex;align-items:flex-end;gap:4px;height:100px;overflow-x:auto;padding-bottom:20px">
@@ -1194,12 +1397,21 @@ function renderMarkup(){
       </div>
     </div>
     <div class="chart-block">
-      <div class="chart-lbl">Categorias (% meta)</div>
-      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-        <svg viewBox="0 0 120 120" width="110" height="110">
-          ${pizzaArcs||'<circle cx="60" cy="60" r="50" fill="var(--border)"/>'}
+      <div class="chart-lbl">Por Categoria (% meta)</div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:10px">
+        <svg viewBox="0 0 120 120" width="100" height="100">
+          ${pizzaCat}
         </svg>
-        <div style="display:flex;flex-direction:column;gap:4px">${legend}</div>
+        <div style="display:flex;flex-direction:column;gap:3px">${legendCat}</div>
+      </div>
+    </div>
+    <div class="chart-block">
+      <div class="chart-lbl">Por Vendedor (total vendido)</div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:10px">
+        <svg viewBox="0 0 120 120" width="100" height="100">
+          ${pizzaVend||'<circle cx="60" cy="60" r="50" fill="var(--border)"/>'}
+        </svg>
+        <div style="display:flex;flex-direction:column;gap:3px">${legendVend||'<div style="font-size:11px;color:var(--dim)">Sem dados</div>'}</div>
       </div>
     </div>
   </div>
