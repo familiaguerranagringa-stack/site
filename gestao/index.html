@@ -808,34 +808,58 @@ function startWakeMode(){
 }
 
 function _startWakeRecog(){
-  if(!wakeActive||vListening)return;
+  if(!wakeActive||vListening||wakeArmed)return;
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   wakeRecog=new SR();
   wakeRecog.lang='pt-BR';
-  wakeRecog.continuous=true;
+  wakeRecog.continuous=false;     // loop manual é mais confiável no Chrome
   wakeRecog.interimResults=true;
   wakeRecog.maxAlternatives=5;
 
   wakeRecog.onresult=(e)=>{
     if(wakeArmed||vListening)return;
     let allText='';
-    for(let i=e.resultIndex;i<e.results.length;i++)
+    for(let i=0;i<e.results.length;i++)
       for(let j=0;j<e.results[i].length;j++)
         allText+=e.results[i][j].transcript+' ';
     const norm=allText.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-    if(norm.includes(WAKE_WORD)||norm.includes('malvadao')){
+
+    // Mostra o que foi ouvido no label (ajuda a ver se está escutando)
+    const wl=document.getElementById('wake-label');
+    if(wl&&norm.trim().length>1)wl.textContent='👂 "'+norm.trim().slice(-22)+'"';
+
+    // Aceita variações de transcrição do Chrome
+    const matches=['malvadao','malvadão','marvadao','mal vadao','malvada','marvada','malvado','mal dado','mau vadao'];
+    if(matches.some(m=>norm.includes(m))){
       wakeArmed=true;
       try{wakeRecog.stop()}catch(e){}
       beep(660,80);setTimeout(()=>beep(1100,150),100);
       document.getElementById('voice-btn').classList.remove('wake-on');
       document.getElementById('voice-btn').classList.add('wake-triggered');
-      document.getElementById('wake-label').textContent='🎤 Ouvindo...';
+      if(wl)wl.textContent='🎤 Ouvindo comando...';
       setTimeout(()=>startVoice(),250);
     }
   };
-  wakeRecog.onend=()=>{if(wakeActive&&!vListening)setTimeout(()=>_startWakeRecog(),800)};
-  wakeRecog.onerror=()=>{if(wakeActive&&!vListening)setTimeout(()=>_startWakeRecog(),1500)};
-  try{wakeRecog.start()}catch(e){}
+
+  // Terminou (silêncio ou resultado) → reinicia imediatamente
+  wakeRecog.onend=()=>{
+    if(wakeActive&&!vListening&&!wakeArmed)
+      setTimeout(()=>_startWakeRecog(),150);
+    // Reseta label se estava mostrando texto ouvido
+    const wl=document.getElementById('wake-label');
+    if(wl&&wl.textContent.startsWith('👂'))wl.textContent='🎤 diga "Malvadão"...';
+  };
+
+  // no-speech é normal → reinicia rápido; outros erros → aguarda mais
+  wakeRecog.onerror=(e)=>{
+    if(!wakeActive||vListening||wakeArmed)return;
+    const d=e.error==='no-speech'?150:e.error==='aborted'?300:2500;
+    setTimeout(()=>_startWakeRecog(),d);
+  };
+
+  try{wakeRecog.start()}catch(e){
+    if(wakeActive&&!vListening)setTimeout(()=>_startWakeRecog(),600);
+  }
 }
 
 function stopWakeMode(){
