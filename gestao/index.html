@@ -168,6 +168,8 @@ tr:hover td{background:var(--bg-hover)}
     <div class="sb-bottom">
 
       <button class="sb-item" id="wake-toggle-btn" onclick="toggleWakeMode()" style="width:100%;margin:0">🔇 Modo Alexa: OFF</button>
+      <button class="sb-item" onclick="mostrarCodigo()" style="width:100%;margin:4px 0 0" id="btn-codigo">🔗 Compartilhar Código</button>
+      <button class="sb-item" onclick="configurarSync()" style="width:100%;margin:4px 0 0">📲 Configurar Sync</button>
       <button class="sb-item" onclick="doLogout()" style="width:100%;margin:4px 0 0;color:var(--dim)">↩ Sair</button>
     </div>
   </aside>
@@ -240,10 +242,9 @@ function loadO(t){try{return JSON.parse(localStorage.getItem(sk(t))||'{}')}catch
 function saveO(t,d){localStorage.setItem(sk(t),JSON.stringify(d));flashSaved();scheduleSync()}
 
 // ── SYNC JSONBIN ────────────────────────────────────────────
-// Chave dividida para segurança
 const _K=['$2a$10$','/L0LORzy','hUWpUl9j8','wFLmucHLadjPeXn5rv1pGwunumQ8QvKs3b4q'];
 const _JK=()=>_K.join('');
-const _BN='srcapas-bacaxa'; // nome do bin
+const _BASE='https://api.jsonbin.io/v3/b';
 let _binId=localStorage.getItem('srcapas_bin_id')||null;
 let _syncTimer=null,_syncing=false;
 
@@ -255,29 +256,30 @@ function setSyncStatus(msg,cor='var(--muted)'){
 async function getOrCreateBin(){
   if(_binId)return _binId;
   try{
-    // Buscar bin existente pelo nome
-    const r=await fetch('https://api.jsonbin.io/v3/b',{
-      headers:{'X-Master-Key':_JK(),'X-Bin-Meta':'false'}
-    });
+    // Listar bins existentes
+    const r=await fetch(_BASE,{headers:{'X-Master-Key':_JK()}});
     if(r.ok){
-      const list=await r.json();
-      const found=(list.result||[]).find(b=>(b.record||{}).name===_BN||(b||{}).name===_BN);
-      if(found){
-        _binId=found.record?.id||found.id||null;
-        if(_binId){localStorage.setItem('srcapas_bin_id',_binId);return _binId;}
+      const data=await r.json();
+      // result é array de objetos com campo "record" sendo o ID (string)
+      const bins=data.result||[];
+      if(bins.length>0){
+        // Usar o primeiro bin encontrado (o da conta do JSONBin)
+        const id=typeof bins[0].record==='string'?bins[0].record:bins[0].record?.id||null;
+        if(id){_binId=id;localStorage.setItem('srcapas_bin_id',id);return id;}
       }
     }
-    // Criar novo bin
-    const r2=await fetch('https://api.jsonbin.io/v3/b',{
+    // Sem bins: criar novo
+    const r2=await fetch(_BASE,{
       method:'POST',
-      headers:{'Content-Type':'application/json','X-Master-Key':_JK(),'X-Bin-Name':_BN,'X-Bin-Private':'false'},
+      headers:{'Content-Type':'application/json','X-Master-Key':_JK(),'X-Bin-Name':'srcapas-bacaxa','X-Bin-Private':'false'},
       body:JSON.stringify({})
     });
     if(r2.ok){
       const d=await r2.json();
-      _binId=d.metadata?.id||null;
-      if(_binId)localStorage.setItem('srcapas_bin_id',_binId);
-      return _binId;
+      const id=d.metadata?.id||null;
+      if(id){_binId=id;localStorage.setItem('srcapas_bin_id',id);
+        notify('Bin criado: '+id+' — guarde este ID!','info');
+        return id;}
     }
   }catch(e){console.log('JSONBin error:',e);}
   return null;
@@ -287,33 +289,26 @@ async function syncFromJB(){
   setSyncStatus('⟳ Carregando...','var(--amber)');
   try{
     const id=await getOrCreateBin();
-    if(!id){setSyncStatus('','');return;}
-    const r=await fetch('https://api.jsonbin.io/v3/b/'+id+'/latest',{
-      headers:{'X-Master-Key':_JK(),'X-Bin-Meta':'false'}
-    });
+    if(!id){setSyncStatus('⚠ Sem ID','var(--red)');return;}
+    const r=await fetch(_BASE+'/'+id+'/latest',{headers:{'X-Master-Key':_JK(),'X-Bin-Meta':'false'}});
     if(r.ok){
-      const data=await r.json();
-      const rec=data.record||data;
-      // Popular localStorage com os dados do servidor
-      if(rec&&typeof rec==='object'){
+      const rec=(await r.json()).record||(await r.json());
+      if(rec&&typeof rec==='object'&&Object.keys(rec).length>0){
         Object.entries(rec).forEach(([k,v])=>{
           if(k.startsWith('srcapas_'))localStorage.setItem(k,JSON.stringify(v));
         });
+        setSyncStatus('✓ Sincronizado','var(--green)');
+      } else {
+        setSyncStatus('• Nuvem vazia','var(--dim)');
       }
-      setSyncStatus('✓ Sincronizado','var(--green)');
-      setTimeout(()=>setSyncStatus('',''),2500);
+      setTimeout(()=>setSyncStatus('',''),3000);
     } else {
       setSyncStatus('• Local','var(--dim)');
     }
-  }catch(e){
-    setSyncStatus('• Offline','var(--dim)');
-  }
+  }catch(e){setSyncStatus('• Offline','var(--dim)');}
 }
 
-function scheduleSync(){
-  clearTimeout(_syncTimer);
-  _syncTimer=setTimeout(pushToJB,3000);
-}
+function scheduleSync(){clearTimeout(_syncTimer);_syncTimer=setTimeout(pushToJB,3000);}
 
 async function pushToJB(){
   if(_syncing)return;
@@ -321,8 +316,7 @@ async function pushToJB(){
   setSyncStatus('⟳ Salvando...','var(--amber)');
   try{
     const id=await getOrCreateBin();
-    if(!id)throw new Error('Sem bin ID');
-    // Coletar dados do localStorage
+    if(!id)throw new Error('Sem bin');
     const dados={};
     for(let i=0;i<localStorage.length;i++){
       const k=localStorage.key(i);
@@ -331,22 +325,60 @@ async function pushToJB(){
         catch{dados[k]=localStorage.getItem(k);}
       }
     }
-    const r=await fetch('https://api.jsonbin.io/v3/b/'+id,{
+    const r=await fetch(_BASE+'/'+id,{
       method:'PUT',
       headers:{'Content-Type':'application/json','X-Master-Key':_JK()},
       body:JSON.stringify(dados)
     });
-    if(r.ok){
-      setSyncStatus('✓ Salvo na nuvem','var(--green)');
-      setTimeout(()=>setSyncStatus('',''),2000);
-    } else {
-      setSyncStatus('⚠ Erro ao salvar','var(--red)');
-    }
-  }catch(e){
-    setSyncStatus('⚠ Offline','var(--dim)');
-  }finally{
-    _syncing=false;
-  }
+    if(r.ok){setSyncStatus('✓ Salvo na nuvem','var(--green)');setTimeout(()=>setSyncStatus('',''),2000);}
+    else{setSyncStatus('⚠ Erro ao salvar','var(--red)');}
+  }catch(e){setSyncStatus('⚠ Offline','var(--dim)');}
+  finally{_syncing=false;}
+}
+
+// Forçar sync manual (botão na topbar)
+function forcaSync(){syncFromJB().then(()=>render());}
+function forçaPush(){pushToJB();}
+
+// Mostrar código do bin para compartilhar
+function mostrarCodigo(){
+  if(!_binId){notify('Sem código ainda — faça um lançamento primeiro','info');return;}
+  const m=document.createElement('div');
+  m.className='modal-bg';
+  m.innerHTML=`<div class="modal">
+    <h2>Código de Sincronização</h2>
+    <p>Passe este código para Terra e Paiva inserirem em "Configurar Sync":</p>
+    <div style="background:var(--bg);border:1px solid var(--gold-dim);border-radius:6px;padding:14px;font-family:'Syne',sans-serif;font-size:16px;font-weight:700;color:var(--gold);text-align:center;letter-spacing:.1em;margin-bottom:16px">${_binId}</div>
+    <button class="btn-gold" onclick="navigator.clipboard.writeText('${_binId}').then(()=>this.textContent='✓ Copiado!');this.textContent='Copiado!'" style="width:100%;margin-bottom:8px">📋 Copiar Código</button>
+    <button class="btn-ghost" style="width:100%" onclick="this.closest('.modal-bg').remove()">Fechar</button>
+  </div>`;
+  document.body.appendChild(m);
+}
+
+function configurarSync(){
+  const m=document.createElement('div');
+  m.className='modal-bg';
+  m.innerHTML=`<div class="modal">
+    <h2>Configurar Sincronização</h2>
+    <p>Peça ao Leandro (Guerra) o código de sincronização e insira abaixo:</p>
+    <div class="fl" style="margin-bottom:16px">
+      <label>Código de Sincronização</label>
+      <input class="fi" type="text" id="sync-code-input" placeholder="Cole o código aqui...">
+    </div>
+    <div style="display:flex;gap:10px">
+      <button class="btn-gold" style="flex:1" onclick="
+        const v=document.getElementById('sync-code-input').value.trim();
+        if(!v){return;}
+        localStorage.setItem('srcapas_bin_id',v);
+        _binId=v;
+        this.closest('.modal-bg').remove();
+        syncFromJB().then(()=>render());
+        notify('Conectado! Carregando dados...','ok');
+      ">Conectar</button>
+      <button class="btn-ghost" onclick="this.closest('.modal-bg').remove()">Cancelar</button>
+    </div>
+  </div>`;
+  document.body.appendChild(m);
 }
 
 function notify(msg,type='info'){
