@@ -168,8 +168,6 @@ tr:hover td{background:var(--bg-hover)}
     <div class="sb-bottom">
 
       <button class="sb-item" id="wake-toggle-btn" onclick="toggleWakeMode()" style="width:100%;margin:0">🔇 Modo Alexa: OFF</button>
-      <button class="sb-item" onclick="mostrarCodigo()" style="width:100%;margin:4px 0 0" id="btn-codigo">🔗 Compartilhar Código</button>
-      <button class="sb-item" onclick="configurarSync()" style="width:100%;margin:4px 0 0">📲 Configurar Sync</button>
       <button class="sb-item" onclick="doLogout()" style="width:100%;margin:4px 0 0;color:var(--dim)">↩ Sair</button>
     </div>
   </aside>
@@ -242,14 +240,9 @@ function save(t,d){localStorage.setItem(sk(t),JSON.stringify(d));flashSaved();sc
 function loadO(t){try{return JSON.parse(localStorage.getItem(sk(t))||'{}')}catch{return{}}}
 function saveO(t,d){localStorage.setItem(sk(t),JSON.stringify(d));flashSaved();scheduleSync()}
 
-// ── SYNC JSONBIN ────────────────────────────────────────────
-const _JB_BASE = 'https://api.jsonbin.io/v3/b';
-// Chave do JSONBin em partes
-const _JK = () => ['$2a$10$','/L0LORzy','hUWpUl9j8','wFLmucHLadjPeXn5rv1pGwunumQ8QvKs3b4q'].join('');
-
-let _binId = localStorage.getItem('srcapas_bin_id') || '6a3968d6f5f4af5e291e38f3';
-// Garantir que o bin ID fixo está sempre salvo
-if(_binId) localStorage.setItem('srcapas_bin_id', _binId);
+// ── FIREBASE REALTIME DATABASE ─────────────────────────────
+const _FB_URL = 'https://grupofamiliaguerra-9d13e-default-rtdb.firebaseio.com';
+const _FB_PATH = '/srcapas/bacaxa.json';
 let _syncTimer = null, _syncing = false;
 
 function setSyncStatus(msg, cor) {
@@ -257,49 +250,16 @@ function setSyncStatus(msg, cor) {
   if (el) { el.textContent = msg; el.style.color = cor || 'var(--muted)'; }
 }
 
-// Criar um novo bin e retornar o ID
-async function criarBin() {
-  try {
-    const r = await fetch(_JB_BASE, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Master-Key': _JK(),
-        'X-Bin-Name': 'srcapas-bacaxa',
-        'X-Bin-Private': 'false'
-      },
-      body: JSON.stringify({ _info: 'SR. CAPAS Bacaxa - dados compartilhados' })
-    });
-    const d = await r.json();
-    const id = d?.metadata?.id || null;
-    if (id) {
-      _binId = id;
-      localStorage.setItem('srcapas_bin_id', id);
-      console.log('Bin criado:', id);
-    }
-    return id;
-  } catch(e) {
-    console.error('Erro ao criar bin:', e);
-    return null;
-  }
-}
-
-// Carregar dados do JSONBin para o localStorage
-async function syncFromJB() {
-  if (!_binId) { setSyncStatus('Sem sync', 'var(--dim)'); return; }
+// Carregar dados do Firebase para o localStorage
+async function syncFromFB() {
   setSyncStatus('⟳ Carregando...', 'var(--amber)');
   try {
-    const r = await fetch(_JB_BASE + '/' + _binId + '/latest', {
-      headers: { 'X-Master-Key': _JK() }
-    });
+    const r = await fetch(_FB_URL + _FB_PATH + '?t=' + Date.now());
     if (!r.ok) { setSyncStatus('• Local', 'var(--dim)'); return; }
-    const json = await r.json();
-    const rec = json.record || json;
-    if (rec && typeof rec === 'object' && Object.keys(rec).length > 1) {
+    const rec = await r.json();
+    if (rec && typeof rec === 'object' && Object.keys(rec).length > 0) {
       Object.entries(rec).forEach(([k, v]) => {
-        if (k.startsWith('srcapas_') && k !== 'srcapas_bin_id') {
-          localStorage.setItem(k, JSON.stringify(v));
-        }
+        if (k.startsWith('srcapas_')) localStorage.setItem(k, JSON.stringify(v));
       });
       setSyncStatus('✓ Sincronizado', 'var(--green)');
     } else {
@@ -308,36 +268,35 @@ async function syncFromJB() {
     setTimeout(() => setSyncStatus('', ''), 3000);
   } catch(e) {
     setSyncStatus('• Offline', 'var(--dim)');
+    console.log('Firebase sync error:', e);
   }
 }
 
-// Salvar localStorage no JSONBin
-function scheduleSync() { clearTimeout(_syncTimer); _syncTimer = setTimeout(pushToJB, 3000); }
+// Salvar localStorage no Firebase
+function scheduleSync() { clearTimeout(_syncTimer); _syncTimer = setTimeout(pushToFB, 3000); }
 
-async function pushToJB() {
-  if (_syncing || !_binId) return;
+async function pushToFB() {
+  if (_syncing) return;
   _syncing = true;
   setSyncStatus('⟳ Salvando...', 'var(--amber)');
   try {
-    const dados = { _ts: Date.now() };
+    const dados = {};
     for (let i = 0; i < localStorage.length; i++) {
       const k = localStorage.key(i);
-      if (k && k.startsWith('srcapas_') && k !== 'srcapas_bin_id') {
+      if (k && k.startsWith('srcapas_')) {
         try { dados[k] = JSON.parse(localStorage.getItem(k)); }
         catch { dados[k] = localStorage.getItem(k); }
       }
     }
-    const r = await fetch(_JB_BASE + '/' + _binId, {
+    const r = await fetch(_FB_URL + _FB_PATH, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json', 'X-Master-Key': _JK() },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(dados)
     });
     if (r.ok) {
       setSyncStatus('✓ Salvo', 'var(--green)');
       setTimeout(() => setSyncStatus('', ''), 2000);
     } else {
-      const err = await r.json();
-      console.error('Push error:', err);
       setSyncStatus('⚠ Erro', 'var(--red)');
     }
   } catch(e) {
@@ -346,29 +305,15 @@ async function pushToJB() {
   _syncing = false;
 }
 
-// Mostrar código do bin para compartilhar
-function mostrarCodigo(){
-  if(!_binId){notify('Aguarde ou faça um lançamento para gerar o código','info');return;}
-  const id=_binId;
-  const m=document.createElement('div');
-  m.className='modal-bg';
-  const div=document.createElement('div');
-  div.className='modal';
-  div.innerHTML='<h2>🔗 Código de Sincronização</h2><p>Passe este código para Terra e Paiva insertir em <strong>📲 Configurar Sync</strong>:</p><div id="bin-code-box" style="background:var(--bg);border:2px solid var(--gold);border-radius:8px;padding:16px;font-size:13px;font-weight:800;color:var(--gold);text-align:center;word-break:break-all;margin-bottom:16px;letter-spacing:.05em">'+id+'</div><button class="btn-gold" style="width:100%;margin-bottom:8px" onclick="navigator.clipboard.writeText(document.getElementById(\'bin-code-box\').textContent).then(()=>{this.textContent=\'✓ Copiado!\';})">📋 Copiar Código</button><button class="btn-ghost" style="width:100%" onclick="this.closest(\'.modal-bg\').remove()">Fechar</button>';
-  m.appendChild(div);
-  document.body.appendChild(m);
+// Sync manual
+async function syncManual() {
+  notify('⟳ Sincronizando...', 'info');
+  await pushToFB();
+  await syncFromFB();
+  render();
+  notify('✓ Sincronizado!', 'ok');
 }
 
-// Configurar sync com código recebido
-function configurarSync(){
-  const m=document.createElement("div");
-  m.className="modal-bg";
-  const d=document.createElement("div");
-  d.className="modal";
-  d.innerHTML="<h2>📲 Configurar Sincronização</h2><p>Peça o <strong>Código de Sincronização</strong> ao Leandro e cole abaixo:</p><div class=\"fl\" style=\"margin-bottom:16px\"><label>Código</label><input class=\"fi\" id=\"sync-in\" placeholder=\"Cole o código aqui...\"></div><div style=\"display:flex;gap:8px\"><button class=\"btn-gold\" style=\"flex:1\" onclick=\"var v=document.getElementById('sync-in').value.trim();if(!v){notify('Cole o código','err');return;}_binId=v;localStorage.setItem('srcapas_bin_id',v);this.closest('.modal-bg').remove();notify('Conectando...','info');syncFromJB().then(()=>render());\" >Conectar</button><button class=\"btn-ghost\" onclick=\"this.closest('.modal-bg').remove()\">Cancelar</button></div>";
-  m.appendChild(d);
-  document.body.appendChild(m);
-}
 
 function notify(msg,type='info'){
   const c=document.getElementById('notif'),d=document.createElement('div');
@@ -449,11 +394,10 @@ function initApp(){
   ms.innerHTML=MESES.map((m,i)=>`<option value="${i+1}"${i+1===ST.mes?' selected':''}>${m}</option>`).join('');
   const y=ST.ano;
   ys.innerHTML=[y-1,y,y+1].map(v=>`<option value="${v}"${v===y?' selected':''}>${v}</option>`).join('');
-  // Sempre: push local → nuvem, depois pull nuvem → local, depois renderiza
+  // Push dados locais para Firebase, depois carrega e renderiza
   (async()=>{
-    setSyncStatus('⟳ Sincronizando...','var(--amber)');
-    await pushToJB();   // envia o que tem local
-    await syncFromJB(); // carrega o que está na nuvem
+    await pushToFB();
+    await syncFromFB();
     render();
   })();
 }
@@ -466,7 +410,7 @@ function changeEmpresa(v){
 function changePeriod(){
   ST.mes=Number(document.getElementById('sel-mes').value);
   ST.ano=Number(document.getElementById('sel-ano').value);
-  syncFromJB().then(()=>render()).catch(()=>render());
+  syncFromFB().then(()=>render()).catch(()=>render());
 }
 
 
