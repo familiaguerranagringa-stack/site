@@ -919,13 +919,31 @@ async function lerArquivo(file){
     reader.readAsDataURL(file);
   });
 }
-function verAnexo(b64,nome){
-  const a=document.createElement('a');a.href=b64;a.download=nome;a.click();
+function verAnexo(b64,nome,tipo){
+  const m=document.createElement('div');
+  m.className='modal-bg';
+  m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:500;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px';
+  const ehPDF=tipo&&tipo.includes('pdf')||nome.toLowerCase().endsWith('.pdf');
+  const conteudo=ehPDF
+    ?`<iframe src="${b64}" style="width:min(700px,90vw);height:80vh;border:none;border-radius:8px;background:#fff"></iframe>`
+    :`<img src="${b64}" style="max-width:min(800px,90vw);max-height:80vh;border-radius:8px;object-fit:contain">`;
+  m.innerHTML=`
+    <div style="display:flex;justify-content:space-between;align-items:center;width:min(700px,90vw);margin-bottom:10px">
+      <span style="color:#fff;font-size:13px;font-weight:600">📎 ${nome}</span>
+      <div style="display:flex;gap:8px">
+        <a href="${b64}" download="${nome}" class="btn-ghost" style="font-size:11px;text-decoration:none;padding:5px 12px">⬇ Baixar</a>
+        <button class="btn-ghost" style="font-size:11px" onclick="this.closest('.modal-bg').remove()">✕ Fechar</button>
+      </div>
+    </div>
+    ${conteudo}`;
+  m.addEventListener('click',e=>{if(e.target===m)m.remove();});
+  document.body.appendChild(m);
 }
 function iconAnexo(anexo){
   if(!anexo)return'';
   const ico=anexo.tipo&&anexo.tipo.includes('pdf')?'📄':'🖼';
-  return `<span style="font-size:11px;color:var(--green);cursor:pointer" onclick="verAnexo('${anexo.b64}','${anexo.nome}')" title="${anexo.nome}">${ico} ${anexo.nome.slice(0,18)}${anexo.nome.length>18?'...':''}</span>`;
+  const nomeCorto=anexo.nome.slice(0,18)+(anexo.nome.length>18?'...':'');
+  return`<span style="font-size:11px;color:var(--green);cursor:pointer;text-decoration:underline" onclick="verAnexo('${anexo.b64}','${anexo.nome}','${anexo.tipo||''}')" title="Clique para visualizar">${ico} ${nomeCorto}</span>`;
 }
 
 // ── VERIFICAÇÃO MENSAL ──────────────────────────────────────
