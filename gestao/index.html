@@ -243,223 +243,89 @@ function saveO(t,d){localStorage.setItem(sk(t),JSON.stringify(d));flashSaved();s
 // ── FIREBASE REALTIME DATABASE ─────────────────────────────
 const _FB_URL = 'https://grupofamiliaguerra-9d13e-default-rtdb.firebaseio.com';
 const _FB_PATH = '/srcapas/bacaxa.json';
-let _syncTimer = null, _syncing = false, _fbSSE = null, _ultimoTs = 0;
+let _syncTimer = null, _syncing = false;
 
 function setSyncStatus(msg, cor) {
-  const el = document.getElementById('sync-status');
-  if (el) { el.textContent = msg; el.style.color = cor || 'var(--muted)'; }
+  try {
+    const el = document.getElementById('sync-status');
+    if (el) { el.textContent = msg; el.style.color = cor || 'var(--muted)'; }
+  } catch(e) {}
 }
 
 function aplicarDados(rec) {
-  if (!rec || typeof rec !== 'object') return;
-  Object.entries(rec).forEach(([k, v]) => {
-    if (k.startsWith('srcapas_')) localStorage.setItem(k, JSON.stringify(v));
+  try {
+    if (!rec || typeof rec !== 'object') return;
+    Object.entries(rec).forEach(function(entry) {
+      const k = entry[0], v = entry[1];
+      if (k && k.startsWith('srcapas_')) {
+        localStorage.setItem(k, JSON.stringify(v));
+      }
+    });
+  } catch(e) { console.error('aplicarDados erro:', e); }
+}
+
+function scheduleSync() {
+  clearTimeout(_syncTimer);
+  _syncTimer = setTimeout(pushToFB, 3000);
+}
+
+function syncFromFB() {
+  setSyncStatus('⟳ Carregando...', 'var(--amber)');
+  return fetch(_FB_URL + _FB_PATH + '?t=' + Date.now())
+    .then(function(r) {
+      if (!r.ok) { setSyncStatus('• Local', 'var(--dim)'); return; }
+      return r.json();
+    })
+    .then(function(rec) {
+      if (rec && typeof rec === 'object' && Object.keys(rec).length > 1) {
+        aplicarDados(rec);
+        setSyncStatus('✓ Sincronizado', 'var(--green)');
+        setTimeout(function() { setSyncStatus('', ''); }, 3000);
+      } else {
+        setSyncStatus('• Vazio', 'var(--dim)');
+        setTimeout(function() { setSyncStatus('', ''); }, 3000);
+      }
+    })
+    .catch(function(e) {
+      setSyncStatus('• Offline', 'var(--dim)');
+    });
+}
+
+function pushToFB() {
+  if (_syncing) return Promise.resolve();
+  _syncing = true;
+  setSyncStatus('⟳ Salvando...', 'var(--amber)');
+  var dados = { _ts: Date.now() };
+  try {
+    for (var i = 0; i < localStorage.length; i++) {
+      var k = localStorage.key(i);
+      if (k && k.startsWith('srcapas_')) {
+        try { dados[k] = JSON.parse(localStorage.getItem(k)); }
+        catch(e) { dados[k] = localStorage.getItem(k); }
+      }
+    }
+  } catch(e) {}
+  return fetch(_FB_URL + _FB_PATH, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(dados)
+  })
+  .then(function(r) {
+    _syncing = false;
+    if (r.ok) {
+      setSyncStatus('✓ Salvo', 'var(--green)');
+      setTimeout(function() { setSyncStatus('', ''); }, 2000);
+    } else {
+      setSyncStatus('⚠ Erro ' + r.status, 'var(--red)');
+    }
+  })
+  .catch(function(e) {
+    _syncing = false;
+    setSyncStatus('• Offline', 'var(--dim)');
   });
 }
 
-async function syncFromFB() {
-  setSyncStatus('⟳ Carregando...', 'var(--amber)');
-  try {
-    const r = await fetch(_FB_URL + _FB_PATH + '?t=' + Date.now());
-    if (!r.ok) { setSyncStatus('• Local', 'var(--dim)'); return; }
-    const rec = await r.json();
-    if (rec && typeof rec === 'object' && Object.keys(rec).length > 0) {
-      aplicarDados(rec);
-      setSyncStatus('✓ Sincronizado', 'var(--green)');
-    } else {
-      setSyncStatus('• Nuvem vazia', 'var(--dim)');
-    }
-    setTimeout(() => setSyncStatus('', ''), 3000);
-  } catch(e) { setSyncStatus('• Offline', 'var(--dim)'); }
-}
 
-function scheduleSync() { clearTimeout(_syncTimer); _syncTimer = setTimeout(pushToFB, 2000); }
-
-async function pushToFB() {
-  if (_syncing) return;
-  _syncing = true;
-  setSyncStatus('⟳ Salvando...', 'var(--amber)');
-  try {
-    const dados = { _ts: Date.now() };
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i);
-      if (k && k.startsWith('srcapas_')) {
-        try { dados[k] = JSON.parse(localStorage.getItem(k)); }
-        catch { dados[k] = localStorage.getItem(k); }
-      }
-    }
-    // Calcular tamanho
-    const json = JSON.stringify(dados);
-    const kb = (json.length/1024).toFixed(0);
-    setSyncStatus('⟳ Enviando '+kb+'KB...', 'var(--amber)');
-
-    // Timeout de 30 segundos
-    const ctrl = new AbortController();
-    const timeout = setTimeout(() => ctrl.abort(), 30000);
-
-    const r = await fetch(_FB_URL + _FB_PATH, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: json,
-      signal: ctrl.signal
-    });
-    clearTimeout(timeout);
-
-    if (r.ok) {
-      setSyncStatus('✓ Salvo', 'var(--green)');
-      setTimeout(() => setSyncStatus('', ''), 2000);
-    } else {
-      const err = await r.text();
-      console.error('Firebase PUT error:', r.status, err);
-      setSyncStatus('⚠ Erro '+r.status, 'var(--red)');
-      notify('Erro Firebase: '+r.status+' — '+err.slice(0,80), 'err');
-    }
-  } catch(e) {
-    if (e.name === 'AbortError') {
-      setSyncStatus('⚠ Timeout', 'var(--red)');
-      notify('Timeout: dados muito grandes ou sem conexão com Firebase', 'err');
-    } else {
-      setSyncStatus('• Offline', 'var(--dim)');
-      notify('Erro: '+e.message, 'err');
-    }
-    console.error('pushToFB error:', e);
-  }
-  _syncing = false;
-}
-
-// ── SYNC EM TEMPO REAL via Server-Sent Events ──────────────
-function startRealtimeSync() {
-  if (_fbSSE) { try { _fbSSE.close(); } catch(e) {} }
-  try {
-    _fbSSE = new EventSource(_FB_URL + _FB_PATH);
-    _fbSSE.addEventListener('put', e => {
-      try {
-        const data = JSON.parse(e.data);
-        const rec = data.data;
-        if (!rec || typeof rec !== 'object') return;
-        const ts = rec._ts || 0;
-        if (ts <= _ultimoTs) return;
-        _ultimoTs = ts;
-        aplicarDados(rec);
-        setSyncStatus('✓ Atualizado', 'var(--green)');
-        setTimeout(() => setSyncStatus('', ''), 2000);
-        render();
-      } catch(err) {}
-    });
-    _fbSSE.addEventListener('patch', e => {
-      try {
-        const data = JSON.parse(e.data);
-        if (data.data) { aplicarDados(data.data); render(); }
-      } catch(err) {}
-    });
-    _fbSSE.onerror = () => {
-      try { _fbSSE.close(); } catch(e) {}
-      setTimeout(() => startRealtimeSync(), 5000);
-    };
-    setSyncStatus('● Ao vivo', 'var(--green)');
-    setTimeout(() => setSyncStatus('', ''), 3000);
-  } catch(e) {
-    setInterval(syncFromFB, 15000); // fallback polling
-  }
-}
-
-async function testarFirebase(){
-  notify('⟳ Testando conexão Firebase...','info');
-  try{
-    const r=await fetch(_FB_URL+_FB_PATH+'?t='+Date.now());
-    const texto=await r.text();
-    const kb=(texto.length/1024).toFixed(1);
-    if(r.ok){
-      const dados=JSON.parse(texto);
-      const chaves=Object.keys(dados||{}).filter(k=>k.startsWith('srcapas_'));
-      notify('✓ Firebase OK! '+kb+'KB, '+chaves.length+' registros encontrados','ok');
-      // Aplicar forçadamente
-      chaves.forEach(k=>{
-        try{localStorage.setItem(k,JSON.stringify(dados[k]));}catch(e){}
-      });
-      render();
-      notify('✓ Dados carregados! '+chaves.length+' registros aplicados','ok');
-    } else {
-      notify('⚠ Firebase retornou erro '+r.status+': '+texto.slice(0,100),'err');
-    }
-  }catch(e){
-    notify('⚠ Erro ao conectar Firebase: '+e.message,'err');
-  }
-}
-  const temDados = Array.from({length:localStorage.length},(_,i)=>localStorage.key(i))
-    .some(k => k && k.startsWith('srcapas_'));
-  if (temDados) { await pushToFB(); }
-  await syncFromFB();
-  render();
-  notify('✓ Sincronizado!', 'ok');
-}
-
-
-function notify(msg,type='info'){
-  const c=document.getElementById('notif'),d=document.createElement('div');
-  d.className=`ni ${type}`;d.textContent=msg;c.appendChild(d);
-  setTimeout(()=>d.remove(),3500);
-}
-function flashSaved(){
-  const el=document.getElementById('tb-title');
-  const orig=el.dataset.orig||el.textContent;
-  el.dataset.orig=orig;
-  el.innerHTML=orig+' <span style="font-size:11px;color:var(--green);font-family:\'DM Sans\',sans-serif;font-weight:400">✓ Salvo</span>';
-  setTimeout(()=>{el.textContent=orig},2000);
-}
-
-// AUTH
-function checkAuth(){
-  const ok=sessionStorage.getItem('srcapas_ok');
-  document.getElementById('login-screen').style.display=ok?'none':'flex';
-  document.getElementById('app').style.display=ok?'flex':'none';
-  document.getElementById('voice-btn').style.display=ok?'flex':'none';
-  if(ok)initApp();
-}
-function doLogin(){
-  const u=document.getElementById('l-user').value.trim().toUpperCase(),p=document.getElementById('l-pass').value;
-  // login admin
-  if(u===CREDS.u.toUpperCase()&&p===CREDS.p){
-    sessionStorage.setItem('srcapas_ok','1');
-    sessionStorage.setItem('srcapas_role','admin');
-    sessionStorage.setItem('srcapas_nome','Leandro');
-    document.getElementById('login-screen').style.display='none';
-    document.getElementById('app').style.display='flex';
-    document.getElementById('voice-btn').style.display='flex';
-    initApp();return;
-  }
-  // login usuários extras (Terra, Paiva)
-  const extra=CREDS_EXTRA.find(c=>c.u.toUpperCase()===u&&c.p===p);
-  if(extra){
-    sessionStorage.setItem('srcapas_ok','1');
-    sessionStorage.setItem('srcapas_role','funcionario');
-    sessionStorage.setItem('srcapas_nome',extra.nome);
-    document.getElementById('login-screen').style.display='none';
-    document.getElementById('app').style.display='flex';
-    document.getElementById('voice-btn').style.display='flex';
-    initApp();return;
-  }
-  // login funcionário cadastrado no sistema
-  const funs=JSON.parse(localStorage.getItem('srcapas_funcionarios_bacaxa')||'[]');
-  const fun=funs.find(f=>f.user&&f.user.toUpperCase()===u&&f.pwd===p);
-  if(fun){
-    sessionStorage.setItem('srcapas_ok','1');
-    sessionStorage.setItem('srcapas_role','funcionario');
-    sessionStorage.setItem('srcapas_nome',fun.nome);
-    document.getElementById('login-screen').style.display='none';
-    document.getElementById('app').style.display='flex';
-    document.getElementById('voice-btn').style.display='flex';
-    initApp();return;
-  }
-  const el=document.getElementById('l-err');el.style.display='block';
-  setTimeout(()=>el.style.display='none',3000);
-}
-function doLogout(){sessionStorage.removeItem('srcapas_ok');location.reload()}
-document.getElementById('l-pass').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin()});
-document.getElementById('l-user').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('l-pass').focus()});
-
-// INIT
-// Sync manual com feedback visível
 async function syncManual(){
   notify('⟳ Enviando dados para a nuvem...','info');
   setSyncStatus('⟳ Enviando...','var(--amber)');
@@ -474,14 +340,7 @@ function initApp(){
   ms.innerHTML=MESES.map((m,i)=>`<option value="${i+1}"${i+1===ST.mes?' selected':''}>${m}</option>`).join('');
   const y=ST.ano;
   ys.innerHTML=[y-1,y,y+1].map(v=>`<option value="${v}"${v===y?' selected':''}>${v}</option>`).join('');
-  // Carrega dados do Firebase, renderiza, e inicia sincronização em tempo real
-  syncFromFB().then(()=>{
-    render();
-    startRealtimeSync(); // conecta ao Firebase SSE — sync automático sem botão
-  }).catch(()=>{
-    render();
-    startRealtimeSync();
-  });
+  syncFromFB().then(function(){ render(); }).catch(function(){ render(); });
 }
 function changeEmpresa(v){
   ST.empresa=v;
