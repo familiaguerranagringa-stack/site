@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SR. CAPAS — Gestão Financeira</title>
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -14,7 +14,6 @@
   --text:#EBEBEB;--muted:#8A8A8A;--dim:#444444;
   --green:#4ADE80;--red:#F87171;--blue:#7FB8C9;--amber:#F5A623;
 }
-.num-grande{font-family:var(--font-num);font-variant-numeric:tabular-nums;font-feature-settings:"tnum";letter-spacing:-.01em;font-weight:700}
 html,body{min-height:100vh;background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
 #app{display:flex;min-height:100vh}
 .sidebar{width:220px;min-width:220px;background:var(--bg-card);border-right:1px solid var(--border);display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto}
@@ -50,7 +49,7 @@ html,body{min-height:100vh;background:var(--bg);color:var(--text);font-family:'D
 .kpi:hover{border-color:var(--gold-dim)}
 .kpi-accent{position:absolute;top:0;left:0;right:0;height:2px}
 .kpi-label{font-size:10px;font-weight:600;letter-spacing:.16em;color:var(--muted);text-transform:uppercase;margin-bottom:8px}
-.kpi-value{font-family:'Inter',system-ui,sans-serif;font-size:21px;font-weight:700;font-variant-numeric:tabular-nums;font-feature-settings:"tnum";letter-spacing:-.015em;line-height:1.1}
+.kpi-value{font-family:'Syne',sans-serif;font-size:21px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.1}
 .kpi-sub{font-size:11px;color:var(--dim);margin-top:5px}
 .sec-hdr{display:flex;align-items:center;gap:12px;margin-bottom:16px}
 .sec-hdr h2{font-family:'Syne',sans-serif;font-size:10px;font-weight:700;letter-spacing:.2em;color:var(--gold);text-transform:uppercase;white-space:nowrap}
@@ -230,14 +229,6 @@ const NOW=new Date();
 const ST={tab:'dashboard',empresa:'bacaxa',mes:NOW.getMonth()+1,ano:NOW.getFullYear()};
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
 const fmt=n=>BRL.format(n??0);
-// Formato grande: separa R$ do número para melhor hierarquia visual
-function fmtBig(n,cor='var(--gold)'){
-  const v=BRL.format(n??0);
-  const partes=v.split(/\s+/); // ["R$", "142.247,78"]
-  const simbolo=partes[0]||'R$';
-  const numero=partes.slice(1).join(' ');
-  return`<span style="font-size:13px;font-weight:600;color:var(--muted);vertical-align:super;margin-right:3px;letter-spacing:.05em">${simbolo}</span><span style="color:${cor};letter-spacing:-.02em">${numero}</span>`;
-}
 const pct=(n,b)=>!b||b===0?'—':(n/b*100).toFixed(1)+'%';
 const vc=n=>n>0?'pos':n<0?'neg':'dim';
 const uuid=()=>Math.random().toString(36).slice(2,9);
@@ -1520,7 +1511,7 @@ function renderMarkup(){
     h+='<div class="fg" style="grid-template-columns:1fr 1fr">';
     h+='<div class="fl"><label>Meta Base R$</label><input class="fi" type="number" step="0.01" value="'+(metaDigitada||'')+'" placeholder="0,00" onchange="saveMkField(\'metaMes\',+this.value);renderMarkup()"></div>';
     h+='<div class="fl"><label>Dias a Abrir</label><input class="fi" type="number" value="'+diasAbrir+'" min="1" max="31" onchange="saveMkField(\'diasAbrir\',+this.value);renderMarkup()"></div></div>';
-    h+='<div style="margin:8px 0;background:var(--gold-bg);border:1px solid var(--gold-dim);border-radius:8px;padding:12px 14px"><div style="font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:4px">META DO MÊS (markup '+(pctAtual*100).toFixed(1)+'%)</div><div style="font-family:'Inter',system-ui,sans-serif;font-size:28px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.02em;color:var(--gold)">'+fmt(metaMes)+'</div><div style="font-size:10px;color:var(--dim);margin-top:2px">Base: '+fmt(metaDigitada)+'</div></div>';
+    h+='<div style="margin:8px 0;background:var(--gold-bg);border:1px solid var(--gold-dim);border-radius:8px;padding:12px 14px"><div style="font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:4px">META DO MÊS (markup '+(pctAtual*100).toFixed(1)+'%)</div><div style="font-family:'Syne',sans-serif;font-size:28px;font-weight:800;color:var(--gold)">'+fmt(metaMes)+'</div><div style="font-size:10px;color:var(--dim);margin-top:2px">Base: '+fmt(metaDigitada)+'</div></div>';
     h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
     h+='<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px"><div style="font-size:9px;color:var(--muted);text-transform:uppercase;margin-bottom:4px">Total Vendido</div><div style="font-family:\'Syne\',sans-serif;font-size:15px;font-weight:700;color:var(--green)">'+fmt(totalVendido)+'</div></div>';
     h+='<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px"><div style="font-size:9px;color:var(--muted);text-transform:uppercase;margin-bottom:4px">Média de Venda</div><div style="font-family:\'Syne\',sans-serif;font-size:15px;font-weight:700;color:var(--text)">'+fmt(media)+'</div></div>';
