@@ -246,7 +246,9 @@ const _JB_BASE = 'https://api.jsonbin.io/v3/b';
 // Chave do JSONBin em partes
 const _JK = () => ['$2a$10$','/L0LORzy','hUWpUl9j8','wFLmucHLadjPeXn5rv1pGwunumQ8QvKs3b4q'].join('');
 
-let _binId = localStorage.getItem('srcapas_bin_id') || null;
+let _binId = localStorage.getItem('srcapas_bin_id') || '6a3968d6f5f4af5e291e38f3';
+// Garantir que o bin ID fixo está sempre salvo
+if(_binId) localStorage.setItem('srcapas_bin_id', _binId);
 let _syncTimer = null, _syncing = false;
 
 function setSyncStatus(msg, cor) {
@@ -436,22 +438,20 @@ function initApp(){
   ms.innerHTML=MESES.map((m,i)=>`<option value="${i+1}"${i+1===ST.mes?' selected':''}>${m}</option>`).join('');
   const y=ST.ano;
   ys.innerHTML=[y-1,y,y+1].map(v=>`<option value="${v}"${v===y?' selected':''}>${v}</option>`).join('');
-  if(!_binId){
-    // Sem bin: criar automaticamente
-    setSyncStatus('⟳ Configurando nuvem...','var(--amber)');
-    criarBin().then(id=>{
-      if(id){
-        setSyncStatus('✓ Nuvem pronta','var(--green)');
-        setTimeout(()=>setSyncStatus('',''),4000);
-        setTimeout(()=>notify('✓ Nuvem pronta! Clique em "🔗 Compartilhar Código" na sidebar para conectar Terra e Paiva.','ok'),800);
-      } else {
-        setSyncStatus('• Sem nuvem','var(--dim)');
-        notify('Sem conexão com a nuvem. Verifique a internet.','err');
-      }
+
+  // Verificar se tem dados locais
+  const temDadosLocais=Array.from({length:localStorage.length},(_,i)=>localStorage.key(i))
+    .some(k=>k&&k.startsWith('srcapas_')&&k!=='srcapas_bin_id');
+
+  if(temDadosLocais){
+    // Tem dados: enviar para nuvem PRIMEIRO, depois sincronizar
+    setSyncStatus('⟳ Enviando para nuvem...','var(--amber)');
+    pushToJB().then(()=>{
       render();
     }).catch(()=>render());
   } else {
-    // Tem bin: sincronizar e renderizar
+    // Sem dados locais: carregar da nuvem
+    setSyncStatus('⟳ Carregando da nuvem...','var(--amber)');
     syncFromJB().then(()=>render()).catch(()=>render());
   }
 }
