@@ -243,14 +243,20 @@ function saveO(t,d){localStorage.setItem(sk(t),JSON.stringify(d));flashSaved();s
 // ── FIREBASE REALTIME DATABASE ─────────────────────────────
 const _FB_URL = 'https://grupofamiliaguerra-9d13e-default-rtdb.firebaseio.com';
 const _FB_PATH = '/srcapas/bacaxa.json';
-let _syncTimer = null, _syncing = false;
+let _syncTimer = null, _syncing = false, _fbSSE = null, _ultimoTs = 0;
 
 function setSyncStatus(msg, cor) {
   const el = document.getElementById('sync-status');
   if (el) { el.textContent = msg; el.style.color = cor || 'var(--muted)'; }
 }
 
-// Carregar dados do Firebase para o localStorage
+function aplicarDados(rec) {
+  if (!rec || typeof rec !== 'object') return;
+  Object.entries(rec).forEach(([k, v]) => {
+    if (k.startsWith('srcapas_')) localStorage.setItem(k, JSON.stringify(v));
+  });
+}
+
 async function syncFromFB() {
   setSyncStatus('⟳ Carregando...', 'var(--amber)');
   try {
@@ -258,29 +264,23 @@ async function syncFromFB() {
     if (!r.ok) { setSyncStatus('• Local', 'var(--dim)'); return; }
     const rec = await r.json();
     if (rec && typeof rec === 'object' && Object.keys(rec).length > 0) {
-      Object.entries(rec).forEach(([k, v]) => {
-        if (k.startsWith('srcapas_')) localStorage.setItem(k, JSON.stringify(v));
-      });
+      aplicarDados(rec);
       setSyncStatus('✓ Sincronizado', 'var(--green)');
     } else {
       setSyncStatus('• Nuvem vazia', 'var(--dim)');
     }
     setTimeout(() => setSyncStatus('', ''), 3000);
-  } catch(e) {
-    setSyncStatus('• Offline', 'var(--dim)');
-    console.log('Firebase sync error:', e);
-  }
+  } catch(e) { setSyncStatus('• Offline', 'var(--dim)'); }
 }
 
-// Salvar localStorage no Firebase
-function scheduleSync() { clearTimeout(_syncTimer); _syncTimer = setTimeout(pushToFB, 3000); }
+function scheduleSync() { clearTimeout(_syncTimer); _syncTimer = setTimeout(pushToFB, 2000); }
 
 async function pushToFB() {
   if (_syncing) return;
   _syncing = true;
   setSyncStatus('⟳ Salvando...', 'var(--amber)');
   try {
-    const dados = {};
+    const dados = { _ts: Date.now() };
     for (let i = 0; i < localStorage.length; i++) {
       const k = localStorage.key(i);
       if (k && k.startsWith('srcapas_')) {
@@ -289,34 +289,58 @@ async function pushToFB() {
       }
     }
     const r = await fetch(_FB_URL + _FB_PATH, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(dados)
     });
-    if (r.ok) {
-      setSyncStatus('✓ Salvo', 'var(--green)');
-      setTimeout(() => setSyncStatus('', ''), 2000);
-    } else {
-      setSyncStatus('⚠ Erro', 'var(--red)');
-    }
-  } catch(e) {
-    setSyncStatus('• Offline', 'var(--dim)');
-  }
+    if (r.ok) { setSyncStatus('✓ Salvo', 'var(--green)'); setTimeout(() => setSyncStatus('', ''), 2000); }
+    else { setSyncStatus('⚠ Erro', 'var(--red)'); }
+  } catch(e) { setSyncStatus('• Offline', 'var(--dim)'); }
   _syncing = false;
 }
 
-// Sync manual — push local para nuvem e depois carrega
-async function syncManual(){
-  const temDados=Array.from({length:localStorage.length},(_,i)=>localStorage.key(i))
-    .some(k=>k&&k.startsWith('srcapas_'));
-  if(temDados){
-    notify('⟳ Enviando dados para a nuvem...','info');
-    await pushToFB();
-    notify('✓ Enviado! Carregando...','ok');
+// ── SYNC EM TEMPO REAL via Server-Sent Events ──────────────
+function startRealtimeSync() {
+  if (_fbSSE) { try { _fbSSE.close(); } catch(e) {} }
+  try {
+    _fbSSE = new EventSource(_FB_URL + _FB_PATH);
+    _fbSSE.addEventListener('put', e => {
+      try {
+        const data = JSON.parse(e.data);
+        const rec = data.data;
+        if (!rec || typeof rec !== 'object') return;
+        const ts = rec._ts || 0;
+        if (ts <= _ultimoTs) return;
+        _ultimoTs = ts;
+        aplicarDados(rec);
+        setSyncStatus('✓ Atualizado', 'var(--green)');
+        setTimeout(() => setSyncStatus('', ''), 2000);
+        render();
+      } catch(err) {}
+    });
+    _fbSSE.addEventListener('patch', e => {
+      try {
+        const data = JSON.parse(e.data);
+        if (data.data) { aplicarDados(data.data); render(); }
+      } catch(err) {}
+    });
+    _fbSSE.onerror = () => {
+      try { _fbSSE.close(); } catch(e) {}
+      setTimeout(() => startRealtimeSync(), 5000);
+    };
+    setSyncStatus('● Ao vivo', 'var(--green)');
+    setTimeout(() => setSyncStatus('', ''), 3000);
+  } catch(e) {
+    setInterval(syncFromFB, 15000); // fallback polling
   }
+}
+
+async function syncManual() {
+  const temDados = Array.from({length:localStorage.length},(_,i)=>localStorage.key(i))
+    .some(k => k && k.startsWith('srcapas_'));
+  if (temDados) { await pushToFB(); }
   await syncFromFB();
   render();
-  notify('✓ Sincronizado!','ok');
+  notify('✓ Sincronizado!', 'ok');
 }
 
 
@@ -399,9 +423,14 @@ function initApp(){
   ms.innerHTML=MESES.map((m,i)=>`<option value="${i+1}"${i+1===ST.mes?' selected':''}>${m}</option>`).join('');
   const y=ST.ano;
   ys.innerHTML=[y-1,y,y+1].map(v=>`<option value="${v}"${v===y?' selected':''}>${v}</option>`).join('');
-  // Ao iniciar: SEMPRE carrega do Firebase primeiro, depois renderiza
-  // Push só acontece quando o usuário salva um lançamento (scheduleSync)
-  syncFromFB().then(()=>render()).catch(()=>render());
+  // Carrega dados do Firebase, renderiza, e inicia sincronização em tempo real
+  syncFromFB().then(()=>{
+    render();
+    startRealtimeSync(); // conecta ao Firebase SSE — sync automático sem botão
+  }).catch(()=>{
+    render();
+    startRealtimeSync();
+  });
 }
 function changeEmpresa(v){
   ST.empresa=v;
