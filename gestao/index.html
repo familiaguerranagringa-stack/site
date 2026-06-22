@@ -305,13 +305,18 @@ async function pushToFB() {
   _syncing = false;
 }
 
-// Sync manual
-async function syncManual() {
-  notify('⟳ Sincronizando...', 'info');
-  await pushToFB();
+// Sync manual — push local para nuvem e depois carrega
+async function syncManual(){
+  const temDados=Array.from({length:localStorage.length},(_,i)=>localStorage.key(i))
+    .some(k=>k&&k.startsWith('srcapas_'));
+  if(temDados){
+    notify('⟳ Enviando dados para a nuvem...','info');
+    await pushToFB();
+    notify('✓ Enviado! Carregando...','ok');
+  }
   await syncFromFB();
   render();
-  notify('✓ Sincronizado!', 'ok');
+  notify('✓ Sincronizado!','ok');
 }
 
 
@@ -394,12 +399,9 @@ function initApp(){
   ms.innerHTML=MESES.map((m,i)=>`<option value="${i+1}"${i+1===ST.mes?' selected':''}>${m}</option>`).join('');
   const y=ST.ano;
   ys.innerHTML=[y-1,y,y+1].map(v=>`<option value="${v}"${v===y?' selected':''}>${v}</option>`).join('');
-  // Push dados locais para Firebase, depois carrega e renderiza
-  (async()=>{
-    await pushToFB();
-    await syncFromFB();
-    render();
-  })();
+  // Ao iniciar: SEMPRE carrega do Firebase primeiro, depois renderiza
+  // Push só acontece quando o usuário salva um lançamento (scheduleSync)
+  syncFromFB().then(()=>render()).catch(()=>render());
 }
 function changeEmpresa(v){
   ST.empresa=v;
