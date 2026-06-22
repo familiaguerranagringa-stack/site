@@ -326,13 +326,11 @@ function pushToFB() {
 }
 
 
-async function syncManual(){
-  notify('⟳ Enviando dados para a nuvem...','info');
-  setSyncStatus('⟳ Enviando...','var(--amber)');
-  await pushToJB();
-  await syncFromJB();
-  render();
-  notify('✓ Sincronização completa!','ok');
+function syncManual(){
+  var temDados=false;
+  for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);if(k&&k.startsWith('srcapas_')){temDados=true;break;}}
+  var p=temDados?pushToFB():Promise.resolve();
+  p.then(function(){return syncFromFB();}).then(function(){render();notify('✓ Sincronizado!','ok');});
 }
 
 function initApp(){
