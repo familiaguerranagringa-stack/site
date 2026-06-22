@@ -180,6 +180,7 @@ tr:hover td{background:var(--bg-hover)}
       </div>
       <button class="btn-ghost" onclick="window.print()">⎙ Imprimir</button>
       <button class="btn-ghost" onclick="syncManual()" style="border-color:var(--gold-dim);color:var(--gold)" title="Sincronizar dados com a nuvem">☁ Sync</button>
+      <button class="btn-ghost" onclick="testarFirebase()" style="border-color:#7FB8C9;color:#7FB8C9;font-size:11px" title="Testar e forçar carregamento do Firebase">🔄 Forçar</button>
       <span id="sync-status" style="font-size:11px;color:var(--muted);min-width:100px;text-align:right"></span>
     </div>
     <div class="content" id="content"></div>
@@ -363,7 +364,29 @@ function startRealtimeSync() {
   }
 }
 
-async function syncManual() {
+async function testarFirebase(){
+  notify('⟳ Testando conexão Firebase...','info');
+  try{
+    const r=await fetch(_FB_URL+_FB_PATH+'?t='+Date.now());
+    const texto=await r.text();
+    const kb=(texto.length/1024).toFixed(1);
+    if(r.ok){
+      const dados=JSON.parse(texto);
+      const chaves=Object.keys(dados||{}).filter(k=>k.startsWith('srcapas_'));
+      notify('✓ Firebase OK! '+kb+'KB, '+chaves.length+' registros encontrados','ok');
+      // Aplicar forçadamente
+      chaves.forEach(k=>{
+        try{localStorage.setItem(k,JSON.stringify(dados[k]));}catch(e){}
+      });
+      render();
+      notify('✓ Dados carregados! '+chaves.length+' registros aplicados','ok');
+    } else {
+      notify('⚠ Firebase retornou erro '+r.status+': '+texto.slice(0,100),'err');
+    }
+  }catch(e){
+    notify('⚠ Erro ao conectar Firebase: '+e.message,'err');
+  }
+}
   const temDados = Array.from({length:localStorage.length},(_,i)=>localStorage.key(i))
     .some(k => k && k.startsWith('srcapas_'));
   if (temDados) { await pushToFB(); }
