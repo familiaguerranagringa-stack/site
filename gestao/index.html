@@ -891,18 +891,56 @@ function saveVerif(v){
   if(v.c!==undefined) localStorage.setItem(sk('verif_custos'), JSON.stringify(v.c));
   flashSaved();
 }
-let showFF=false,showFC=false,filtroCusto='';
+let showFF=false,showFC=false,filtroCusto='',showCrediario=false;
+
+// ── UTILITÁRIOS DE ARQUIVO ──────────────────────────────────
+async function lerArquivo(file){
+  return new Promise((resolve,reject)=>{
+    if(file.size>3*1024*1024){reject(new Error('Arquivo muito grande. Máximo 3MB.'));return;}
+    const reader=new FileReader();
+    reader.onload=e=>{
+      // Comprimir imagens
+      if(file.type.startsWith('image/')){
+        const img=new Image();
+        img.onload=()=>{
+          const canvas=document.createElement('canvas');
+          const scale=Math.min(1200/img.width,900/img.height,1);
+          canvas.width=img.width*scale;
+          canvas.height=img.height*scale;
+          canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
+          resolve({nome:file.name,tipo:file.type,b64:canvas.toDataURL('image/jpeg',0.75)});
+        };
+        img.src=e.target.result;
+      } else {
+        resolve({nome:file.name,tipo:file.type,b64:e.target.result});
+      }
+    };
+    reader.onerror=reject;
+    reader.readAsDataURL(file);
+  });
+}
+function verAnexo(b64,nome){
+  const a=document.createElement('a');a.href=b64;a.download=nome;a.click();
+}
+function iconAnexo(anexo){
+  if(!anexo)return'';
+  const ico=anexo.tipo&&anexo.tipo.includes('pdf')?'📄':'🖼';
+  return `<span style="font-size:11px;color:var(--green);cursor:pointer" onclick="verAnexo('${anexo.b64}','${anexo.nome}')" title="${anexo.nome}">${ico} ${anexo.nome.slice(0,18)}${anexo.nome.length>18?'...':''}</span>`;
+}
+
+// ── VERIFICAÇÃO MENSAL ──────────────────────────────────────
 function renderVerif(){
   const v=getVerif();
   const funs=v.f||[];
   const todosC=v.c||[];
-  // Filtro de custos
+  const creds=v.cred||[];
   const custos=filtroCusto?todosC.filter(cu=>cu.st===filtroCusto):todosC;
   const c=document.getElementById('content');
   const stO=['PENDENTE','PAGO','VENCIDO'].map(x=>`<option value="${x}">${x}</option>`).join('');
   const fmO=FORMAS.map(x=>`<option value="${x}">${x}</option>`).join('');
+  const funOpts=funs.map(f=>`<option value="${f.id}">${f.nome}</option>`).join('');
 
-  // Verificar vencimentos
+  // Vencimentos
   const hj=new Date();hj.setHours(0,0,0,0);
   const amanha=new Date(hj);amanha.setDate(amanha.getDate()+1);
   function vencBadge(cu){
@@ -914,106 +952,277 @@ function renderVerif(){
     return'';
   }
 
-  const fRows=funs.map(f=>`<tr>
-    <td style="text-align:left">${f.nome}</td>
-    <td style="color:var(--muted);font-size:12px">${f.user?'@'+f.user:'<span style="color:var(--dim)">sem login</span>'}</td>
-    <td>${fmt(f.sal)}</td><td>${fmt(f.adi)}</td><td>${fmt(f.vale)}</td>
-    <td class="gold" style="font-family:'Syne',sans-serif;font-weight:700">${fmt((+f.sal||0)+(+f.adi||0)+(+f.vale||0))}</td>
-    <td><span class="badge ${f.st==='PAGO'?'b-ok':'b-pend'}">${f.st||'PENDENTE'}</span></td>
-    <td><button class="btn-sm" onclick="delVi('f','${f.id}')">×</button></td>
-  </tr>`).join('');
-  const totalF=funs.reduce((s,f)=>s+(+f.sal||0)+(+f.adi||0)+(+f.vale||0),0);
+  // Parcelas de crediário por funcionário no mês atual
+  function parcelaCred(funId){
+    return creds.filter(cr=>cr.funId===funId&&cr.st==='ativo')
+      .reduce((s,cr)=>s+(+cr.valorParcela||0),0);
+  }
 
+  // Rows de funcionários
+  const fRows=funs.map(f=>{
+    const bon=+f.bonificacao||0;
+    const parcelas=parcelaCred(f.id);
+    const total=(+f.sal||0)+(+f.adi||0)+(+f.vale||0)+bon-parcelas;
+    return`<tr>
+      <td style="text-align:left;font-weight:500">${f.nome}</td>
+      <td>${fmt(f.sal)}</td>
+      <td>${fmt(f.adi)}</td>
+      <td>${fmt(f.vale)}</td>
+      <td class="pos">${bon?fmt(bon):'—'}</td>
+      <td class="neg" style="font-size:11px">${parcelas?'-'+fmt(parcelas):'—'}</td>
+      <td class="gold" style="font-family:'Syne',sans-serif;font-weight:700">${fmt(total)}</td>
+      <td><span class="badge ${f.st==='PAGO'?'b-ok':'b-pend'}">${f.st||'PENDENTE'}</span></td>
+      <td style="white-space:nowrap">
+        <button class="btn-sm btn-ok" onclick="editFun('${f.id}')" style="margin-right:4px">✏</button>
+        <button class="btn-sm" onclick="delVi('f','${f.id}')">×</button>
+      </td>
+    </tr>`;
+  }).join('');
+  const totalF=funs.reduce((s,f)=>{
+    const bon=+f.bonificacao||0;
+    const parc=parcelaCred(f.id);
+    return s+(+f.sal||0)+(+f.adi||0)+(+f.vale||0)+bon-parc;
+  },0);
+
+  // Rows de custos
   const cRows=custos.map(cu=>`<tr>
-    <td style="text-align:left">${cu.nome}${vencBadge(cu)}</td><td>${fmt(cu.val)}</td>
+    <td style="text-align:left">
+      ${cu.nome}${vencBadge(cu)}
+      <div style="margin-top:2px">${iconAnexo(cu.boleto)}${cu.comprovante?'<span style="margin-left:8px">'+iconAnexo(cu.comprovante)+'</span>':''}</div>
+    </td>
+    <td>${fmt(cu.val)}</td>
     <td style="font-family:'Syne',sans-serif;font-size:11px;color:var(--muted)">${cu.venc?new Date(cu.venc+'T12:00:00').toLocaleDateString('pt-BR'):'—'}</td>
     <td>${cu.forma||'—'}</td>
     <td><span class="badge ${cu.st==='PAGO'?'b-ok':cu.st==='VENCIDO'?'b-late':'b-pend'}">${cu.st||'PENDENTE'}</span></td>
     <td style="font-size:11px;color:var(--dim);text-align:left">${cu.obs||''}</td>
-    <td>
+    <td style="white-space:nowrap">
       <button class="btn-sm btn-ok" onclick="editCusto('${cu.id}')" style="margin-right:4px" title="Editar">✏</button>
-      <button class="btn-sm btn-ok" onclick="toggleCusto('${cu.id}')" style="margin-right:4px">${cu.st==='PAGO'?'↩ Desfazer':'✓ Pago'}</button>
+      ${cu.st!=='PAGO'?`<button class="btn-sm btn-ok" onclick="pagarCusto('${cu.id}')" style="margin-right:4px">✓ Pago</button>`:`<button class="btn-sm" onclick="desfazerPagto('${cu.id}')" style="margin-right:4px">↩</button>`}
       <button class="btn-sm" onclick="delVi('c','${cu.id}')">×</button>
     </td>
   </tr>`).join('');
   const totalC=todosC.reduce((s,cu)=>s+(+cu.val||0),0);
   const pagosC=todosC.filter(cu=>cu.st==='PAGO').reduce((s,cu)=>s+(+cu.val||0),0);
-  const pendentesC=todosC.filter(cu=>cu.st!=='PAGO').reduce((s,cu)=>s+(+cu.val||0),0);
-  // Filtros de custos
+  const pendentesC=totalC-pagosC;
   const filtrosBtns=['','PENDENTE','PAGO','VENCIDO'].map(f=>`<button onclick="filtroCusto='${f}';renderVerif()" style="padding:5px 12px;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;border-radius:20px;cursor:pointer;border:1px solid ${filtroCusto===f?'var(--gold)':'var(--border)'};background:${filtroCusto===f?'var(--gold-bg)':'transparent'};color:${filtroCusto===f?'var(--gold)':'var(--muted)'};font-family:'DM Sans',sans-serif">${f||'Todos'}</button>`).join('');
-  const pagos=custos.filter(cu=>cu.st==='PAGO').reduce((s,cu)=>s+(+cu.val||0),0);
 
-  const h=`
-  <div class="sec-hdr"><h2>Quadro de Funcionários</h2><div class="sec-line"></div><button class="btn-ghost" onclick="showFF=!showFF;renderVerif()">${showFF?'− Fechar':'+ Funcionário'}</button></div>
+  // Rows de crediários
+  const credRows=creds.map(cr=>{
+    const fun=funs.find(f=>f.id===cr.funId);
+    return`<tr>
+      <td style="text-align:left">${cr.desc||'—'}</td>
+      <td>${fun?fun.nome:'—'}</td>
+      <td>${fmt(cr.valorTotal)}</td>
+      <td>${cr.parcelas}x</td>
+      <td class="neg">${fmt(cr.valorParcela)}/mês</td>
+      <td><span class="badge ${cr.st==='ativo'?'b-pend':'b-ok'}">${cr.st==='ativo'?'ATIVO':'QUITADO'}</span></td>
+      <td style="white-space:nowrap">
+        ${cr.st==='ativo'?`<button class="btn-sm btn-ok" onclick="quitarCred('${cr.id}')" style="margin-right:4px">✓ Quitar</button>`:''}
+        <button class="btn-sm" onclick="delVi('cred','${cr.id}')">×</button>
+      </td>
+    </tr>`;
+  }).join('');
+
+  c.innerHTML=`
+  <!-- FUNCIONÁRIOS -->
+  <div class="sec-hdr"><h2>Quadro de Funcionários</h2><div class="sec-line"></div>
+    <button class="btn-ghost" onclick="showFF=!showFF;renderVerif()">${showFF?'− Fechar':'+ Funcionário'}</button>
+  </div>
   ${showFF?`<div class="form-card">
     <div class="fg">
-      <div class="fl"><label>Nome</label><input class="fi" type="text" id="fn-n" placeholder="Nome completo"></div>
+      <div class="fl"><label>Nome Completo</label><input class="fi" type="text" id="fn-n" placeholder="Nome completo"></div>
       <div class="fl"><label>Salário R$</label><input class="fi" type="number" step="0.01" id="fn-s" placeholder="0,00"></div>
       <div class="fl"><label>Adiantamento R$</label><input class="fi" type="number" step="0.01" id="fn-a" placeholder="0,00"></div>
       <div class="fl"><label>Vales R$</label><input class="fi" type="number" step="0.01" id="fn-v" placeholder="0,00"></div>
-      <div class="fl"><label>Usuário (login)</label><input class="fi" type="text" id="fn-user" placeholder="Ex: gerson" autocomplete="off"></div>
-      <div class="fl"><label>Senha de Acesso</label><input class="fi" type="password" id="fn-pwd" placeholder="Senha para entrar no sistema" autocomplete="new-password"></div>
+      <div class="fl"><label>Bonificação R$</label><input class="fi" type="number" step="0.01" id="fn-bon" placeholder="0,00"></div>
       <div class="fl"><label>Status</label><select class="fi" id="fn-st">${stO}</select></div>
     </div>
     <button class="btn-gold" onclick="addFun()">Salvar Funcionário</button>
   </div>`:''}
-  ${funs.length?`<div class="tbl-wrap"><table>
-    <tr><th style="text-align:left">Nome</th><th style="text-align:left">Usuário</th><th>Salário</th><th>Adiantamento</th><th>Vales</th><th>Total a Pagar</th><th>Status</th><th></th></tr>
+  ${funs.length?`<div class="tbl-wrap" style="margin-bottom:20px"><table>
+    <tr><th style="text-align:left">Nome</th><th>Salário</th><th>Adiant.</th><th>Vales</th><th>Bonific.</th><th>Crediário</th><th>Total</th><th>Status</th><th></th></tr>
     ${fRows}
-    <tr class="tfoot"><td colspan="4">TOTAL PESSOAL</td><td class="gold">${fmt(totalF)}</td><td></td><td></td></tr>
-  </table></div>`:'<div class="empty" style="padding:20px">👤 <div>Nenhum funcionário cadastrado.</div></div>'}
+    <tr class="tfoot"><td colspan="6">TOTAL PESSOAL</td><td class="gold">${fmt(totalF)}</td><td></td><td></td></tr>
+  </table></div>`:'<div class="empty" style="padding:20px">👤 Nenhum funcionário cadastrado.</div>'}
 
-  <div class="sec-hdr" style="margin-top:8px"><h2>Custos Fixos</h2><div class="sec-line"></div><button class="btn-ghost" onclick="showFC=!showFC;renderVerif()">${showFC?'− Fechar':'+ Custo Fixo'}</button></div>
+  <!-- CUSTOS FIXOS -->
+  <div class="sec-hdr" style="margin-top:8px"><h2>Custos Fixos</h2><div class="sec-line"></div>
+    <button class="btn-ghost" onclick="showFC=!showFC;renderVerif()">${showFC?'− Fechar':'+ Custo Fixo'}</button>
+  </div>
   <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center">
     ${filtrosBtns}
     <span style="font-size:11px;color:var(--muted);margin-left:8px">Pago: <span style="color:var(--green)">${fmt(pagosC)}</span> | Pendente: <span style="color:var(--amber)">${fmt(pendentesC)}</span></span>
   </div>
   ${showFC?`<div class="form-card">
     <div class="fg">
-      <div class="fl" style="grid-column:span 2"><label>Descrição</label><input class="fi" type="text" id="cu-n" placeholder="Ex: Luz Enel, Aluguel Paulo César, Internet OKVirtual..."></div>
+      <div class="fl" style="grid-column:span 2"><label>Descrição</label><input class="fi" type="text" id="cu-n" placeholder="Ex: Luz Enel, Aluguel, Internet..."></div>
       <div class="fl"><label>Valor R$</label><input class="fi" type="number" step="0.01" id="cu-v" placeholder="0,00"></div>
       <div class="fl"><label>Vencimento</label><input class="fi" type="date" id="cu-vc"></div>
       <div class="fl"><label>Forma Pagamento</label><select class="fi" id="cu-f">${fmO}</select></div>
       <div class="fl"><label>Status</label><select class="fi" id="cu-st">${stO}</select></div>
-      <div class="fl" style="grid-column:span 2"><label>Observação (nº boleto, CNPJ, senha...)</label><input class="fi" type="text" id="cu-o" placeholder="Opcional"></div>
+      <div class="fl" style="grid-column:span 2"><label>Observação</label><input class="fi" type="text" id="cu-o" placeholder="Nº boleto, CNPJ..."></div>
+      <div class="fl" style="grid-column:span 2">
+        <label>📎 Anexar Boleto <span style="color:var(--dim);font-size:9px">(opcional — PNG, JPG, PDF)</span></label>
+        <input class="fi" type="file" id="cu-boleto" accept="image/*,.pdf" style="padding:6px">
+      </div>
     </div>
     <button class="btn-gold" onclick="addCusto()">Salvar Custo Fixo</button>
   </div>`:''}
   ${custos.length?`<div class="tbl-wrap"><table>
-    <tr><th style="text-align:left">Descrição</th><th>Valor</th><th>Vencimento</th><th>Forma</th><th>Status</th><th style="text-align:left">Observação</th><th>Ações</th></tr>
+    <tr><th style="text-align:left">Descrição</th><th>Valor</th><th>Vencimento</th><th>Forma</th><th>Status</th><th style="text-align:left">Obs.</th><th>Ações</th></tr>
     ${cRows}
-    <tr class="tfoot"><td colspan="1">TOTAL CUSTOS</td><td class="neg">${fmt(totalC)}</td><td colspan="2">Pago: <span class="pos">${fmt(pagos)}</span></td><td>Pendente: <span class="gold">${fmt(totalC-pagos)}</span></td><td colspan="2"></td></tr>
-  </table></div>`:'<div class="empty" style="padding:20px">📋 <div>Nenhum custo fixo cadastrado.</div></div>'}
+    <tr class="tfoot"><td>TOTAL</td><td class="neg">${fmt(totalC)}</td><td colspan="2">Pago: <span class="pos">${fmt(pagosC)}</span></td><td>Pendente: <span class="gold">${fmt(pendentesC)}</span></td><td colspan="2"></td></tr>
+  </table></div>`:'<div class="empty" style="padding:20px">📋 Nenhum custo fixo.</div>'}
+
+  <!-- CREDIÁRIOS -->
+  <div class="sec-hdr" style="margin-top:24px"><h2>💳 Crediários de Funcionários</h2><div class="sec-line"></div>
+    <button class="btn-ghost" onclick="showCrediario=!showCrediario;renderVerif()">${showCrediario?'− Fechar':'+ Novo Crediário'}</button>
+  </div>
+  ${showCrediario?`<div class="form-card">
+    <div class="fg">
+      <div class="fl" style="grid-column:span 2"><label>Descrição do Crediário</label><input class="fi" type="text" id="cr-desc" placeholder="Ex: Celular Samsung, Notebook Dell..."></div>
+      <div class="fl"><label>Funcionário</label><select class="fi" id="cr-fun">${funOpts||'<option>Cadastre um funcionário primeiro</option>'}</select></div>
+      <div class="fl"><label>Valor Total R$</label><input class="fi" type="number" step="0.01" id="cr-total" placeholder="0,00" oninput="calcParcelaCred()"></div>
+      <div class="fl"><label>Nº de Parcelas</label><select class="fi" id="cr-parc" onchange="calcParcelaCred()">
+        ${[1,2,3,4,5,6,7,8,9,10,11,12].map(n=>`<option value="${n}">${n}x</option>`).join('')}
+      </select></div>
+      <div class="fl"><label>Valor da Parcela <span style="color:var(--gold);font-size:9px">auto</span></label>
+        <input class="fi" type="text" id="cr-parcela" placeholder="R$ 0,00" readonly style="color:var(--gold);font-weight:700">
+      </div>
+    </div>
+    <button class="btn-gold" onclick="addCred()">Registrar Crediário</button>
+  </div>`:''}
+  ${creds.length?`<div class="tbl-wrap"><table>
+    <tr><th style="text-align:left">Descrição</th><th style="text-align:left">Funcionário</th><th>Total</th><th>Parcelas</th><th>Parcela/Mês</th><th>Status</th><th></th></tr>
+    ${credRows}
+  </table></div>`:'<div style="color:var(--dim);font-size:12px;padding:12px 0">Nenhum crediário registrado.</div>'}
   `;
-  c.innerHTML=h;
 }
+
+// ── FUNÇÕES DE FUNCIONÁRIO ──────────────────────────────────
 function addFun(){
   const v=getVerif();if(!v.f)v.f=[];
   const n=document.getElementById('fn-n').value;if(!n){notify('Informe o nome','err');return}
-  const user=document.getElementById('fn-user').value.trim().toLowerCase();
-  const pwd=document.getElementById('fn-pwd').value;
-  if(user&&!pwd){notify('Informe a senha para o usuário','err');return}
-  // verificar se usuário já existe
-  if(user&&v.f.find(f=>f.user===user)){notify('Usuário já cadastrado','err');return}
-  v.f.push({id:uuid(),nome:n,user:user||'',pwd:pwd||'',sal:+document.getElementById('fn-s').value||0,adi:+document.getElementById('fn-a').value||0,vale:+document.getElementById('fn-v').value||0,st:document.getElementById('fn-st').value});
+  v.f.push({id:uuid(),nome:n,sal:+document.getElementById('fn-s').value||0,
+    adi:+document.getElementById('fn-a').value||0,vale:+document.getElementById('fn-v').value||0,
+    bonificacao:+document.getElementById('fn-bon').value||0,st:document.getElementById('fn-st').value});
   saveVerif(v);showFF=false;renderVerif();notify('Funcionário adicionado!','ok');
 }
-function addCusto(){
+function editFun(id){
+  const v=getVerif();const f=v.f.find(x=>x.id===id);if(!f)return;
+  const stO=['PENDENTE','PAGO','VENCIDO'].map(x=>`<option value="${x}"${f.st===x?' selected':''}>${x}</option>`).join('');
+  showEditModal('Editar Funcionário',[
+    {id:'nome',label:'Nome',type:'text',value:f.nome},
+    {id:'sal',label:'Salário R$',type:'number',value:f.sal||''},
+    {id:'adi',label:'Adiantamento R$',type:'number',value:f.adi||''},
+    {id:'vale',label:'Vales R$',type:'number',value:f.vale||''},
+    {id:'bonificacao',label:'Bonificação R$',type:'number',value:f.bonificacao||''},
+    {id:'st',label:'Status',type:'select',value:f.st,options:['PENDENTE','PAGO','VENCIDO'].map(x=>({v:x,l:x}))},
+  ],vals=>{Object.assign(f,vals);saveVerif(v);notify('Funcionário atualizado!','ok');renderVerif();});
+}
+
+// ── FUNÇÕES DE CUSTO FIXO ──────────────────────────────────
+async function addCusto(){
   const v=getVerif();if(!v.c)v.c=[];
   const n=document.getElementById('cu-n').value;if(!n){notify('Informe a descrição','err');return}
-  v.c.push({id:uuid(),nome:n,val:+document.getElementById('cu-v').value||0,venc:document.getElementById('cu-vc').value,forma:document.getElementById('cu-f').value,st:document.getElementById('cu-st').value,obs:document.getElementById('cu-o').value});
+  const fileInput=document.getElementById('cu-boleto');
+  let boleto=null;
+  if(fileInput&&fileInput.files[0]){
+    try{boleto=await lerArquivo(fileInput.files[0]);}
+    catch(e){notify(e.message,'err');return;}
+  }
+  v.c.push({id:uuid(),nome:n,val:+document.getElementById('cu-v').value||0,
+    venc:document.getElementById('cu-vc').value,forma:document.getElementById('cu-f').value,
+    st:document.getElementById('cu-st').value,obs:document.getElementById('cu-o').value,
+    boleto,comprovante:null});
   saveVerif(v);showFC=false;renderVerif();notify('Custo adicionado!','ok');
 }
-function delVi(tipo,id){
-  if(!confirm('Remover?'))return;
-  const v=getVerif();v[tipo]=(v[tipo]||[]).filter(r=>r.id!==id);saveVerif(v);renderVerif();
+
+function pagarCusto(id){
+  // Exige comprovante de pagamento
+  const m=document.createElement('div');
+  m.className='modal-bg';
+  const div=document.createElement('div');
+  div.className='modal';
+  div.innerHTML=`<h2>✓ Confirmar Pagamento</h2>
+    <p>Anexe o <strong>comprovante de pagamento</strong> para confirmar:</p>
+    <div class="fl" style="margin-bottom:16px">
+      <label>📎 Comprovante <span style="color:var(--red);font-size:10px">* obrigatório</span></label>
+      <input class="fi" type="file" id="comp-file" accept="image/*,.pdf" style="padding:6px">
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn-gold" style="flex:1" onclick="confirmarPagto('${id}',this)">✓ Confirmar Pagamento</button>
+      <button class="btn-ghost" onclick="this.closest('.modal-bg').remove()">Cancelar</button>
+    </div>`;
+  m.appendChild(div);
+  document.body.appendChild(m);
 }
-function toggleCusto(id){
+
+async function confirmarPagto(id, btn){
+  const fileInput=document.getElementById('comp-file');
+  if(!fileInput||!fileInput.files[0]){notify('Anexe o comprovante para confirmar o pagamento','err');return;}
+  btn.textContent='Aguarde...';btn.disabled=true;
+  try{
+    const comprovante=await lerArquivo(fileInput.files[0]);
+    const v=getVerif();
+    const cu=(v.c||[]).find(c=>c.id===id);
+    if(cu){cu.st='PAGO';cu.comprovante=comprovante;}
+    saveVerif(v);
+    document.querySelector('.modal-bg').remove();
+    renderVerif();
+    notify('✓ Pagamento confirmado com comprovante!','ok');
+  }catch(e){notify(e.message,'err');btn.textContent='✓ Confirmar Pagamento';btn.disabled=false;}
+}
+
+function desfazerPagto(id){
+  if(!confirm('Desfazer pagamento? O comprovante será removido.'))return;
   const v=getVerif();
   const cu=(v.c||[]).find(c=>c.id===id);
-  if(cu)cu.st=cu.st==='PAGO'?'PENDENTE':'PAGO';
+  if(cu){cu.st='PENDENTE';cu.comprovante=null;}
   saveVerif(v);renderVerif();
 }
+
+function delVi(tipo,id){
+  if(!confirm('Remover?'))return;
+  const v=getVerif();
+  if(tipo==='cred'){v.cred=(v.cred||[]).filter(r=>r.id!==id);}
+  else{v[tipo]=(v[tipo]||[]).filter(r=>r.id!==id);}
+  saveVerif(v);renderVerif();
+}
+
+// ── CREDIÁRIOS ──────────────────────────────────────────────
+function calcParcelaCred(){
+  const total=parseFloat(document.getElementById('cr-total')?.value)||0;
+  const parc=parseInt(document.getElementById('cr-parc')?.value)||1;
+  const el=document.getElementById('cr-parcela');
+  if(el)el.value=total>0?fmt(total/parc):'';
+}
+function addCred(){
+  const v=getVerif();if(!v.cred)v.cred=[];
+  const funId=document.getElementById('cr-fun')?.value;
+  const desc=document.getElementById('cr-desc')?.value;
+  const total=+document.getElementById('cr-total')?.value||0;
+  const parc=+document.getElementById('cr-parc')?.value||1;
+  if(!funId){notify('Selecione o funcionário','err');return}
+  if(!total){notify('Informe o valor total','err');return}
+  const funs=v.f||[];
+  const fun=funs.find(f=>f.id===funId);
+  v.cred.push({id:uuid(),desc,funId,funNome:fun?fun.nome:'',
+    valorTotal:total,parcelas:parc,valorParcela:total/parc,
+    dataInicio:today(),st:'ativo'});
+  saveVerif(v);showCrediario=false;renderVerif();
+  notify('Crediário registrado! Parcela de '+fmt(total/parc)+'/mês descontada do funcionário.','ok');
+}
+function quitarCred(id){
+  if(!confirm('Marcar crediário como quitado?'))return;
+  const v=getVerif();
+  const cr=(v.cred||[]).find(c=>c.id===id);
+  if(cr)cr.st='quitado';
+  saveVerif(v);renderVerif();
+}
+// toggleCusto mantido por compatibilidade
+function toggleCusto(id){pagarCusto(id);}
+
 
 // DRE + RECOMPRA + MARKUP
 function renderDRE(){
