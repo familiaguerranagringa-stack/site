@@ -288,13 +288,42 @@ async function pushToFB() {
         catch { dados[k] = localStorage.getItem(k); }
       }
     }
+    // Calcular tamanho
+    const json = JSON.stringify(dados);
+    const kb = (json.length/1024).toFixed(0);
+    setSyncStatus('⟳ Enviando '+kb+'KB...', 'var(--amber)');
+
+    // Timeout de 30 segundos
+    const ctrl = new AbortController();
+    const timeout = setTimeout(() => ctrl.abort(), 30000);
+
     const r = await fetch(_FB_URL + _FB_PATH, {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(dados)
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: json,
+      signal: ctrl.signal
     });
-    if (r.ok) { setSyncStatus('✓ Salvo', 'var(--green)'); setTimeout(() => setSyncStatus('', ''), 2000); }
-    else { setSyncStatus('⚠ Erro', 'var(--red)'); }
-  } catch(e) { setSyncStatus('• Offline', 'var(--dim)'); }
+    clearTimeout(timeout);
+
+    if (r.ok) {
+      setSyncStatus('✓ Salvo', 'var(--green)');
+      setTimeout(() => setSyncStatus('', ''), 2000);
+    } else {
+      const err = await r.text();
+      console.error('Firebase PUT error:', r.status, err);
+      setSyncStatus('⚠ Erro '+r.status, 'var(--red)');
+      notify('Erro Firebase: '+r.status+' — '+err.slice(0,80), 'err');
+    }
+  } catch(e) {
+    if (e.name === 'AbortError') {
+      setSyncStatus('⚠ Timeout', 'var(--red)');
+      notify('Timeout: dados muito grandes ou sem conexão com Firebase', 'err');
+    } else {
+      setSyncStatus('• Offline', 'var(--dim)');
+      notify('Erro: '+e.message, 'err');
+    }
+    console.error('pushToFB error:', e);
+  }
   _syncing = false;
 }
 
