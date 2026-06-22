@@ -181,6 +181,7 @@ tr:hover td{background:var(--bg-hover)}
         <select id="sel-ano" class="tb-sel" onchange="changePeriod()"></select>
       </div>
       <button class="btn-ghost" onclick="window.print()">⎙ Imprimir</button>
+      <button class="btn-ghost" onclick="syncManual()" style="border-color:var(--gold-dim);color:var(--gold)" title="Sincronizar dados com a nuvem">☁ Sync</button>
       <span id="sync-status" style="font-size:11px;color:var(--muted);min-width:100px;text-align:right"></span>
     </div>
     <div class="content" id="content"></div>
@@ -433,27 +434,28 @@ document.getElementById('l-pass').addEventListener('keydown',e=>{if(e.key==='Ent
 document.getElementById('l-user').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('l-pass').focus()});
 
 // INIT
+// Sync manual com feedback visível
+async function syncManual(){
+  notify('⟳ Enviando dados para a nuvem...','info');
+  setSyncStatus('⟳ Enviando...','var(--amber)');
+  await pushToJB();
+  await syncFromJB();
+  render();
+  notify('✓ Sincronização completa!','ok');
+}
+
 function initApp(){
   const ms=document.getElementById('sel-mes'),ys=document.getElementById('sel-ano');
   ms.innerHTML=MESES.map((m,i)=>`<option value="${i+1}"${i+1===ST.mes?' selected':''}>${m}</option>`).join('');
   const y=ST.ano;
   ys.innerHTML=[y-1,y,y+1].map(v=>`<option value="${v}"${v===y?' selected':''}>${v}</option>`).join('');
-
-  // Verificar se tem dados locais
-  const temDadosLocais=Array.from({length:localStorage.length},(_,i)=>localStorage.key(i))
-    .some(k=>k&&k.startsWith('srcapas_')&&k!=='srcapas_bin_id');
-
-  if(temDadosLocais){
-    // Tem dados: enviar para nuvem PRIMEIRO, depois sincronizar
-    setSyncStatus('⟳ Enviando para nuvem...','var(--amber)');
-    pushToJB().then(()=>{
-      render();
-    }).catch(()=>render());
-  } else {
-    // Sem dados locais: carregar da nuvem
-    setSyncStatus('⟳ Carregando da nuvem...','var(--amber)');
-    syncFromJB().then(()=>render()).catch(()=>render());
-  }
+  // Sempre: push local → nuvem, depois pull nuvem → local, depois renderiza
+  (async()=>{
+    setSyncStatus('⟳ Sincronizando...','var(--amber)');
+    await pushToJB();   // envia o que tem local
+    await syncFromJB(); // carrega o que está na nuvem
+    render();
+  })();
 }
 function changeEmpresa(v){
   ST.empresa=v;
