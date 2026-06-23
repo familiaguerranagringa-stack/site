@@ -312,12 +312,13 @@ function _coletaDados(ts) {
 }
 var _pushPromise = null;
 function pushToFB() {
+  // Não envia se está offline ou sem dados
   var ts = Date.now();
   var dados = _coletaDados(ts);
+  if (Object.keys(dados).length <= 1) return Promise.resolve(); // só tem _ts, nada a enviar
   setSyncStatus('⟳ Salvando...', 'var(--amber)');
   _pushPromise = fetch(_FB_URL + _FB_PATH, {
     method: 'PUT',
-    keepalive: true,
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(dados)
   })
@@ -330,14 +331,16 @@ function pushToFB() {
       console.log('[FB PUSH OK] ts='+ts);
     } else {
       _fbOk = false;
-      setSyncStatus('⚠ Push Erro '+r.status+' — veja console','var(--red)');
+      setSyncStatus('⚠ Firebase '+r.status,'var(--red)');
       console.error('[FB PUSH ERRO]', r.status, r.statusText);
+      notify('Erro Firebase '+r.status+': '+r.statusText,'err');
     }
   })
   .catch(function(e) {
     _fbOk = false;
-    setSyncStatus('⚠ Offline/CORS','var(--red)');
-    console.error('[FB PUSH FALHOU]', e);
+    setSyncStatus('⚠ '+e.name,'var(--red)');
+    notify('Falha no sync: '+e.name+' — '+e.message,'err');
+    console.error('[FB PUSH FALHOU]', e.name, e.message, e);
   });
   return _pushPromise;
 }
