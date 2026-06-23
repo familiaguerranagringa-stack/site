@@ -243,7 +243,7 @@ function saveO(t,d){localStorage.setItem(sk(t),JSON.stringify(d));flashSaved();s
 // ── FIREBASE REALTIME DATABASE ─────────────────────────────
 const _FB_URL = 'https://grupofamiliaguerra-9d13e-default-rtdb.firebaseio.com';
 const _FB_PATH = '/srcapas/bacaxa.json';
-let _syncTimer = null, _syncing = false, _lastFBts = 0, _autoSyncId = null;
+let _syncTimer = null, _syncing = false, _lastFBts = 0, _autoSyncId = null, _fbSSE = null;
 
 function setSyncStatus(msg, cor) {
   try {
@@ -279,11 +279,8 @@ function syncFromFB() {
     .then(function(rec) {
       if (rec && typeof rec === 'object' && Object.keys(rec).length > 1) {
         var fbTs = rec._ts || 0;
-        if (fbTs > _lastFBts) {
-          _lastFBts = fbTs;
-          aplicarDados(rec);
-          render();
-        }
+        if (fbTs > _lastFBts) { _lastFBts = fbTs; }
+        aplicarDados(rec);
         setSyncStatus('✓ Sincronizado', 'var(--green)');
         setTimeout(function() { setSyncStatus('', ''); }, 3000);
       } else {
@@ -332,11 +329,36 @@ function pushToFB() {
 }
 
 
+function _mergeFB(rec) {
+  if (!rec || typeof rec !== 'object') return;
+  Object.entries(rec).forEach(function(entry) {
+    var k = entry[0], fbVal = entry[1];
+    if (!k || !k.startsWith('srcapas_')) return;
+    var localStr = localStorage.getItem(k);
+    if (!localStr) { localStorage.setItem(k, JSON.stringify(fbVal)); return; }
+    try {
+      var localVal = JSON.parse(localStr);
+      if (Array.isArray(fbVal) && Array.isArray(localVal)) {
+        var byId = {};
+        localVal.forEach(function(it) { if (it.id) byId[it.id] = it; });
+        fbVal.forEach(function(it) { if (it.id && !byId[it.id]) byId[it.id] = it; });
+        var merged = Object.values(byId).sort(function(a,b){ return (a.data||'').localeCompare(b.data||''); });
+        localStorage.setItem(k, JSON.stringify(merged));
+      } else { localStorage.setItem(k, JSON.stringify(fbVal)); }
+    } catch(e) { localStorage.setItem(k, JSON.stringify(fbVal)); }
+  });
+}
 function syncManual(){
-  var temDados=false;
-  for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);if(k&&k.startsWith('srcapas_')){temDados=true;break;}}
-  var p=temDados?pushToFB():Promise.resolve();
-  p.then(function(){return syncFromFB();}).then(function(){render();notify('✓ Sincronizado!','ok');});
+  setSyncStatus('⟳ Sincronizando...', 'var(--amber)');
+  fetch(_FB_URL + _FB_PATH + '?t=' + Date.now())
+    .then(function(r){ return r.ok ? r.json() : null; })
+    .then(function(rec){
+      if (rec && rec._ts) _lastFBts = rec._ts;
+      _mergeFB(rec);
+      return pushToFB();
+    })
+    .then(function(){ render(); notify('✓ Sincronizado!', 'ok'); })
+    .catch(function(){ render(); notify('⚠ Sem conexão — dados locais', 'info'); });
 }
 
 function initApp(){
@@ -345,9 +367,7 @@ function initApp(){
   const y=ST.ano;
   ys.innerHTML=[y-1,y,y+1].map(v=>`<option value="${v}"${v===y?' selected':''}>${v}</option>`).join('');
   syncFromFB().then(function(){ render(); }).catch(function(){ render(); });
-  // Auto-sync a cada 30 segundos
-  if (_autoSyncId) clearInterval(_autoSyncId);
-  _autoSyncId = setInterval(_silentSync, 30000);
+  startRealtimeSync(); // SSE Firebase — atualizações em tempo real
 }
 function changeEmpresa(v){
   ST.empresa=v;
@@ -2030,22 +2050,52 @@ function cancelVoice(){
 }
 
 
-// ── AUTO-SYNC ──────────────────────────────────────────────────
+// ── SYNC EM TEMPO REAL (SSE Firebase) ─────────────────────────
 function _silentSync() {
   fetch(_FB_URL + _FB_PATH + '?t=' + Date.now())
-    .then(function(r) { return r.ok ? r.json() : null; })
-    .then(function(rec) {
+    .then(function(r){ return r.ok ? r.json() : null; })
+    .then(function(rec){
       if (!rec || typeof rec !== 'object') return;
       var fbTs = rec._ts || 0;
       if (fbTs > _lastFBts) {
         _lastFBts = fbTs;
-        aplicarDados(rec);
+        _mergeFB(rec);
         render();
         setSyncStatus('✓ Atualizado', 'var(--green)');
-        setTimeout(function() { setSyncStatus('', ''); }, 2000);
+        setTimeout(function(){ setSyncStatus('',''); }, 2000);
       }
     })
-    .catch(function() {}); // falha silenciosa
+    .catch(function(){});
+}
+function startRealtimeSync() {
+  if (_fbSSE) { try { _fbSSE.close(); } catch(e) {} _fbSSE = null; }
+  if (_autoSyncId) { clearInterval(_autoSyncId); _autoSyncId = null; }
+  try {
+    _fbSSE = new EventSource(_FB_URL + _FB_PATH);
+    _fbSSE.addEventListener('put', function(e) {
+      try {
+        var p = JSON.parse(e.data);
+        var rec = p && p.data;
+        if (!rec || typeof rec !== 'object') return;
+        var fbTs = rec._ts || 0;
+        if (fbTs > _lastFBts) {
+          _lastFBts = fbTs;
+          _mergeFB(rec);
+          render();
+          setSyncStatus('✓ Ao vivo', 'var(--green)');
+          setTimeout(function(){ setSyncStatus('',''); }, 2000);
+        }
+      } catch(ex) {}
+    });
+    _fbSSE.onerror = function() {
+      if (!_autoSyncId) _autoSyncId = setInterval(_silentSync, 5000);
+    };
+    _fbSSE.onopen = function() {
+      if (_autoSyncId) { clearInterval(_autoSyncId); _autoSyncId = null; }
+    };
+  } catch(ex) {
+    _autoSyncId = setInterval(_silentSync, 5000);
+  }
 }
 
 // ── NOTIFICAÇÕES ──────────────────────────────────────────────
