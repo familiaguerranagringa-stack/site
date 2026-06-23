@@ -2020,6 +2020,58 @@ function cancelVoice(){
   _voltarAoWake();
 }
 
+// ── NOTIFICAÇÕES ──────────────────────────────────────────────
+function notify(msg, tipo) {
+  const c = document.getElementById('notif');
+  if (!c) return;
+  const el = document.createElement('div');
+  el.className = 'ni ' + (tipo || 'ok');
+  el.textContent = msg;
+  c.appendChild(el);
+  setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 3200);
+}
+function flashSaved() {
+  notify('✓ Salvo', 'ok');
+}
+
+// ── AUTENTICAÇÃO ───────────────────────────────────────────────
+function checkAuth() {
+  const ok = sessionStorage.getItem('srcapas_auth');
+  if (ok) {
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app').style.display = '';
+    initApp();
+  } else {
+    document.getElementById('app').style.display = 'none';
+    document.getElementById('login-screen').style.display = 'flex';
+  }
+}
+function doLogin() {
+  const u = document.getElementById('l-user').value.trim();
+  const p = document.getElementById('l-pass').value;
+  const err = document.getElementById('l-err');
+  const adminOk = u === CREDS.u && p === CREDS.p;
+  const extraOk = CREDS_EXTRA.find(c => c.u === u && c.p === p);
+  if (adminOk || extraOk) {
+    sessionStorage.setItem('srcapas_auth', u);
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app').style.display = '';
+    err.style.display = 'none';
+    initApp();
+  } else {
+    err.style.display = 'block';
+    document.getElementById('l-pass').value = '';
+  }
+}
+function doLogout() {
+  sessionStorage.removeItem('srcapas_auth');
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('l-user').value = '';
+  document.getElementById('l-pass').value = '';
+  document.getElementById('l-err').style.display = 'none';
+}
+
 checkAuth();
 </script>
 </body>
