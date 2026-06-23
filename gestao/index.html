@@ -353,12 +353,20 @@ function _mergeFB(rec) {
 }
 function syncManual(){
   setSyncStatus('⟳ Sincronizando...', 'var(--amber)');
-  fetch(_FB_URL + _FB_PATH + '?t=' + Date.now())
+  // Se há push pendente (dado salvo há pouco), envia primeiro para não perder
+  var pre = (_syncTimer) ? (clearTimeout(_syncTimer), _syncTimer=null, pushToFB()) : Promise.resolve();
+  pre
+    .then(function(){
+      return fetch(_FB_URL + _FB_PATH + '?t=' + Date.now());
+    })
     .then(function(r){ return r.ok ? r.json() : null; })
     .then(function(rec){
-      if (rec && rec._ts) _lastFBts = rec._ts;
-      _mergeFB(rec);
-      return pushToFB();
+      // Firebase vence — aplicarDados substitui local inteiro (exclusões propagam)
+      if (rec && typeof rec === 'object') {
+        if (rec._ts) _lastFBts = rec._ts;
+        aplicarDados(rec);
+      }
+      return pushToFB(); // confirma estado atual no Firebase
     })
     .then(function(){ render(); notify('✓ Sincronizado!', 'ok'); })
     .catch(function(){ render(); notify('⚠ Sem conexão — dados locais', 'info'); });
@@ -2060,14 +2068,11 @@ function _silentSync() {
     .then(function(rec){
       if (!rec || typeof rec !== 'object' || !rec._ts) return;
       if (rec._ts !== _lastFBts) {
-        var era = _lastFBts;
         _lastFBts = rec._ts;
-        _mergeFB(rec);
+        aplicarDados(rec); // Firebase vence — exclusões propagam
         render();
-        if (rec._ts > era && era > 0) {
-          setSyncStatus('✓ Atualizado', 'var(--green)');
-          setTimeout(function(){ setSyncStatus('',''); }, 2000);
-        }
+        setSyncStatus('✓ Atualizado', 'var(--green)');
+        setTimeout(function(){ setSyncStatus('',''); }, 2000);
       }
     })
     .catch(function(){});
@@ -2087,7 +2092,7 @@ function startRealtimeSync() {
         if (!rec || typeof rec !== 'object' || !rec._ts) return;
         if (rec._ts !== _lastFBts) {
           _lastFBts = rec._ts;
-          _mergeFB(rec);
+          aplicarDados(rec); // Firebase vence — exclusões propagam
           render();
           setSyncStatus('✓ Ao vivo', 'var(--green)');
           setTimeout(function(){ setSyncStatus('',''); }, 2000);
@@ -2097,7 +2102,7 @@ function startRealtimeSync() {
     _fbSSE.addEventListener('patch', function(e) {
       try {
         var p = JSON.parse(e.data);
-        if (p && p.data) { _mergeFB(p.data); render(); }
+        if (p && p.data) { aplicarDados(p.data); render(); }
       } catch(ex) {}
     });
   } catch(ex) {} // SSE falhou — polling já cobre
