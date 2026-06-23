@@ -858,13 +858,13 @@ function delFi(key,id){
 function getVerif(){
   const custos=JSON.parse(localStorage.getItem(sk('verif_custos'))||'[]');
   const funs=JSON.parse(localStorage.getItem('srcapas_funcionarios_'+ST.empresa)||'[]');
-  const creds=JSON.parse(localStorage.getItem(sk('verif_cred'))||'[]');
+  const creds=JSON.parse(localStorage.getItem('srcapas_creds_'+ST.empresa)||'[]');
   return{f:funs,c:custos,cred:creds};
 }
 function saveVerif(v){
   if(v.f!==undefined) localStorage.setItem('srcapas_funcionarios_'+ST.empresa, JSON.stringify(v.f));
   if(v.c!==undefined) localStorage.setItem(sk('verif_custos'), JSON.stringify(v.c));
-  if(v.cred!==undefined) localStorage.setItem(sk('verif_cred'), JSON.stringify(v.cred));
+  if(v.cred!==undefined) localStorage.setItem('srcapas_creds_'+ST.empresa, JSON.stringify(v.cred));
   flashSaved();
   pushToFB();
 }
@@ -947,10 +947,20 @@ function renderVerif(){
     return'';
   }
 
-  // Parcelas de crediário por funcionário no mês atual
+  // Parcelas de crediário por funcionário — filtra pelo mês atual dentro do range
   function parcelaCred(funId){
-    return creds.filter(cr=>cr.funId===funId&&cr.st==='ativo')
-      .reduce((s,cr)=>s+(+cr.valorParcela||0),0);
+    const ano=ST.ano, mes=ST.mes;
+    return (creds||[]).filter(cr=>cr.funId===funId&&cr.st==='ativo').reduce((s,cr)=>{
+      if(!cr.dataInicio) return s+(+cr.valorParcela||0);
+      const ini=new Date(cr.dataInicio+'T12:00:00');
+      const iniAno=ini.getFullYear(), iniMes=ini.getMonth()+1;
+      const mesesDecorridos=(ano-iniAno)*12+(mes-iniMes);
+      // mês é válido se está dentro do range [0, parcelas-1]
+      if(mesesDecorridos>=0 && mesesDecorridos<(+cr.parcelas||1)){
+        return s+(+cr.valorParcela||0);
+      }
+      return s;
+    },0);
   }
 
   // Rows de funcionários
@@ -1423,9 +1433,15 @@ function renderMarkup(){
     const hoje=new Date();
     const gastosDia={};
     sa.forEach(r=>{if(r.data&&r.val)gastosDia[r.data]=(gastosDia[r.data]||0)+(+r.val||0)});
-    // financeiras por dia de venda
-    const finDia={};
-    PARCEIROS.forEach(p=>{const k=p.toLowerCase().replace(/\s+/g,'_');(fiMk[k]||[]).forEach(r=>{if(r.dv&&r.vv)finDia[r.dv]=(finDia[r.dv]||0)+(+r.vv||0);});});
+    // financeiras por dia de venda (valor e taxa)
+    const finDia={}, taxDia={};
+    PARCEIROS.forEach(p=>{
+      const k=p.toLowerCase().replace(/\s+/g,'_');
+      (fiMk[k]||[]).forEach(r=>{
+        if(r.dv&&r.vv) finDia[r.dv]=(finDia[r.dv]||0)+(+r.vv||0);
+        if(r.dv&&r.tx) taxDia[r.dv]=(taxDia[r.dv]||0)+(+r.tx||0);
+      });
+    });
     let cmvAcc2=0,vendaAcc=0,taxasAcc=0,gastosAcc=0;
     const diasAbertos=[];
     const tblRows=[];
@@ -1440,7 +1456,7 @@ function renderMarkup(){
       if(!isSun&&(enDia||temFin)){
         cmvAcc2+=enDia?(+enDia.cmv||0):0;
         vendaAcc+=(enDia?((+enDia.din||0)+(+enDia.pix||0)+(+enDia.cart||0)+(+enDia.rend||0)):0)+(finDia[dt]||0);
-        taxasAcc+=enDia?((+enDia.tpix||0)+(+enDia.tcart||0)):0;
+        taxasAcc+=(enDia?((+enDia.tpix||0)+(+enDia.tcart||0)):0)+(taxDia[dt]||0);
         gastosAcc+=gastosDia[dt]||0;
         diasAbertos.push(dt);
       }
@@ -1541,7 +1557,11 @@ function renderMarkup(){
         const metaVendCat=metaVendInd*(pp/100);
         const vendido=(vend[nome]||{})[cat]||0;
         const falta=metaVendCat-vendido;
-        return'<td style="text-align:right;font-size:11px"><div style="color:var(--gold)">'+fmt(metaVendCat)+'</div><div style="color:var(--green)">'+fmt(vendido)+'</div><div style="color:'+(falta>0?'var(--red)':'var(--green)')+'">'+( falta>0?'Falta '+fmt(falta):'✓ Batido')+'</div></td>';
+        const labelStyle='font-size:9px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase';
+        return'<td style="text-align:right;font-size:11px;line-height:1.6">'+
+          '<div><span style="'+labelStyle+'">meta</span><br><span style="color:var(--gold);font-weight:700">'+fmt(metaVendCat)+'</span></div>'+
+          '<div><span style="'+labelStyle+'">vendido</span><br><span style="color:var(--green);font-weight:700">'+fmt(vendido)+'</span></div>'+
+          '<div><span style="'+labelStyle+'">falta</span><br><span style="color:'+(falta>0?'var(--red)':'var(--green)')+';font-weight:700">'+(falta>0?fmt(falta):'✓ Batido')+'</span></div></td>';
       }).join('');
       return'<tr><td><strong>'+nome+'</strong><br><span style="font-size:10px;color:var(--gold)">'+fmt(metaVendInd)+'</span></td>'+catCols+'</tr>';
     }).join('');
