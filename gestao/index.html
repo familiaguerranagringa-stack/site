@@ -243,7 +243,7 @@ function saveO(t,d){localStorage.setItem(sk(t),JSON.stringify(d));flashSaved();s
 // ── FIREBASE REALTIME DATABASE ─────────────────────────────
 const _FB_URL = 'https://grupofamiliaguerra-9d13e-default-rtdb.firebaseio.com';
 const _FB_PATH = '/srcapas/bacaxa.json';
-let _syncTimer = null, _syncing = false;
+let _syncTimer = null, _syncing = false, _lastFBts = 0, _autoSyncId = null;
 
 function setSyncStatus(msg, cor) {
   try {
@@ -278,7 +278,12 @@ function syncFromFB() {
     })
     .then(function(rec) {
       if (rec && typeof rec === 'object' && Object.keys(rec).length > 1) {
-        aplicarDados(rec);
+        var fbTs = rec._ts || 0;
+        if (fbTs > _lastFBts) {
+          _lastFBts = fbTs;
+          aplicarDados(rec);
+          render();
+        }
         setSyncStatus('✓ Sincronizado', 'var(--green)');
         setTimeout(function() { setSyncStatus('', ''); }, 3000);
       } else {
@@ -296,6 +301,7 @@ function pushToFB() {
   _syncing = true;
   setSyncStatus('⟳ Salvando...', 'var(--amber)');
   var dados = { _ts: Date.now() };
+  _lastFBts = dados._ts; // Registrar nosso próprio push para evitar re-render desnecessário
   try {
     for (var i = 0; i < localStorage.length; i++) {
       var k = localStorage.key(i);
@@ -339,6 +345,9 @@ function initApp(){
   const y=ST.ano;
   ys.innerHTML=[y-1,y,y+1].map(v=>`<option value="${v}"${v===y?' selected':''}>${v}</option>`).join('');
   syncFromFB().then(function(){ render(); }).catch(function(){ render(); });
+  // Auto-sync a cada 30 segundos
+  if (_autoSyncId) clearInterval(_autoSyncId);
+  _autoSyncId = setInterval(_silentSync, 30000);
 }
 function changeEmpresa(v){
   ST.empresa=v;
@@ -2018,6 +2027,25 @@ function cancelVoice(){
   document.getElementById('vp-txt').textContent='Fale o lançamento...';
   document.getElementById('vp-st').textContent='Ouvindo...';
   _voltarAoWake();
+}
+
+
+// ── AUTO-SYNC ──────────────────────────────────────────────────
+function _silentSync() {
+  fetch(_FB_URL + _FB_PATH + '?t=' + Date.now())
+    .then(function(r) { return r.ok ? r.json() : null; })
+    .then(function(rec) {
+      if (!rec || typeof rec !== 'object') return;
+      var fbTs = rec._ts || 0;
+      if (fbTs > _lastFBts) {
+        _lastFBts = fbTs;
+        aplicarDados(rec);
+        render();
+        setSyncStatus('✓ Atualizado', 'var(--green)');
+        setTimeout(function() { setSyncStatus('', ''); }, 2000);
+      }
+    })
+    .catch(function() {}); // falha silenciosa
 }
 
 // ── NOTIFICAÇÕES ──────────────────────────────────────────────
