@@ -2,6 +2,8 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SR. CAPAS — Gestão Financeira</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
@@ -243,7 +245,7 @@ function saveO(t,d){localStorage.setItem(sk(t),JSON.stringify(d));flashSaved();s
 // ── FIREBASE REALTIME DATABASE ─────────────────────────────
 const _FB_URL = 'https://grupofamiliaguerra-9d13e-default-rtdb.firebaseio.com';
 const _FB_PATH = '/srcapas/bacaxa.json';
-let _syncTimer = null, _pushing = false, _lastFBts = 0, _pollId = null, _fbSSE = null;
+let _syncTimer = null, _lastFBts = 0, _pollId = null, _fbSSE = null;
 
 function setSyncStatus(msg, cor) {
   try {
@@ -266,7 +268,7 @@ function aplicarDados(rec) {
 
 function scheduleSync() {
   clearTimeout(_syncTimer);
-  _syncTimer = setTimeout(pushToFB, 1500);
+  _syncTimer = setTimeout(pushToFB, 500);
 }
 
 function syncFromFB() {
@@ -293,42 +295,39 @@ function syncFromFB() {
     });
 }
 
-function pushToFB() {
-  if (_pushing) return Promise.resolve();
-  _pushing = true;
-  // Timeout de segurança: libera _pushing após 12s para não travar
-  var safety = setTimeout(function(){ _pushing = false; }, 12000);
-  setSyncStatus('⟳ Salvando...', 'var(--amber)');
-  var ts = Date.now();
-  var dados = { _ts: ts };
+function _coletaDados(ts) {
+  var d = { _ts: ts || Date.now() };
   try {
     for (var i = 0; i < localStorage.length; i++) {
       var k = localStorage.key(i);
       if (k && k.startsWith('srcapas_')) {
-        try { dados[k] = JSON.parse(localStorage.getItem(k)); }
-        catch(e) { dados[k] = localStorage.getItem(k); }
+        try { d[k] = JSON.parse(localStorage.getItem(k)); }
+        catch(e) { d[k] = localStorage.getItem(k); }
       }
     }
   } catch(e) {}
+  return d;
+}
+function pushToFB() {
+  var ts = Date.now();
+  var dados = _coletaDados(ts);
+  setSyncStatus('⟳ Salvando...', 'var(--amber)');
   return fetch(_FB_URL + _FB_PATH, {
     method: 'PUT',
+    keepalive: true,
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(dados)
   })
   .then(function(r) {
-    clearTimeout(safety); _pushing = false;
     if (r.ok) {
-      _lastFBts = ts; // só atualiza depois de confirmar o push
+      _lastFBts = ts;
       setSyncStatus('✓ Salvo', 'var(--green)');
       setTimeout(function() { setSyncStatus('', ''); }, 2000);
     } else {
       setSyncStatus('⚠ Erro ' + r.status, 'var(--red)');
     }
   })
-  .catch(function(e) {
-    clearTimeout(safety); _pushing = false;
-    setSyncStatus('• Offline', 'var(--dim)');
-  });
+  .catch(function() { setSyncStatus('• Offline', 'var(--dim)'); });
 }
 
 
@@ -353,20 +352,17 @@ function _mergeFB(rec) {
 }
 function syncManual(){
   setSyncStatus('⟳ Sincronizando...', 'var(--amber)');
-  // Se há push pendente (dado salvo há pouco), envia primeiro para não perder
-  var pre = (_syncTimer) ? (clearTimeout(_syncTimer), _syncTimer=null, pushToFB()) : Promise.resolve();
-  pre
-    .then(function(){
-      return fetch(_FB_URL + _FB_PATH + '?t=' + Date.now());
-    })
+  clearTimeout(_syncTimer); _syncTimer = null;
+  // Puxa Firebase (Firebase vence — exclusões propagam)
+  fetch(_FB_URL + _FB_PATH + '?t=' + Date.now())
     .then(function(r){ return r.ok ? r.json() : null; })
     .then(function(rec){
-      // Firebase vence — aplicarDados substitui local inteiro (exclusões propagam)
       if (rec && typeof rec === 'object') {
         if (rec._ts) _lastFBts = rec._ts;
         aplicarDados(rec);
       }
-      return pushToFB(); // confirma estado atual no Firebase
+      // Depois envia estado atual
+      return pushToFB();
     })
     .then(function(){ render(); notify('✓ Sincronizado!', 'ok'); })
     .catch(function(){ render(); notify('⚠ Sem conexão — dados locais', 'info'); });
@@ -869,6 +865,7 @@ function saveVerif(v){
   if(v.f!==undefined) localStorage.setItem('srcapas_funcionarios_'+ST.empresa, JSON.stringify(v.f));
   if(v.c!==undefined) localStorage.setItem(sk('verif_custos'), JSON.stringify(v.c));
   flashSaved();
+  scheduleSync();
 }
 let showFF=false,showFC=false,filtroCusto='',showCrediario=false;
 
@@ -2080,7 +2077,7 @@ function _silentSync() {
 function startRealtimeSync() {
   // Polling a cada 5s — garantido, independente de SSE
   if (_pollId) clearInterval(_pollId);
-  _pollId = setInterval(_silentSync, 5000);
+  _pollId = setInterval(_silentSync, 3000);
   // SSE como bônus (atualizações instantâneas quando funciona)
   if (_fbSSE) { try { _fbSSE.close(); } catch(e) {} _fbSSE = null; }
   try {
