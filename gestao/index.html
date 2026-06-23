@@ -243,7 +243,7 @@ function saveO(t,d){localStorage.setItem(sk(t),JSON.stringify(d));flashSaved();s
 // ── FIREBASE REALTIME DATABASE ─────────────────────────────
 const _FB_URL = 'https://grupofamiliaguerra-9d13e-default-rtdb.firebaseio.com';
 const _FB_PATH = '/srcapas/bacaxa.json';
-let _syncTimer = null, _syncing = false, _lastFBts = 0, _autoSyncId = null, _fbSSE = null;
+let _syncTimer = null, _pushing = false, _lastFBts = 0, _pollId = null, _fbSSE = null;
 
 function setSyncStatus(msg, cor) {
   try {
@@ -266,7 +266,7 @@ function aplicarDados(rec) {
 
 function scheduleSync() {
   clearTimeout(_syncTimer);
-  _syncTimer = setTimeout(pushToFB, 3000);
+  _syncTimer = setTimeout(pushToFB, 1500);
 }
 
 function syncFromFB() {
@@ -294,11 +294,13 @@ function syncFromFB() {
 }
 
 function pushToFB() {
-  if (_syncing) return Promise.resolve();
-  _syncing = true;
+  if (_pushing) return Promise.resolve();
+  _pushing = true;
+  // Timeout de segurança: libera _pushing após 12s para não travar
+  var safety = setTimeout(function(){ _pushing = false; }, 12000);
   setSyncStatus('⟳ Salvando...', 'var(--amber)');
-  var dados = { _ts: Date.now() };
-  _lastFBts = dados._ts; // Registrar nosso próprio push para evitar re-render desnecessário
+  var ts = Date.now();
+  var dados = { _ts: ts };
   try {
     for (var i = 0; i < localStorage.length; i++) {
       var k = localStorage.key(i);
@@ -314,8 +316,9 @@ function pushToFB() {
     body: JSON.stringify(dados)
   })
   .then(function(r) {
-    _syncing = false;
+    clearTimeout(safety); _pushing = false;
     if (r.ok) {
+      _lastFBts = ts; // só atualiza depois de confirmar o push
       setSyncStatus('✓ Salvo', 'var(--green)');
       setTimeout(function() { setSyncStatus('', ''); }, 2000);
     } else {
@@ -323,7 +326,7 @@ function pushToFB() {
     }
   })
   .catch(function(e) {
-    _syncing = false;
+    clearTimeout(safety); _pushing = false;
     setSyncStatus('• Offline', 'var(--dim)');
   });
 }
@@ -367,7 +370,7 @@ function initApp(){
   const y=ST.ano;
   ys.innerHTML=[y-1,y,y+1].map(v=>`<option value="${v}"${v===y?' selected':''}>${v}</option>`).join('');
   syncFromFB().then(function(){ render(); }).catch(function(){ render(); });
-  startRealtimeSync(); // SSE Firebase — atualizações em tempo real
+  startRealtimeSync(); // polling 5s + SSE bônus
 }
 function changeEmpresa(v){
   ST.empresa=v;
@@ -2055,31 +2058,35 @@ function _silentSync() {
   fetch(_FB_URL + _FB_PATH + '?t=' + Date.now())
     .then(function(r){ return r.ok ? r.json() : null; })
     .then(function(rec){
-      if (!rec || typeof rec !== 'object') return;
-      var fbTs = rec._ts || 0;
-      if (fbTs > _lastFBts) {
-        _lastFBts = fbTs;
+      if (!rec || typeof rec !== 'object' || !rec._ts) return;
+      if (rec._ts !== _lastFBts) {
+        var era = _lastFBts;
+        _lastFBts = rec._ts;
         _mergeFB(rec);
         render();
-        setSyncStatus('✓ Atualizado', 'var(--green)');
-        setTimeout(function(){ setSyncStatus('',''); }, 2000);
+        if (rec._ts > era && era > 0) {
+          setSyncStatus('✓ Atualizado', 'var(--green)');
+          setTimeout(function(){ setSyncStatus('',''); }, 2000);
+        }
       }
     })
     .catch(function(){});
 }
 function startRealtimeSync() {
+  // Polling a cada 5s — garantido, independente de SSE
+  if (_pollId) clearInterval(_pollId);
+  _pollId = setInterval(_silentSync, 5000);
+  // SSE como bônus (atualizações instantâneas quando funciona)
   if (_fbSSE) { try { _fbSSE.close(); } catch(e) {} _fbSSE = null; }
-  if (_autoSyncId) { clearInterval(_autoSyncId); _autoSyncId = null; }
   try {
     _fbSSE = new EventSource(_FB_URL + _FB_PATH);
     _fbSSE.addEventListener('put', function(e) {
       try {
         var p = JSON.parse(e.data);
         var rec = p && p.data;
-        if (!rec || typeof rec !== 'object') return;
-        var fbTs = rec._ts || 0;
-        if (fbTs > _lastFBts) {
-          _lastFBts = fbTs;
+        if (!rec || typeof rec !== 'object' || !rec._ts) return;
+        if (rec._ts !== _lastFBts) {
+          _lastFBts = rec._ts;
           _mergeFB(rec);
           render();
           setSyncStatus('✓ Ao vivo', 'var(--green)');
@@ -2087,15 +2094,13 @@ function startRealtimeSync() {
         }
       } catch(ex) {}
     });
-    _fbSSE.onerror = function() {
-      if (!_autoSyncId) _autoSyncId = setInterval(_silentSync, 5000);
-    };
-    _fbSSE.onopen = function() {
-      if (_autoSyncId) { clearInterval(_autoSyncId); _autoSyncId = null; }
-    };
-  } catch(ex) {
-    _autoSyncId = setInterval(_silentSync, 5000);
-  }
+    _fbSSE.addEventListener('patch', function(e) {
+      try {
+        var p = JSON.parse(e.data);
+        if (p && p.data) { _mergeFB(p.data); render(); }
+      } catch(ex) {}
+    });
+  } catch(ex) {} // SSE falhou — polling já cobre
 }
 
 // ── NOTIFICAÇÕES ──────────────────────────────────────────────
@@ -2150,6 +2155,11 @@ function doLogout() {
   document.getElementById('l-err').style.display = 'none';
 }
 
+
+// Push antes de fechar a aba (garante que dado não se perca)
+window.addEventListener('beforeunload', function() {
+  if (_syncTimer) { clearTimeout(_syncTimer); pushToFB(); }
+});
 checkAuth();
 </script>
 </body>
