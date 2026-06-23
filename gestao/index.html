@@ -138,6 +138,8 @@ tr:hover td{background:var(--bg-hover)}
 @media(max-width:768px){.sidebar{display:none}.content{padding:14px 12px 80px}.kpi-grid{grid-template-columns:1fr 1fr}}
 @media print{.sidebar,.topbar,#voice-btn,#vp{display:none!important}.content{padding:0}body{background:#fff;color:#000}}
 </style>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 </head>
 <body>
 <div id="notif"></div>
@@ -245,7 +247,14 @@ function saveO(t,d){localStorage.setItem(sk(t),JSON.stringify(d));flashSaved();p
 
 // ── FIREBASE REALTIME DATABASE ─────────────────────────────
 const _FB_URL = 'https://grupofamiliaguerra-9d13e-default-rtdb.firebaseio.com';
-const _FB_PATH = '/srcapas/bacaxa.json';
+// Firebase SDK WebSocket — substitui REST completamente
+firebase.initializeApp({
+  apiKey:'AIzaSyBdp0xbPdybkjI8D-mp-_uI57qUHxhDXvg',
+  databaseURL:'https://grupofamiliaguerra-9d13e-default-rtdb.firebaseio.com',
+  projectId:'grupofamiliaguerra-9d13e'
+});
+const _db=firebase.database();
+const _dbRef=_db.ref('srcapas/bacaxa');
 let _syncTimer = null, _lastFBts = 0, _pollId = null, _fbSSE = null;
 
 function setSyncStatus(msg, cor) {
@@ -275,25 +284,22 @@ function scheduleSync() {
 
 function syncFromFB() {
   setSyncStatus('⟳ Carregando...', 'var(--amber)');
-  return fetch(_FB_URL + _FB_PATH + '?t=' + Date.now())
-    .then(function(r) {
-      if (!r.ok) { setSyncStatus('• Local', 'var(--dim)'); return; }
-      return r.json();
-    })
-    .then(function(rec) {
-      if (rec && typeof rec === 'object' && Object.keys(rec).length > 1) {
-        var fbTs = rec._ts || 0;
-        if (fbTs > _lastFBts) { _lastFBts = fbTs; }
+  return _dbRef.once('value')
+    .then(function(snap) {
+      var rec = snap.val();
+      if (rec && typeof rec === 'object' && rec._ts) {
+        _lastFBts = rec._ts;
         aplicarDados(rec);
         setSyncStatus('✓ Sincronizado', 'var(--green)');
-        setTimeout(function() { setSyncStatus('', ''); }, 3000);
+        setTimeout(function() { setSyncStatus('• Online','var(--green)'); }, 3000);
       } else {
-        setSyncStatus('• Vazio', 'var(--dim)');
-        setTimeout(function() { setSyncStatus('', ''); }, 3000);
+        setSyncStatus('• Online (vazio)', 'var(--green)');
+        setTimeout(function() { setSyncStatus('',''); }, 3000);
       }
     })
     .catch(function(e) {
-      setSyncStatus('• Offline', 'var(--dim)');
+      setSyncStatus('• Local', 'var(--dim)');
+      console.warn('[FB syncFromFB]', e.message);
     });
 }
 
@@ -310,39 +316,23 @@ function _coletaDados(ts) {
   } catch(e) {}
   return d;
 }
-var _pushPromise = null;
 function pushToFB() {
-  // Não envia se está offline ou sem dados
   var ts = Date.now();
   var dados = _coletaDados(ts);
-  if (Object.keys(dados).length <= 1) return Promise.resolve(); // só tem _ts, nada a enviar
+  if (Object.keys(dados).length <= 1) return Promise.resolve();
   setSyncStatus('⟳ Salvando...', 'var(--amber)');
-  _pushPromise = fetch(_FB_URL + _FB_PATH, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(dados)
-  })
-  .then(function(r) {
-    if (r.ok) {
+  return _dbRef.set(dados)
+    .then(function() {
       _lastFBts = ts;
-      _fbOk = true;
       setSyncStatus('✓ Salvo', 'var(--green)');
-      setTimeout(function() { setSyncStatus('• Conectado','var(--green)'); }, 2000);
+      setTimeout(function() { setSyncStatus('• Online','var(--green)'); }, 2000);
       console.log('[FB PUSH OK] ts='+ts);
-    } else {
-      _fbOk = false;
-      setSyncStatus('⚠ Firebase '+r.status,'var(--red)');
-      console.error('[FB PUSH ERRO]', r.status, r.statusText);
-      notify('Erro Firebase '+r.status+': '+r.statusText,'err');
-    }
-  })
-  .catch(function(e) {
-    _fbOk = false;
-    setSyncStatus('⚠ '+e.name,'var(--red)');
-    notify('Falha no sync: '+e.name+' — '+e.message,'err');
-    console.error('[FB PUSH FALHOU]', e.name, e.message, e);
-  });
-  return _pushPromise;
+    })
+    .catch(function(e) {
+      setSyncStatus('⚠ '+e.message,'var(--red)');
+      notify('Erro ao salvar: '+e.message,'err');
+      console.error('[FB PUSH FALHOU]', e.message);
+    });
 }
 
 
@@ -368,19 +358,14 @@ function _mergeFB(rec) {
 function syncManual(){
   setSyncStatus('⟳ Sincronizando...', 'var(--amber)');
   clearTimeout(_syncTimer); _syncTimer = null;
-  // Puxa Firebase (Firebase vence — exclusões propagam)
-  fetch(_FB_URL + _FB_PATH + '?t=' + Date.now())
-    .then(function(r){ return r.ok ? r.json() : null; })
-    .then(function(rec){
-      if (rec && typeof rec === 'object') {
-        if (rec._ts) _lastFBts = rec._ts;
-        aplicarDados(rec);
-      }
-      // Depois envia estado atual
+  _dbRef.once('value')
+    .then(function(snap){
+      var rec = snap.val();
+      if (rec && rec._ts) { _lastFBts = rec._ts; aplicarDados(rec); }
       return pushToFB();
     })
-    .then(function(){ render(); notify('✓ Sincronizado!', 'ok'); })
-    .catch(function(){ render(); notify('⚠ Sem conexão — dados locais', 'info'); });
+    .then(function(){ render(); notify('✓ Sincronizado!','ok'); })
+    .catch(function(e){ render(); notify('⚠ '+e.message,'info'); });
 }
 
 function initApp(){
@@ -2082,83 +2067,60 @@ function cancelVoice(){
 
 
 // ── SYNC EM TEMPO REAL (SSE Firebase) ─────────────────────────
-var _fbOk = null;
 function _silentSync() {
-  fetch(_FB_URL + _FB_PATH + '?t=' + Date.now())
-    .then(function(r){
-      if(!r.ok){ _fbOk=false; setSyncStatus('⚠ Pull Erro '+r.status,'var(--red)'); console.error('[FB PULL ERRO]',r.status); return null; }
-      _fbOk=true;
-      return r.json();
-    })
-    .then(function(rec){
-      if (!rec || typeof rec !== 'object' || !rec._ts) return;
+  _dbRef.once('value')
+    .then(function(snap) {
+      var rec = snap.val();
+      if (!rec || !rec._ts) return;
       if (rec._ts !== _lastFBts) {
-        console.log('[FB PULL] novo ts='+rec._ts+' (era '+_lastFBts+')');
+        console.log('[FB PULL] novo ts='+rec._ts);
         _lastFBts = rec._ts;
         aplicarDados(rec);
         render();
-        setSyncStatus('✓ Atualizado', 'var(--green)');
-        setTimeout(function(){ setSyncStatus('• Conectado','var(--green)'); }, 2000);
+        setSyncStatus('✓ Atualizado','var(--green)');
+        setTimeout(function(){ setSyncStatus('• Online','var(--green)'); },2000);
       }
     })
-    .catch(function(e){ _fbOk=false; setSyncStatus('⚠ Offline','var(--red)'); console.error('[FB PULL FALHOU]',e); });
+    .catch(function(e){ console.warn('[FB silentSync]',e.message); });
 }
 function startRealtimeSync() {
-  // Polling a cada 5s — garantido, independente de SSE
+  // Polling SDK como backup (3s)
   if (_pollId) clearInterval(_pollId);
-  _pollId = setInterval(_silentSync, 2000);
-  // SSE como bônus (atualizações instantâneas quando funciona)
-  if (_fbSSE) { try { _fbSSE.close(); } catch(e) {} _fbSSE = null; }
-  try {
-    _fbSSE = new EventSource(_FB_URL + _FB_PATH);
-    _fbSSE.addEventListener('put', function(e) {
-      try {
-        var p = JSON.parse(e.data);
-        var rec = p && p.data;
-        if (!rec || typeof rec !== 'object' || !rec._ts) return;
-        if (rec._ts !== _lastFBts) {
-          _lastFBts = rec._ts;
-          aplicarDados(rec); // Firebase vence — exclusões propagam
-          render();
-          setSyncStatus('✓ Ao vivo', 'var(--green)');
-          setTimeout(function(){ setSyncStatus('',''); }, 2000);
-        }
-      } catch(ex) {}
-    });
-    _fbSSE.addEventListener('patch', function(e) {
-      try {
-        var p = JSON.parse(e.data);
-        if (p && p.data) { aplicarDados(p.data); render(); }
-      } catch(ex) {}
-    });
-  } catch(ex) {} // SSE falhou — polling já cobre
+  _pollId = setInterval(_silentSync, 3000);
+  // Listener em tempo real via WebSocket (SDK) — instantâneo
+  _dbRef.off(); // limpar listeners anteriores
+  _dbRef.on('value', function(snap) {
+    var rec = snap.val();
+    if (!rec || !rec._ts) return;
+    if (rec._ts !== _lastFBts) {
+      console.log('[FB LIVE] ts='+rec._ts);
+      _lastFBts = rec._ts;
+      aplicarDados(rec);
+      render();
+      setSyncStatus('✓ Ao vivo','var(--green)');
+      setTimeout(function(){ setSyncStatus('• Online','var(--green)'); },2000);
+    }
+  }, function(err) {
+    console.warn('[FB listener erro]', err.message);
+  });
 }
 
 
 // ── DIAGNÓSTICO FIREBASE ────────────────────────────────────────
 function diagFB(){
-  notify('⟳ Testando Firebase...','info');
-  // Teste de leitura
-  fetch(_FB_URL + _FB_PATH + '?t=' + Date.now())
-    .then(function(r){
-      if(r.ok) return r.json().then(function(d){
-        var ts=d&&d._ts?new Date(d._ts).toLocaleTimeString('pt-BR'):'(sem ts)';
-        notify('✅ LEITURA OK — ts Firebase: '+ts,'ok');
-        console.log('[DIAG] Leitura OK, dados:', Object.keys(d||{}).length, 'chaves');
-      });
-      else { notify('❌ LEITURA FALHOU: HTTP '+r.status+' — verifique regras do Firebase','err'); console.error('[DIAG] HTTP',r.status); }
+  notify('⟳ Testando Firebase SDK...','info');
+  _dbRef.once('value')
+    .then(function(snap){
+      var d=snap.val();
+      var ts=d&&d._ts?new Date(d._ts).toLocaleTimeString('pt-BR'):'(vazio)';
+      notify('✅ LEITURA OK — Firebase: '+ts+', '+(d?Object.keys(d).length:0)+' chaves','ok');
+      console.log('[DIAG] Leitura OK',d);
     })
-    .catch(function(e){ notify('❌ LEITURA FALHOU: '+e.message,'err'); console.error('[DIAG]',e); });
-  // Teste de escrita
+    .catch(function(e){ notify('❌ LEITURA FALHOU: '+e.message,'err'); });
   setTimeout(function(){
-    var testDados={_ts:Date.now(),_diag:'test'};
-    fetch(_FB_URL+'/_diag_test.json',{method:'PUT',keepalive:true,headers:{'Content-Type':'application/json'},body:JSON.stringify(testDados)})
-      .then(function(r){
-        if(r.ok) notify('✅ ESCRITA OK — Firebase aceitou o dado','ok');
-        else notify('❌ ESCRITA FALHOU: HTTP '+r.status+' — verifique regras do Firebase','err');
-        console.log('[DIAG] Escrita HTTP',r.status);
-      })
-      .catch(function(e){ notify('❌ ESCRITA FALHOU: '+e.message,'err'); console.error('[DIAG WRITE]',e); });
+    _db.ref('_diag_test').set({ts:Date.now(),ok:true})
+      .then(function(){ notify('✅ ESCRITA OK — SDK WebSocket funcionando','ok'); })
+      .catch(function(e){ notify('❌ ESCRITA FALHOU: '+e.message,'err'); });
   },500);
 }
 
