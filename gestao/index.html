@@ -182,6 +182,7 @@ tr:hover td{background:var(--bg-hover)}
       </div>
       <button class="btn-ghost" onclick="window.print()">⎙ Imprimir</button>
       <button class="btn-ghost" onclick="syncManual()" style="border-color:var(--gold-dim);color:var(--gold)" title="Sincronizar dados com a nuvem">☁ Sync</button>
+      <button class="btn-ghost" onclick="diagFB()" style="font-size:10px;border-color:var(--border);color:var(--muted)" title="Testar conexão Firebase">🔧 Diagnóstico</button>
       <span id="sync-status" style="font-size:11px;color:var(--muted);min-width:100px;text-align:right"></span>
     </div>
     <div class="content" id="content"></div>
@@ -238,9 +239,9 @@ const today=()=>new Date().toISOString().slice(0,10);
 
 function sk(t){return`srcapas_${t}_${ST.empresa}_${ST.ano}_${String(ST.mes).padStart(2,'0')}`}
 function load(t){try{return JSON.parse(localStorage.getItem(sk(t))||'[]')}catch{return[]}}
-function save(t,d){localStorage.setItem(sk(t),JSON.stringify(d));flashSaved();scheduleSync()}
+function save(t,d){localStorage.setItem(sk(t),JSON.stringify(d));flashSaved();pushToFB();}
 function loadO(t){try{return JSON.parse(localStorage.getItem(sk(t))||'{}')}catch{return{}}}
-function saveO(t,d){localStorage.setItem(sk(t),JSON.stringify(d));flashSaved();scheduleSync()}
+function saveO(t,d){localStorage.setItem(sk(t),JSON.stringify(d));flashSaved();pushToFB();}
 
 // ── FIREBASE REALTIME DATABASE ─────────────────────────────
 const _FB_URL = 'https://grupofamiliaguerra-9d13e-default-rtdb.firebaseio.com';
@@ -267,8 +268,9 @@ function aplicarDados(rec) {
 }
 
 function scheduleSync() {
+  // Push imediato + debounce para não duplicar
   clearTimeout(_syncTimer);
-  _syncTimer = setTimeout(pushToFB, 500);
+  _syncTimer = setTimeout(pushToFB, 200);
 }
 
 function syncFromFB() {
@@ -308,11 +310,12 @@ function _coletaDados(ts) {
   } catch(e) {}
   return d;
 }
+var _pushPromise = null;
 function pushToFB() {
   var ts = Date.now();
   var dados = _coletaDados(ts);
   setSyncStatus('⟳ Salvando...', 'var(--amber)');
-  return fetch(_FB_URL + _FB_PATH, {
+  _pushPromise = fetch(_FB_URL + _FB_PATH, {
     method: 'PUT',
     keepalive: true,
     headers: { 'Content-Type': 'application/json' },
@@ -321,13 +324,22 @@ function pushToFB() {
   .then(function(r) {
     if (r.ok) {
       _lastFBts = ts;
+      _fbOk = true;
       setSyncStatus('✓ Salvo', 'var(--green)');
-      setTimeout(function() { setSyncStatus('', ''); }, 2000);
+      setTimeout(function() { setSyncStatus('• Conectado','var(--green)'); }, 2000);
+      console.log('[FB PUSH OK] ts='+ts);
     } else {
-      setSyncStatus('⚠ Erro ' + r.status, 'var(--red)');
+      _fbOk = false;
+      setSyncStatus('⚠ Push Erro '+r.status+' — veja console','var(--red)');
+      console.error('[FB PUSH ERRO]', r.status, r.statusText);
     }
   })
-  .catch(function() { setSyncStatus('• Offline', 'var(--dim)'); });
+  .catch(function(e) {
+    _fbOk = false;
+    setSyncStatus('⚠ Offline/CORS','var(--red)');
+    console.error('[FB PUSH FALHOU]', e);
+  });
+  return _pushPromise;
 }
 
 
@@ -866,7 +878,7 @@ function saveVerif(v){
   if(v.c!==undefined) localStorage.setItem(sk('verif_custos'), JSON.stringify(v.c));
   if(v.cred!==undefined) localStorage.setItem(sk('verif_cred'), JSON.stringify(v.cred));
   flashSaved();
-  scheduleSync();
+  pushToFB();
 }
 let showFF=false,showFC=false,filtroCusto='',showCrediario=false;
 
@@ -2067,25 +2079,31 @@ function cancelVoice(){
 
 
 // ── SYNC EM TEMPO REAL (SSE Firebase) ─────────────────────────
+var _fbOk = null;
 function _silentSync() {
   fetch(_FB_URL + _FB_PATH + '?t=' + Date.now())
-    .then(function(r){ return r.ok ? r.json() : null; })
+    .then(function(r){
+      if(!r.ok){ _fbOk=false; setSyncStatus('⚠ Pull Erro '+r.status,'var(--red)'); console.error('[FB PULL ERRO]',r.status); return null; }
+      _fbOk=true;
+      return r.json();
+    })
     .then(function(rec){
       if (!rec || typeof rec !== 'object' || !rec._ts) return;
       if (rec._ts !== _lastFBts) {
+        console.log('[FB PULL] novo ts='+rec._ts+' (era '+_lastFBts+')');
         _lastFBts = rec._ts;
-        aplicarDados(rec); // Firebase vence — exclusões propagam
+        aplicarDados(rec);
         render();
         setSyncStatus('✓ Atualizado', 'var(--green)');
-        setTimeout(function(){ setSyncStatus('',''); }, 2000);
+        setTimeout(function(){ setSyncStatus('• Conectado','var(--green)'); }, 2000);
       }
     })
-    .catch(function(){});
+    .catch(function(e){ _fbOk=false; setSyncStatus('⚠ Offline','var(--red)'); console.error('[FB PULL FALHOU]',e); });
 }
 function startRealtimeSync() {
   // Polling a cada 5s — garantido, independente de SSE
   if (_pollId) clearInterval(_pollId);
-  _pollId = setInterval(_silentSync, 3000);
+  _pollId = setInterval(_silentSync, 2000);
   // SSE como bônus (atualizações instantâneas quando funciona)
   if (_fbSSE) { try { _fbSSE.close(); } catch(e) {} _fbSSE = null; }
   try {
@@ -2111,6 +2129,34 @@ function startRealtimeSync() {
       } catch(ex) {}
     });
   } catch(ex) {} // SSE falhou — polling já cobre
+}
+
+
+// ── DIAGNÓSTICO FIREBASE ────────────────────────────────────────
+function diagFB(){
+  notify('⟳ Testando Firebase...','info');
+  // Teste de leitura
+  fetch(_FB_URL + _FB_PATH + '?t=' + Date.now())
+    .then(function(r){
+      if(r.ok) return r.json().then(function(d){
+        var ts=d&&d._ts?new Date(d._ts).toLocaleTimeString('pt-BR'):'(sem ts)';
+        notify('✅ LEITURA OK — ts Firebase: '+ts,'ok');
+        console.log('[DIAG] Leitura OK, dados:', Object.keys(d||{}).length, 'chaves');
+      });
+      else { notify('❌ LEITURA FALHOU: HTTP '+r.status+' — verifique regras do Firebase','err'); console.error('[DIAG] HTTP',r.status); }
+    })
+    .catch(function(e){ notify('❌ LEITURA FALHOU: '+e.message,'err'); console.error('[DIAG]',e); });
+  // Teste de escrita
+  setTimeout(function(){
+    var testDados={_ts:Date.now(),_diag:'test'};
+    fetch(_FB_URL+'/_diag_test.json',{method:'PUT',keepalive:true,headers:{'Content-Type':'application/json'},body:JSON.stringify(testDados)})
+      .then(function(r){
+        if(r.ok) notify('✅ ESCRITA OK — Firebase aceitou o dado','ok');
+        else notify('❌ ESCRITA FALHOU: HTTP '+r.status+' — verifique regras do Firebase','err');
+        console.log('[DIAG] Escrita HTTP',r.status);
+      })
+      .catch(function(e){ notify('❌ ESCRITA FALHOU: '+e.message,'err'); console.error('[DIAG WRITE]',e); });
+  },500);
 }
 
 // ── NOTIFICAÇÕES ──────────────────────────────────────────────
