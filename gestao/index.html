@@ -856,14 +856,15 @@ function delFi(key,id){
 
 // VERIFICAÇÃO
 function getVerif(){
-  // custos fixos = por mês; funcionários = global (não mudam com o mês)
   const custos=JSON.parse(localStorage.getItem(sk('verif_custos'))||'[]');
   const funs=JSON.parse(localStorage.getItem('srcapas_funcionarios_'+ST.empresa)||'[]');
-  return{f:funs,c:custos};
+  const creds=JSON.parse(localStorage.getItem(sk('verif_cred'))||'[]');
+  return{f:funs,c:custos,cred:creds};
 }
 function saveVerif(v){
   if(v.f!==undefined) localStorage.setItem('srcapas_funcionarios_'+ST.empresa, JSON.stringify(v.f));
   if(v.c!==undefined) localStorage.setItem(sk('verif_custos'), JSON.stringify(v.c));
+  if(v.cred!==undefined) localStorage.setItem(sk('verif_cred'), JSON.stringify(v.cred));
   flashSaved();
   scheduleSync();
 }
@@ -956,7 +957,7 @@ function renderVerif(){
   const fRows=funs.map(f=>{
     const bon=+f.bonificacao||0;
     const parcelas=parcelaCred(f.id);
-    const total=(+f.sal||0)+(+f.adi||0)+(+f.vale||0)+bon-parcelas;
+    const total=(+f.sal||0)-(+f.adi||0)-(+f.vale||0)+bon-parcelas;
     return`<tr>
       <td style="text-align:left;font-weight:500">${f.nome}</td>
       <td>${fmt(f.sal)}</td>
@@ -975,7 +976,7 @@ function renderVerif(){
   const totalF=funs.reduce((s,f)=>{
     const bon=+f.bonificacao||0;
     const parc=parcelaCred(f.id);
-    return s+(+f.sal||0)+(+f.adi||0)+(+f.vale||0)+bon-parc;
+    return s+(+f.sal||0)-(+f.adi||0)-(+f.vale||0)+bon-parc;
   },0);
 
   // Rows de custos
@@ -1222,7 +1223,7 @@ function toggleCusto(id){pagarCusto(id);}
 function renderDRE(){
   const t=calcTotais();
   const v=getVerif();
-  const pessoal=(v.f||[]).reduce((s,f)=>s+(+f.sal||0)+(+f.adi||0)+(+f.vale||0),0);
+  const pessoal=(v.f||[]).reduce((s,f)=>s+(+f.sal||0)+(+f.vale||0)+(+f.bonificacao||0),0);
   const custoFixo=(v.c||[]).reduce((s,c)=>s+(+c.val||0),0);
   const sa=load('saidas');
   const mkt=sa.filter(r=>r.cat==='Marketing').reduce((s,r)=>s+(+r.val||0),0);
@@ -1410,8 +1411,10 @@ function renderMarkup(){
     const diasAbrir=cfg.diasAbrir||26;
 
     // Markup atual
+    const fiMk=loadO('fin');
     let cAcc=0,vAcc=0;
-    en.forEach(r=>{cAcc+=(+r.cmv||0);vAcc+=(+r.din||0)+(+r.pix||0)+(+r.cart||0);});
+    en.forEach(r=>{cAcc+=(+r.cmv||0);vAcc+=(+r.din||0)+(+r.pix||0)+(+r.cart||0)+(+r.rend||0);});
+    PARCEIROS.forEach(p=>{const k=p.toLowerCase().replace(/\s+/g,'_');vAcc+=(fiMk[k]||[]).reduce((s,r)=>s+(+r.vv||0),0);});
     const pctAtual=cAcc>0&&vAcc>0?vAcc/(2*cAcc):1.0;
     const metaMes=metaDigitada>0&&pctAtual>0?metaDigitada/(pctAtual/(1+pctAtual)):metaDigitada;
 
@@ -1420,6 +1423,9 @@ function renderMarkup(){
     const hoje=new Date();
     const gastosDia={};
     sa.forEach(r=>{if(r.data&&r.val)gastosDia[r.data]=(gastosDia[r.data]||0)+(+r.val||0)});
+    // financeiras por dia de venda
+    const finDia={};
+    PARCEIROS.forEach(p=>{const k=p.toLowerCase().replace(/\s+/g,'_');(fiMk[k]||[]).forEach(r=>{if(r.dv&&r.vv)finDia[r.dv]=(finDia[r.dv]||0)+(+r.vv||0);});});
     let cmvAcc2=0,vendaAcc=0,taxasAcc=0,gastosAcc=0;
     const diasAbertos=[];
     const tblRows=[];
@@ -1430,10 +1436,11 @@ function renderMarkup(){
       const isSun=dataObj.getDay()===0;
       const isFuture=dataObj>hoje;
       const enDia=en.find(r=>r.data===dt);
-      if(!isSun&&enDia){
-        cmvAcc2+=(+enDia.cmv||0);
-        vendaAcc+=(+enDia.din||0)+(+enDia.pix||0)+(+enDia.cart||0)+(+enDia.rend||0);
-        taxasAcc+=(+enDia.tpix||0)+(+enDia.tcart||0);
+      const temFin=finDia[dt]>0;
+      if(!isSun&&(enDia||temFin)){
+        cmvAcc2+=enDia?(+enDia.cmv||0):0;
+        vendaAcc+=(enDia?((+enDia.din||0)+(+enDia.pix||0)+(+enDia.cart||0)+(+enDia.rend||0)):0)+(finDia[dt]||0);
+        taxasAcc+=enDia?((+enDia.tpix||0)+(+enDia.tcart||0)):0;
         gastosAcc+=gastosDia[dt]||0;
         diasAbertos.push(dt);
       }
@@ -1455,10 +1462,11 @@ function renderMarkup(){
     const maxV=Math.max(...vendDiaria.map(r=>r.vendaAcc-(tblRows[tblRows.indexOf(r)-1]?.vendaAcc||0)),1);
     // Barras com valor exibido
     const vendasDiariaArr=[];
+    const diasAbertosSet=new Set(diasAbertos);
     tblRows.forEach((r,idx)=>{
-      if(r.isSun||!r.enDia)return;
+      if(r.isSun||!diasAbertosSet.has(r.dt))return;
       const ant=idx>0?tblRows[idx-1]:null;
-      const diario=r.vendaAcc-(ant&&!ant.isSun&&ant.enDia?ant.vendaAcc:0);
+      const diario=r.vendaAcc-(ant&&diasAbertosSet.has(ant.dt)?ant.vendaAcc:0);
       if(diario>0)vendasDiariaArr.push({d:r.d,v:diario});
     });
     const maxV2=Math.max(...vendasDiariaArr.map(r=>r.v),1);
