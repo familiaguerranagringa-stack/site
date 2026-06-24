@@ -254,6 +254,7 @@ firebase.initializeApp({
   projectId:'grupofamiliaguerra-9d13e'
 });
 const _db=firebase.database();
+try{_db.setPersistenceEnabled(true);}catch(e){} // dados sobrevivem reload
 const _dbRef=_db.ref('srcapas/bacaxa');
 let _syncTimer = null, _lastFBts = 0, _pollId = null, _fbSSE = null;
 
@@ -855,10 +856,26 @@ function delFi(key,id){
 }
 
 // VERIFICAÇÃO
+function getFunsMes(){
+  // dados financeiros mensais por funcionário
+  return JSON.parse(localStorage.getItem(sk('func_mes'))||'{}');
+}
+function saveFunMes(funMes){
+  localStorage.setItem(sk('func_mes'), JSON.stringify(funMes));
+}
 function getVerif(){
   const custos=JSON.parse(localStorage.getItem(sk('verif_custos'))||'[]');
-  const funs=JSON.parse(localStorage.getItem('srcapas_funcionarios_'+ST.empresa)||'[]');
+  const funsGlobal=JSON.parse(localStorage.getItem('srcapas_funcionarios_'+ST.empresa)||'[]');
   const creds=JSON.parse(localStorage.getItem('srcapas_creds_'+ST.empresa)||'[]');
+  const funMes=getFunsMes();
+  // Migrar dados antigos: se global tem sal/adi/vale e mensal está vazio, migrar
+  funsGlobal.forEach(f=>{
+    if(!funMes[f.id] && (f.sal||f.adi||f.vale||f.bonificacao)){
+      funMes[f.id]={sal:f.sal||0,adi:f.adi||0,vale:f.vale||0,bonificacao:f.bonificacao||0,st:f.st||'PENDENTE'};
+    }
+  });
+  // Mesclar: base global + dados do mês
+  const funs=funsGlobal.map(f=>({...f,...(funMes[f.id]||{sal:0,adi:0,vale:0,bonificacao:0,st:'PENDENTE'})}));
   return{f:funs,c:custos,cred:creds};
 }
 function saveVerif(v){
@@ -896,6 +913,24 @@ async function lerArquivo(file){
     reader.readAsDataURL(file);
   });
 }
+
+function trocarAnexo(custoId, campo){
+  const input=document.createElement('input');
+  input.type='file';
+  input.accept='image/*,.pdf';
+  input.onchange=async function(){
+    if(!input.files[0])return;
+    try{
+      const anx=await lerArquivo(input.files[0]);
+      const v=getVerif();
+      const cu=(v.c||[]).find(x=>x.id===custoId);
+      if(!cu){notify('Custo não encontrado','err');return;}
+      cu[campo]=anx;
+      saveVerif(v);renderVerif();notify('Arquivo substituído com sucesso!','ok');
+    }catch(e){notify(e.message,'err');}
+  };
+  input.click();
+}
 function verAnexo(b64,nome,tipo){
   const m=document.createElement('div');
   m.className='modal-bg';
@@ -916,11 +951,13 @@ function verAnexo(b64,nome,tipo){
   m.addEventListener('click',e=>{if(e.target===m)m.remove();});
   document.body.appendChild(m);
 }
-function iconAnexo(anexo){
-  if(!anexo)return'';
+function iconAnexo(anexo, custoId, campo){
+  if(!anexo)return custoId?`<button class="btn-sm" onclick="trocarAnexo('${custoId}','${campo}')" style="font-size:10px">📎 Anexar</button>`:'';
   const ico=anexo.tipo&&anexo.tipo.includes('pdf')?'📄':'🖼';
-  const nomeCorto=anexo.nome.slice(0,18)+(anexo.nome.length>18?'...':'');
-  return`<span style="font-size:11px;color:var(--green);cursor:pointer;text-decoration:underline" onclick="verAnexo('${anexo.b64}','${anexo.nome}','${anexo.tipo||''}')" title="Clique para visualizar">${ico} ${nomeCorto}</span>`;
+  const nomeCorto=anexo.nome.slice(0,14)+(anexo.nome.length>14?'...':'');
+  const verBtn=`<span style="font-size:11px;color:var(--green);cursor:pointer;text-decoration:underline" onclick="verAnexo('${anexo.b64}','${anexo.nome}','${anexo.tipo||''}')" title="Ver arquivo">${ico} ${nomeCorto}</span>`;
+  const trocarBtn=custoId?` <button class="btn-sm" onclick="trocarAnexo('${custoId}','${campo}')" style="font-size:10px;margin-left:4px" title="Trocar arquivo">🔄</button>`:'';
+  return verBtn+trocarBtn;
 }
 
 // ── VERIFICAÇÃO MENSAL ──────────────────────────────────────
@@ -993,7 +1030,7 @@ function renderVerif(){
   const cRows=custos.map(cu=>`<tr>
     <td style="text-align:left">
       ${cu.nome}${vencBadge(cu)}
-      <div style="margin-top:2px">${iconAnexo(cu.boleto)}${cu.comprovante?'<span style="margin-left:8px">'+iconAnexo(cu.comprovante)+'</span>':''}</div>
+      <div style="margin-top:2px">${iconAnexo(cu.boleto,cu.id,'boleto')}${cu.comprovante?'<span style="margin-left:8px">'+iconAnexo(cu.comprovante,cu.id,'comprovante')+'</span>':iconAnexo(null,cu.id,'comprovante')}</div>
     </td>
     <td>${fmt(cu.val)}</td>
     <td style="font-family:'Syne',sans-serif;font-size:11px;color:var(--muted)">${cu.venc?new Date(cu.venc+'T12:00:00').toLocaleDateString('pt-BR'):'—'}</td>
@@ -1115,15 +1152,25 @@ function addFun(){
 }
 function editFun(id){
   const v=getVerif();const f=v.f.find(x=>x.id===id);if(!f)return;
-  const stO=['PENDENTE','PAGO','VENCIDO'].map(x=>`<option value="${x}"${f.st===x?' selected':''}>${x}</option>`).join('');
   showEditModal('Editar Funcionário',[
     {id:'nome',label:'Nome',type:'text',value:f.nome},
-    {id:'sal',label:'Salário R$',type:'number',value:f.sal||''},
-    {id:'adi',label:'Adiantamento R$',type:'number',value:f.adi||''},
-    {id:'vale',label:'Vales R$',type:'number',value:f.vale||''},
-    {id:'bonificacao',label:'Bonificação R$',type:'number',value:f.bonificacao||''},
+    {id:'sal',label:'Salário R$ (este mês)',type:'number',value:f.sal||''},
+    {id:'adi',label:'Adiantamento R$ (este mês)',type:'number',value:f.adi||''},
+    {id:'vale',label:'Vales R$ (este mês)',type:'number',value:f.vale||''},
+    {id:'bonificacao',label:'Bonificação R$ (este mês)',type:'number',value:f.bonificacao||''},
     {id:'st',label:'Status',type:'select',value:f.st,options:['PENDENTE','PAGO','VENCIDO'].map(x=>({v:x,l:x}))},
-  ],vals=>{Object.assign(f,vals);saveVerif(v);notify('Funcionário atualizado!','ok');renderVerif();});
+  ],vals=>{
+    // Nome → global
+    const funsGlobal=JSON.parse(localStorage.getItem('srcapas_funcionarios_'+ST.empresa)||'[]');
+    const fg=funsGlobal.find(x=>x.id===id);
+    if(fg)fg.nome=vals.nome;
+    localStorage.setItem('srcapas_funcionarios_'+ST.empresa,JSON.stringify(funsGlobal));
+    // Sal/adi/vale/bon/st → mensal
+    const funMes=getFunsMes();
+    funMes[id]={sal:+vals.sal||0,adi:+vals.adi||0,vale:+vals.vale||0,bonificacao:+vals.bonificacao||0,st:vals.st||'PENDENTE'};
+    saveFunMes(funMes);
+    pushToFB();notify('Funcionário atualizado para '+['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'][ST.mes-1]+'!','ok');renderVerif();
+  });
 }
 
 // ── FUNÇÕES DE CUSTO FIXO ──────────────────────────────────
