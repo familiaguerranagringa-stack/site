@@ -1034,6 +1034,7 @@ function renderVerif(){
     </td>
     <td>${fmt(cu.val)}</td>
     <td style="font-family:'Syne',sans-serif;font-size:11px;color:var(--muted)">${cu.venc?new Date(cu.venc+'T12:00:00').toLocaleDateString('pt-BR'):'—'}</td>
+    <td style="font-size:11px;color:${cu.dataPagamento?'var(--green)':'var(--dim)'}">${cu.dataPagamento?new Date(cu.dataPagamento+'T12:00:00').toLocaleDateString('pt-BR'):'—'}</td>
     <td>${cu.forma||'—'}</td>
     <td><span class="badge ${cu.st==='PAGO'?'b-ok':cu.st==='VENCIDO'?'b-late':'b-pend'}">${cu.st||'PENDENTE'}</span></td>
     <td style="font-size:11px;color:var(--dim);text-align:left">${cu.obs||''}</td>
@@ -1111,7 +1112,7 @@ function renderVerif(){
     <button class="btn-gold" onclick="addCusto()">Salvar Custo Fixo</button>
   </div>`:''}
   ${custos.length?`<div class="tbl-wrap"><table>
-    <tr><th style="text-align:left">Descrição</th><th>Valor</th><th>Vencimento</th><th>Forma</th><th>Status</th><th style="text-align:left">Obs.</th><th>Ações</th></tr>
+    <tr><th style="text-align:left">Descrição</th><th>Valor</th><th>Vencimento</th><th>Pago em</th><th>Forma</th><th>Status</th><th style="text-align:left">Obs.</th><th>Ações</th></tr>
     ${cRows}
     <tr class="tfoot"><td>TOTAL</td><td class="neg">${fmt(totalC)}</td><td colspan="2">Pago: <span class="pos">${fmt(pagosC)}</span></td><td>Pendente: <span class="gold">${fmt(pendentesC)}</span></td><td colspan="2"></td></tr>
   </table></div>`:'<div class="empty" style="padding:20px">📋 Nenhum custo fixo.</div>'}
@@ -1218,7 +1219,7 @@ async function confirmarPagto(id, btn){
     const comprovante=await lerArquivo(fileInput.files[0]);
     const v=getVerif();
     const cu=(v.c||[]).find(c=>c.id===id);
-    if(cu){cu.st='PAGO';cu.comprovante=comprovante;}
+    if(cu){cu.st='PAGO';cu.comprovante=comprovante;cu.dataPagamento=today();}
     saveVerif(v);
     document.querySelector('.modal-bg').remove();
     renderVerif();
