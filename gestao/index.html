@@ -256,7 +256,7 @@ firebase.initializeApp({
 const _db=firebase.database();
 try{_db.setPersistenceEnabled(true);}catch(e){} // dados sobrevivem reload
 const _dbRef=_db.ref('srcapas/bacaxa');
-let _syncTimer = null, _lastFBts = 0, _pollId = null, _fbSSE = null;
+let _syncTimer = null, _lastFBts = 0, _pollId = null, _fbSSE = null, _pushInProgress = false;
 
 function setSyncStatus(msg, cor) {
   try {
@@ -322,14 +322,17 @@ function pushToFB() {
   var dados = _coletaDados(ts);
   if (Object.keys(dados).length <= 1) return Promise.resolve();
   setSyncStatus('⟳ Salvando...', 'var(--amber)');
+  _pushInProgress = true;
   return _dbRef.set(dados)
     .then(function() {
+      _pushInProgress = false;
       _lastFBts = ts;
       setSyncStatus('✓ Salvo', 'var(--green)');
       setTimeout(function() { setSyncStatus('• Online','var(--green)'); }, 2000);
       console.log('[FB PUSH OK] ts='+ts);
     })
     .catch(function(e) {
+      _pushInProgress = false;
       setSyncStatus('⚠ '+e.message,'var(--red)');
       notify('Erro ao salvar: '+e.message,'err');
       console.error('[FB PUSH FALHOU]', e.message);
@@ -505,7 +508,9 @@ function renderEntradas(){
       <div class="fl"><label>PIX (bruto) R$</label><input class="fi" type="number" step="0.01" id="e-pix" placeholder="0,00" onkeydown="enterNext(event,'e-tpix')"></div>
       <div class="fl"><label>Taxa PIX R$</label><input class="fi" type="number" step="0.01" id="e-tpix" placeholder="0,00" onkeydown="enterNext(event,'e-cart')"></div>
       <div class="fl"><label>Cartão PagBank R$</label><input class="fi" type="number" step="0.01" id="e-cart" placeholder="0,00" onkeydown="enterNext(event,'e-tcart')"></div>
-      <div class="fl"><label>Taxa Cartão R$</label><input class="fi" type="number" step="0.01" id="e-tcart" placeholder="0,00" onkeydown="enterNext(event,'e-rend')"></div>
+      <div class="fl"><label>Taxa PagBank R$</label><input class="fi" type="number" step="0.01" id="e-tcart" placeholder="0,00" onkeydown="enterNext(event,'e-getnet')"></div>
+      <div class="fl"><label>Cartão GetNet R$</label><input class="fi" type="number" step="0.01" id="e-getnet" placeholder="0,00" onkeydown="enterNext(event,'e-tgetnet')"></div>
+      <div class="fl"><label>Taxa GetNet R$</label><input class="fi" type="number" step="0.01" id="e-tgetnet" placeholder="0,00" onkeydown="enterNext(event,'e-rend')"></div>
       <div class="fl"><label>Rendimento R$</label><input class="fi" type="number" step="0.01" id="e-rend" placeholder="0,00" onkeydown="enterNext(event,'e-cred')"></div>
       <div class="fl"><label>Crediário Funcionário R$</label><input class="fi" type="number" step="0.01" id="e-cred" placeholder="0,00" onkeydown="enterNext(event,'e-cmv')"></div>
       <div class="fl"><label>CMV do Dia R$ <span style="font-size:9px;color:var(--gold)">custo merc. vendida</span></label><input class="fi" type="number" step="0.01" id="e-cmv" placeholder="0,00" onkeydown="enterNext(event,'e-obs')"></div>
@@ -515,7 +520,7 @@ function renderEntradas(){
   </div>`;
 
   if(data.length){
-    let tDin=0,tPix=0,tCart=0,tTp=0,tTc=0,tG=0,tTaxaTotal=0,tCmvTotal=0;
+    let tDin=0,tPix=0,tCart=0,tTp=0,tTc=0,tGetnet=0,tTgetnet=0,tG=0,tTaxaTotal=0,tCmvTotal=0;
     // Financeiras por data para somar no total bruto
     const fi=loadO('fin');
     const finPorData={};
@@ -527,9 +532,9 @@ function renderEntradas(){
       const sub=(+r.din||0)+(+r.pix||0)+(+r.cart||0)+(+r.rend||0)+(+r.cred||0);
       const finDia=finPorData[r.data]||0;
       const totalBruto=sub+finDia;
-      const taxa=(+r.tpix||0)+(+r.tcart||0);
+      const taxa=(+r.tpix||0)+(+r.tcart||0)+(+r.tgetnet||0);
       const cmvDia=+r.cmv||0;
-      tDin+=(+r.din||0);tPix+=(+r.pix||0);tCart+=(+r.cart||0);tTp+=(+r.tpix||0);tTc+=(+r.tcart||0);tG+=totalBruto;tTaxaTotal+=taxa;tCmvTotal+=cmvDia;
+      tDin+=(+r.din||0);tPix+=(+r.pix||0);tCart+=(+r.cart||0);tTp+=(+r.tpix||0);tTc+=(+r.tcart||0);tGetnet+=(+r.getnet||0);tTgetnet+=(+r.tgetnet||0);tG+=totalBruto;tTaxaTotal+=taxa;tCmvTotal+=cmvDia;
       const d=new Date(r.data+'T12:00:00');
       return `<tr>
         <td style="font-family:'Syne',sans-serif;font-size:11px;font-weight:600;color:var(--muted)">${d.toLocaleDateString('pt-BR',{weekday:'short',day:'2-digit',month:'2-digit'})}</td>
@@ -548,9 +553,9 @@ function renderEntradas(){
     }).join('');
     h+=`<div class="sec-hdr"><h2>Lançamentos — ${MESES[ST.mes-1]} ${ST.ano}</h2><div class="sec-line"></div></div>
     <div class="tbl-wrap"><table>
-      <tr><th>Data</th><th>Dinheiro</th><th>PIX</th><th>Cartão</th><th>Total Taxas</th><th>CMV Dia</th><th style="text-align:left">Obs.</th><th>Total Bruto</th><th></th></tr>
+      <tr><th>Data</th><th>Dinheiro</th><th>PIX</th><th>PagBank</th><th>GetNet</th><th>Total Taxas</th><th>CMV Dia</th><th style="text-align:left">Obs.</th><th>Total Bruto</th><th></th></tr>
       ${rows}
-      <tr class="tfoot"><td>TOTAL</td><td class="pos">${fmt(tDin)}</td><td class="pos">${fmt(tPix)}</td><td class="pos">${fmt(tCart)}</td><td class="neg">${fmt(tTaxaTotal)}</td><td class="neg">${fmt(tCmvTotal)}</td><td></td><td class="gold">${fmt(tG)}</td><td></td></tr>
+      <tr class="tfoot"><td>TOTAL</td><td class="pos">${fmt(tDin)}</td><td class="pos">${fmt(tPix)}</td><td class="pos">${fmt(tCart)}</td><td class="pos">${fmt(tGetnet)}</td><td class="neg">${fmt(tTaxaTotal)}</td><td class="neg">${fmt(tCmvTotal)}</td><td></td><td class="gold">${fmt(tG)}</td><td></td></tr>
     </table></div>`;
   } else {
     h+=`<div class="empty">📈 <div>Sem entradas lançadas. Use o formulário acima ou o microfone 🎤</div></div>`;
@@ -561,7 +566,7 @@ function addEntrada(){
   const data=load('entradas');
   const dt=document.getElementById('e-dt').value;
   if(!dt){notify('Selecione a data','err');return}
-  data.push({id:uuid(),data:dt,din:+document.getElementById('e-din').value||0,pix:+document.getElementById('e-pix').value||0,tpix:+document.getElementById('e-tpix').value||0,cart:+document.getElementById('e-cart').value||0,tcart:+document.getElementById('e-tcart').value||0,ms:0,rend:+document.getElementById('e-rend').value||0,cred:+document.getElementById('e-cred').value||0,cmv:+document.getElementById('e-cmv').value||0,obs:document.getElementById('e-obs').value});
+  data.push({id:uuid(),data:dt,din:+document.getElementById('e-din').value||0,pix:+document.getElementById('e-pix').value||0,tpix:+document.getElementById('e-tpix').value||0,cart:+document.getElementById('e-cart').value||0,tcart:+document.getElementById('e-tcart').value||0,getnet:+document.getElementById('e-getnet').value||0,tgetnet:+document.getElementById('e-tgetnet').value||0,ms:0,rend:+document.getElementById('e-rend').value||0,cred:+document.getElementById('e-cred').value||0,cmv:+document.getElementById('e-cmv').value||0,obs:document.getElementById('e-obs').value});
   data.sort((a,b)=>a.data.localeCompare(b.data));
   save('entradas',data);notify('Entrada registrada!','ok');renderEntradas();
 }
@@ -615,7 +620,9 @@ function editEntrada(id){
     {id:'pix',label:'PIX (bruto) R$',type:'number',value:r.pix||''},
     {id:'tpix',label:'Taxa PIX R$',type:'number',value:r.tpix||''},
     {id:'cart',label:'Cartão PagBank R$',type:'number',value:r.cart||''},
-    {id:'tcart',label:'Taxa Cartão R$',type:'number',value:r.tcart||''},
+    {id:'tcart',label:'Taxa PagBank R$',type:'number',value:r.tcart||''},
+    {id:'getnet',label:'Cartão GetNet R$',type:'number',value:r.getnet||''},
+    {id:'tgetnet',label:'Taxa GetNet R$',type:'number',value:r.tgetnet||''},
     {id:'rend',label:'Rendimento R$',type:'number',value:r.rend||''},
     {id:'cred',label:'Crediário Funcionário R$',type:'number',value:r.cred||''},
     {id:'cmv',label:'CMV do Dia R$',type:'number',value:r.cmv||''},
@@ -835,13 +842,38 @@ function calcVrAuto(){
 
 function marcarRecebido(key,id){
   const fi=loadO('fin');
-  const r=(fi[key]||[]).find(r=>r.id===id);
+  const r=(fi[key]||[]).find(x=>x.id===id);
   if(!r)return;
-  r.vr=parseFloat(r.vv||0)-parseFloat(r.tx||0);
-  r.dr=today();
+  const vrDef=((+r.vv||0)-(+r.tx||0)).toFixed(2);
+  const m=document.createElement('div');m.className='modal-bg';
+  const div=document.createElement('div');div.className='modal';
+  div.innerHTML=`<h2>✓ Registrar Recebimento</h2>
+    <div class="fl" style="margin-bottom:12px">
+      <label>Data de Recebimento</label>
+      <input class="fi" type="date" id="fin-dr" value="${today()}" style="max-width:200px">
+    </div>
+    <div class="fl" style="margin-bottom:16px">
+      <label>Valor Recebido R$</label>
+      <input class="fi" type="number" step="0.01" id="fin-vr" value="${vrDef}">
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn-gold" style="flex:1" onclick="confirmarRecebimento('${key}','${id}',this)">✓ Confirmar</button>
+      <button class="btn-ghost" onclick="this.closest('.modal-bg').remove()">Cancelar</button>
+    </div>`;
+  m.appendChild(div);document.body.appendChild(m);
+}
+function confirmarRecebimento(key,id,btn){
+  const dr=document.getElementById('fin-dr').value;
+  const vr=parseFloat(document.getElementById('fin-vr').value)||0;
+  if(!dr){notify('Informe a data de recebimento','err');return;}
+  btn.textContent='Aguarde...';btn.disabled=true;
+  const fi=loadO('fin');
+  const r=(fi[key]||[]).find(x=>x.id===id);
+  if(r){r.vr=vr;r.dr=dr;}
   saveO('fin',fi);
-  notify('✓ Recebimento registrado — '+fmt(r.vr),'ok');
+  document.querySelector('.modal-bg').remove();
   renderFin();
+  notify('✓ Recebimento em '+new Date(dr+'T12:00:00').toLocaleDateString('pt-BR')+' — '+fmt(vr),'ok');
 }
 function addFi(key){
   const fi=loadO('fin');const arr=fi[key]||[];
@@ -1052,13 +1084,24 @@ function renderVerif(){
   // Rows de crediários
   const credRows=creds.map(cr=>{
     const fun=funs.find(f=>f.id===cr.funId);
+    // Calcular parcelas restantes no mês atual
+    let restantes=+cr.parcelas||1;
+    if(cr.dataInicio&&cr.st==='ativo'){
+      const ini=new Date(cr.dataInicio+'T12:00:00');
+      const meses=(ST.ano-ini.getFullYear())*12+(ST.mes-(ini.getMonth()+1));
+      restantes=Math.max(0,(+cr.parcelas||1)-meses);
+    }
+    const parcelaAtiva=cr.st==='ativo'&&restantes>0;
     return`<tr>
       <td style="text-align:left">${cr.desc||'—'}</td>
       <td>${fun?fun.nome:'—'}</td>
       <td>${fmt(cr.valorTotal)}</td>
-      <td>${cr.parcelas}x</td>
+      <td style="font-size:11px">
+        <span style="color:var(--gold);font-weight:700">${restantes}x</span>
+        <span style="color:var(--dim)"> / ${cr.parcelas}x total</span>
+      </td>
       <td class="neg">${fmt(cr.valorParcela)}/mês</td>
-      <td><span class="badge ${cr.st==='ativo'?'b-pend':'b-ok'}">${cr.st==='ativo'?'ATIVO':'QUITADO'}</span></td>
+      <td><span class="badge ${parcelaAtiva?'b-pend':cr.st==='ativo'?'b-ok':'b-ok'}">${parcelaAtiva?'ATIVO':restantes===0&&cr.st==='ativo'?'QUITADO':'QUITADO'}</span></td>
       <td style="white-space:nowrap">
         ${cr.st==='ativo'?`<button class="btn-sm btn-ok" onclick="quitarCred('${cr.id}')" style="margin-right:4px">✓ Quitar</button>`:''}
         <button class="btn-sm" onclick="delVi('cred','${cr.id}')">×</button>
@@ -1471,7 +1514,7 @@ function renderMarkup(){
     // Markup atual
     const fiMk=loadO('fin');
     let cAcc=0,vAcc=0;
-    en.forEach(r=>{cAcc+=(+r.cmv||0);vAcc+=(+r.din||0)+(+r.pix||0)+(+r.cart||0)+(+r.rend||0);});
+    en.forEach(r=>{cAcc+=(+r.cmv||0);vAcc+=(+r.din||0)+(+r.pix||0)+(+r.cart||0)+(+r.getnet||0)+(+r.rend||0);});
     PARCEIROS.forEach(p=>{const k=p.toLowerCase().replace(/\s+/g,'_');vAcc+=(fiMk[k]||[]).reduce((s,r)=>s+(+r.vv||0),0);});
     const pctAtual=cAcc>0&&vAcc>0?vAcc/(2*cAcc):1.0;
     const metaMes=metaDigitada>0&&pctAtual>0?metaDigitada/(pctAtual/(1+pctAtual)):metaDigitada;
@@ -1503,8 +1546,8 @@ function renderMarkup(){
       const temFin=finDia[dt]>0;
       if(!isSun&&(enDia||temFin)){
         cmvAcc2+=enDia?(+enDia.cmv||0):0;
-        vendaAcc+=(enDia?((+enDia.din||0)+(+enDia.pix||0)+(+enDia.cart||0)+(+enDia.rend||0)):0)+(finDia[dt]||0);
-        taxasAcc+=(enDia?((+enDia.tpix||0)+(+enDia.tcart||0)):0)+(taxDia[dt]||0);
+        vendaAcc+=(enDia?((+enDia.din||0)+(+enDia.pix||0)+(+enDia.cart||0)+(+enDia.getnet||0)+(+enDia.rend||0)):0)+(finDia[dt]||0);
+        taxasAcc+=(enDia?((+enDia.tpix||0)+(+enDia.tcart||0)+(+enDia.tgetnet||0)):0)+(taxDia[dt]||0);
         gastosAcc+=gastosDia[dt]||0;
         diasAbertos.push(dt);
       }
@@ -2160,7 +2203,7 @@ function startRealtimeSync() {
   _dbRef.on('value', function(snap) {
     var rec = snap.val();
     if (!rec || !rec._ts) return;
-    if (rec._ts !== _lastFBts) {
+    if (rec._ts !== _lastFBts && !_pushInProgress) {
       console.log('[FB LIVE] ts='+rec._ts);
       _lastFBts = rec._ts;
       aplicarDados(rec);
