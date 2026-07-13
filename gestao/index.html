@@ -1324,103 +1324,127 @@ function toggleCusto(id){pagarCusto(id);}
 function renderDRE(){
   const t=calcTotais();
   const v=getVerif();
+  const sa=t.sa;
+
+  // ── Verificação Mensal (pessoal + custos fixos PAGOS)
   const pessoal=(v.f||[]).reduce((s,f)=>s+(+f.sal||0)+(+f.vale||0)+(+f.bonificacao||0),0);
-  const custoFixo=(v.c||[]).reduce((s,c)=>s+(+c.val||0),0);
-  const sa=load('saidas');
-  const mkt=sa.filter(r=>r.cat==='Marketing').reduce((s,r)=>s+(+r.val||0),0);
-  const sOp=sa.filter(r=>r.cat==='Despesa Operacional').reduce((s,r)=>s+(+r.val||0),0);
-  const trib=sa.filter(r=>r.cat==='Tributo').reduce((s,r)=>s+(+r.val||0),0);
-  const totalDOp=pessoal+custoFixo+mkt+sOp+trib;
-  // CMV diário das entradas separado de compras
-  const cmvDiario=load('entradas').reduce((s,r)=>s+(+r.cmv||0),0);
-  const cmvCompras=t.compras; // só compras da aba saídas
-  const lb=t.fat-t.taxas-cmvDiario-cmvCompras;
-  const ebitda=lb-totalDOp;
-  const res=ebitda-(t.erros+t.perdas);
-  // Saldo de Recompra
-  const saldoRc=cmvDiario-cmvCompras+t.perdas;
+  const custoFixoPago=(v.c||[]).filter(c=>c.st==='PAGO').reduce((s,c)=>s+(+c.val||0),0);
+  const verifMensal=pessoal+custoFixoPago;
 
-  const row=(l,val,cls='')=>`<div class="dre-row"><div class="dre-l">${l}</div><div class="dre-v ${cls}">${fmt(val)}</div></div>`;
-  const hdr=l=>`<div class="dre-row dre-hdr"><div class="dre-l">${l}</div><div class="dre-v"></div></div>`;
-  const sub=(l,val)=>`<div class="dre-row dre-sub"><div class="dre-l">${l}</div><div class="dre-v ${vc(val)}">${fmt(val)}</div></div>`;
+  // ── Saídas: banco = tudo exceto compras (excl. verificação mensal q é separada)
+  const bancoSaidas=sa.filter(r=>r.cat!=='Compra Mercadoria').reduce((s,r)=>s+(+r.val||0),0);
+  const totalSaidas=verifMensal+bancoSaidas+t.compras;
 
-  const h=`<div style="display:grid;grid-template-columns:1fr 260px;gap:16px;align-items:start">
-  <div>
-    <div style="margin-bottom:16px">
-      <div style="font-size:10px;letter-spacing:.15em;text-transform:uppercase;color:var(--gold);margin-bottom:4px">SR. CAPAS · Bacaxá / Saquarema</div>
-      <div style="font-family:'Syne',sans-serif;font-size:22px;font-weight:800">${MESES[ST.mes-1]} ${ST.ano}</div>
-    </div>
-    <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden">
-    ${hdr('RECEITA OPERACIONAL BRUTA')}
-    ${row('Dinheiro',t.din,'pos')}
-    ${row('PIX (bruto)',t.pix,'pos')}
-    ${row('Cartão PagBank (bruto)',t.cart,'pos')}
-    ${row('Financeiras — total vendido',t.finVendas,'pos')}
-    ${row('Rendimentos',t.rend,'pos')}
-    ${sub('TOTAL FATURAMENTO BRUTO',t.fat)}
-    ${hdr('DEDUÇÕES')}
-    ${row('Taxas PIX + Cartão + Financeiras',-t.taxas,'neg')}
-    ${row('CMV Diário (Entradas)',-cmvDiario,'neg')}
-    ${sub('RECEITA APÓS DEDUÇÕES',t.fat-t.taxas-cmvDiario)}
-    ${hdr('CMV — COMPRAS')}
-    ${row('Compras registradas (Saídas)',-cmvCompras,'neg')}
-    ${sub('LUCRO BRUTO',lb)}
-    ${hdr('DESPESAS OPERACIONAIS')}
-    ${row('Pessoal (Salários, Vales, Adiant.)',-pessoal,'neg')}
-    ${row('Custos Fixos (Aluguel, Luz, Internet...)',-custoFixo,'neg')}
-    ${row('Marketing e Publicidade',-mkt,'neg')}
-    ${row('Serviços / Despesas Operacionais',-sOp,'neg')}
-    ${row('Tributos',-trib,'neg')}
-    ${sub('RESULTADO OPERACIONAL (EBITDA)',ebitda)}
-    ${hdr('AJUSTES')}
-    ${row('Erros de Caixa',-t.erros,'neg')}
-    ${row('Perdas',-t.perdas,'neg')}
-    <div class="dre-row dre-final"><div class="dre-l">RESULTADO LÍQUIDO DO MÊS</div><div class="dre-v ${res>=0?'pos':'neg'}">${fmt(res)}</div></div>
-    </div>
-    <div style="margin-top:10px;padding:12px;background:var(--gold-bg);border:1px solid var(--gold-dim);border-radius:8px">
-      <div style="font-size:10px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px">Financeiras — Posição</div>
-      <div style="display:flex;gap:16px;flex-wrap:wrap">
-        <div><div style="font-size:9px;color:var(--dim)">Vendido</div><div style="font-family:'Syne',sans-serif;font-size:14px;font-weight:700">${fmt(t.finVendas)}</div></div>
-        <div><div style="font-size:9px;color:var(--dim)">Recebido</div><div style="font-family:'Syne',sans-serif;font-size:14px;font-weight:700;color:var(--green)">${fmt(t.finRecebido)}</div></div>
-        <div><div style="font-size:9px;color:var(--dim)">A Receber</div><div style="font-family:'Syne',sans-serif;font-size:14px;font-weight:700;color:var(--amber)">${fmt(t.finAReceber)}</div></div>
-      </div>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:10px">
-      <div class="kpi"><div class="kpi-label">Margem Bruta</div><div class="kpi-value">${pct(lb,t.fat-t.taxas-cmvDiario)}</div></div>
-      <div class="kpi"><div class="kpi-label">Margem EBITDA</div><div class="kpi-value">${pct(ebitda,t.fat-t.taxas-cmvDiario)}</div></div>
-      <div class="kpi"><div class="kpi-accent" style="background:${res>=0?'var(--green)':'var(--red)'}"></div><div class="kpi-label">Margem Líquida</div><div class="kpi-value ${res>=0?'pos':'neg'}">${pct(res,t.fat-t.taxas-cmvDiario)}</div></div>
-    </div>
+  // ── Bancos
+  const pagbank=t.cart+t.rend+t.finRecebido-bancoSaidas;
+  const malote=t.din;
+  const santander=t.getnet||0;
+  const totalBancos=pagbank+malote+santander;
+
+  // ── Faturamento
+  const fatTotal=t.din+t.pix+t.cart+(t.getnet||0)+t.finVendas+t.rend+t.cred;
+
+  // ── DRE
+  const cmvManual=loadO('recompra_meta').cmvOrc||0;
+  const lucroBruto=fatTotal-cmvManual;
+  const despesas=verifMensal+bancoSaidas; // tudo exceto compras
+  const lucroLiq=lucroBruto-t.taxas-despesas-t.cred;
+
+  // ── Saldo de recompra
+  const disponivel=cmvManual-t.compras-t.perdas;
+
+  // ── Conferência
+  const totalConf=totalBancos+t.finAReceber;
+  const vendasConf=disponivel+lucroLiq;
+  const difConf=totalConf-vendasConf;
+
+  const R=(l,v,cls='',bold=false)=>`
+    <div style="display:flex;justify-content:space-between;padding:7px 14px;border-bottom:1px solid var(--border-lite);font-size:12px${bold?';background:var(--bg-card)':''}">
+      <span style="color:${bold?'var(--text)':'var(--muted)'}${bold?';font-weight:700':''}">${l}</span>
+      <span style="font-variant-numeric:tabular-nums;font-weight:${bold?'700':'500'};color:${cls==='pos'?'var(--green)':cls==='neg'?'var(--red)':cls==='gold'?'var(--gold)':'var(--text)'}">${cls==='neg'?'-':''} R$ ${fmt(Math.abs(v))}</span>
+    </div>`;
+  const H=(l,color='var(--gold)')=>`
+    <div style="padding:8px 14px;background:${color}14;border-bottom:1px solid ${color}44">
+      <span style="font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:${color}">${l}</span>
+    </div>`;
+  const Rtot=(l,v,cls='gold')=>`
+    <div style="display:flex;justify-content:space-between;padding:9px 14px;background:var(--bg-card);font-size:13px;font-weight:700">
+      <span style="color:var(--text)">${l}</span>
+      <span style="font-variant-numeric:tabular-nums;color:${cls==='pos'?'var(--green)':cls==='neg'?'var(--red)':'var(--gold)'}">R$ ${fmt(v)}</span>
+    </div>`;
+  const card=(html,title)=>`<div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--bg-card)">${html}</div>`;
+
+  const h=`
+  <div style="font-size:10px;letter-spacing:.15em;color:var(--gold);margin-bottom:4px;text-transform:uppercase">SR. CAPAS · Bacaxá / Saquarema</div>
+  <div style="font-family:'Syne',sans-serif;font-size:20px;font-weight:800;margin-bottom:16px">Balancete Mensal — ${MESES[ST.mes-1]} ${ST.ano}</div>
+
+  <!-- FATURAMENTO | BANCOS | SAÍDAS -->
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:16px">
+
+    ${card(`${H('Faturamento')}
+      ${R('Dinheiro',t.din,'pos')}
+      ${R('PIX',t.pix,'pos')}
+      ${R('Cartão (PagBank + GetNet)',t.cart+(t.getnet||0),'pos')}
+      ${R('Financeiras (bruto)',t.finVendas,'pos')}
+      ${R('Rendimentos',t.rend,'pos')}
+      ${R('Crediários Funcionário',t.cred,'pos')}
+      ${Rtot('TOTAL',fatTotal)}`)}
+
+    ${card(`${H('Bancos','#7FB8C9')}
+      ${R('PagBank',pagbank,'pos')}
+      ${R('Saldo Malote',malote,'pos')}
+      ${R('Santander (GetNet)',santander,'pos')}
+      ${Rtot('TOTAL',totalBancos,'pos')}`)}
+
+    ${card(`${H('Saídas','var(--red)')}
+      ${R('Verificação Mensal',verifMensal,'neg')}
+      ${R('Banco',bancoSaidas,'neg')}
+      ${R('Compras',t.compras,'neg')}
+      ${Rtot('TOTAL',totalSaidas,'neg')}`)}
   </div>
 
-  <!-- SALDO DE RECOMPRA (coluna direita) -->
-  <div>
-          <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:18px;margin-top:52px">
-      <div style="font-family:'Syne',sans-serif;font-size:10px;font-weight:700;letter-spacing:.18em;color:var(--gold);text-transform:uppercase;margin-bottom:14px">🔄 Saldo de Recompra</div>
-      <div style="border-top:1px solid var(--border-lite);padding-top:10px">
-        <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px">
-          <span style="color:var(--muted)">CMV Diário</span>
-          <span style="color:var(--gold);font-variant-numeric:tabular-nums">${fmt(cmvDiario)}</span>
-        </div>
-        <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px">
-          <span style="color:var(--muted)">(-) Compras</span>
-          <span style="color:var(--red);font-variant-numeric:tabular-nums">${fmt(cmvCompras)}</span>
-        </div>
-        <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px">
-          <span style="color:var(--muted)">(+) Perdas</span>
-          <span style="color:var(--muted);font-variant-numeric:tabular-nums">${fmt(t.perdas)}</span>
-        </div>
-        <div style="border-top:1px solid var(--border);margin-top:8px;padding-top:8px;display:flex;justify-content:space-between">
-          <span style="font-family:'Syne',sans-serif;font-size:11px;font-weight:700;color:var(--text)">SALDO LIVRE</span>
-          <span style="font-family:'Syne',sans-serif;font-size:16px;font-weight:800;color:${saldoRc>=0?'var(--green)':'var(--red)'}">${fmt(saldoRc)}</span>
+  <!-- DRE PRINCIPAL -->
+  <div style="display:grid;grid-template-columns:220px 1fr;gap:14px;align-items:start">
+
+    <!-- ESQUERDA: SALDO DE RECOMPRA + CONFERÊNCIA -->
+    <div style="display:flex;flex-direction:column;gap:12px">
+      ${card(`${H('🔄 Saldo de Recompra','var(--amber)')}
+        ${R('CMV',cmvManual,'gold')}
+        ${R('(-) Compra',t.compras,'neg')}
+        ${R('(-) Perdas',t.perdas,'neg')}
+        ${Rtot('Disponível',disponivel,disponivel>=0?'pos':'neg')}`)}
+
+      ${card(`${H('Conferência Vendas - Banco','#7FC9A8')}
+        ${R('Bancos',totalConf)}
+        ${R('Vendas',vendasConf)}
+        ${Rtot('Diferença',difConf,Math.abs(difConf)<0.1?'pos':'neg')}`)}
+    </div>
+
+    <!-- DIREITA: DRE -->
+    ${card(`${H('DRE — Resultado do Mês')}
+      ${R('Receitas (Faturamento)',fatTotal,'pos')}
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 14px;border-bottom:1px solid var(--border-lite)">
+        <span style="font-size:12px;color:var(--muted)">CMV <span style="font-size:9px;color:var(--gold)">(editável)</span></span>
+        <div style="display:flex;align-items:center;gap:6px">
+          <span style="font-size:11px;color:var(--dim)">R$</span>
+          <input type="number" step="0.01" value="${cmvManual||''}" placeholder="0,00"
+            style="width:110px;background:var(--bg);border:1px solid var(--gold-dim);border-radius:6px;padding:3px 8px;color:var(--gold);font-size:12px;font-variant-numeric:tabular-nums;text-align:right"
+            oninput="const d=loadO('recompra_meta');d.cmvOrc=+this.value||0;saveO('recompra_meta',d);renderDRE()">
         </div>
       </div>
-    </div>
-    </div>
-  </div>
-
+      ${R('Lucro Bruto',lucroBruto,lucroBruto>=0?'pos':'neg',true)}
+      ${R('(-) Taxas',-t.taxas,'neg')}
+      ${R('(-) Despesas',-despesas,'neg')}
+      ${R('(-) Crediário Funcionário',-t.cred,'neg')}
+      <div style="display:flex;justify-content:space-between;padding:12px 14px;background:var(--gold-bg);border-top:2px solid var(--gold)">
+        <span style="font-family:'Syne',sans-serif;font-size:14px;font-weight:800;color:var(--text)">LUCRO LÍQUIDO</span>
+        <span style="font-family:'Syne',sans-serif;font-size:18px;font-weight:800;color:${lucroLiq>=0?'var(--green)':'var(--red)'}">R$ ${fmt(lucroLiq)}</span>
+      </div>`)}
   </div>`;
+
   document.getElementById('content').innerHTML=h;
 }
+
 
 // SALDO DE RECOMPRA
 function renderRecompra(){
