@@ -297,7 +297,16 @@ function lerArquivo(inputEl,cbNomeBase,onDone){
 }
 function comprovanteChip(comp){
   if(!comp) return `<span class="dim" style="font-size:11px">sem comprovante</span>`;
-  return `<span class="file-chip">📎 <a href="${comp.data}" download="${comp.nomeFinal}" target="_blank">${comp.nomeFinal}</a></span>`;
+  return `<span class="file-chip">📎 <a href="#" onclick="event.preventDefault();abrirComprovante('${comp.id||''}',this)" data-file='${JSON.stringify(comp).replace(/'/g,'&apos;')}'>${comp.nomeFinal}</a> <a href="${comp.data}" download="${comp.nomeFinal}" title="baixar" style="color:var(--dim);text-decoration:none">⬇</a></span>`;
+}
+function abrirComprovante(_id,el){
+  const comp=JSON.parse(el.getAttribute('data-file').replace(/&apos;/g,"'"));
+  const w=window.open('');
+  if(comp.mime && comp.mime.startsWith('image/')){
+    w.document.write(`<title>${comp.nomeFinal}</title><body style="margin:0;background:#111;display:flex;align-items:center;justify-content:center;min-height:100vh"><img src="${comp.data}" style="max-width:100%;max-height:100vh"></body>`);
+  } else {
+    w.document.write(`<title>${comp.nomeFinal}</title><style>html,body,iframe{margin:0;padding:0;width:100%;height:100%;border:none}</style><iframe src="${comp.data}"></iframe>`);
+  }
 }
 
 // ── CADASTRO DE IMÓVEIS ──
