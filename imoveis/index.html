@@ -561,7 +561,7 @@ function confirmarImportPDF(iptuTransf){
   save(pkPeriodo('alugueis'),lst);
   if(iptuTransf>0){
     const rp=load(pkPeriodo('repasses'));
-    rp.push({id:uuid(),imovelId,tipo:'IPTU',valor:iptuTransf,envio:document.getElementById('pv-data').value,status:'recebido_a_pagar',comprovante:comp});
+    rp.push({id:uuid(),imovelId,tipo:'IPTU',valor:iptuTransf,envio:document.getElementById('pv-data').value,status:'recebido_a_pagar',relatorioOrigem:comp});
     save(pkPeriodo('repasses'),rp);
   }
   fecharModal();
@@ -571,28 +571,31 @@ function confirmarImportPDF(iptuTransf){
   notify('Importado e lançado com sucesso','ok');render();
 }
 
-// ── REPASSES AO CORRETOR (IPTU/Água) — informativo, NÃO entra no saldo ──
+// ── REPASSES AO CORRETOR (IPTU/Água/Condomínio) — informativo, NÃO entra no saldo ──
 function renderRepasses(){
   const ims=getImoveis();
   const lst=load(pkPeriodo('repasses'));
   return `
-  <div class="sec-note">Contas que você manda para o corretor pagar com o próprio aluguel (IPTU, água). Ficam registradas com comprovante para conferência — <strong>não entram no cálculo do seu saldo</strong>, porque já saem do valor líquido repassado.</div>
+  <div class="sec-note">Contas que você manda para o corretor pagar com o próprio aluguel (IPTU, água, condomínio). Ficam registradas com boleto e comprovante para conferência — <strong>não entram no cálculo do seu saldo</strong>, porque já saem do valor líquido repassado.</div>
   <div class="form-card">
     <div class="sec-hdr"><h2>Nova Conta Enviada ao Corretor</h2><div class="sec-line"></div></div>
     <div class="fg">
       <div class="fl"><label>Imóvel</label><select class="fi" id="rp-im">${selectImoveis()}</select></div>
-      <div class="fl"><label>Tipo</label><select class="fi" id="rp-tipo"><option>IPTU</option><option>Água</option><option>Luz</option><option>Outro</option></select></div>
+      <div class="fl"><label>Tipo</label><select class="fi" id="rp-tipo"><option>IPTU</option><option>Água</option><option>Condomínio</option><option>Luz</option><option>Outro</option></select></div>
       <div class="fl"><label>Valor</label><input class="fi" id="rp-val" type="number" step="0.01" placeholder="0,00"></div>
       <div class="fl"><label>Data Envio ao Corretor</label><input class="fi" id="rp-envio" type="date" value="${today()}"></div>
       <div class="fl"><label>Status</label><select class="fi" id="rp-status"><option value="enviado">Enviado ao corretor</option><option value="pago">Pago</option><option value="recebido_a_pagar">Recebido — a pagar por mim</option></select></div>
     </div>
-    <div class="fl" style="margin-bottom:14px"><label>Comprovante de Pagamento (PDF/imagem, até 4MB)</label><input class="fi" id="rp-file" type="file" accept=".pdf,image/*"></div>
-    <button class="btn-gold" onclick="addRepasse()">+ Registrar</button>
+    <div class="fg">
+      <div class="fl"><label>Boleto (a conta a ser paga)</label><input class="fi" id="rp-file-boleto" type="file" accept=".pdf,image/*"></div>
+      <div class="fl"><label>Comprovante de Pagamento</label><input class="fi" id="rp-file-comp" type="file" accept=".pdf,image/*"></div>
+    </div>
+    <button class="btn-gold" style="margin-top:14px" onclick="addRepasse()">+ Registrar</button>
   </div>
   <div class="tbl-wrap"><table>
-    <thead><tr><th>Imóvel</th><th>Tipo</th><th>Valor</th><th>Envio</th><th>Status</th><th>Comprovante</th><th></th></tr></thead>
+    <thead><tr><th>Imóvel</th><th>Tipo</th><th>Valor</th><th>Envio</th><th>Status</th><th>Boleto</th><th>Comprovante Pgto</th><th></th></tr></thead>
     <tbody>
-      ${lst.length?lst.map(r=>{const badges={pago:['b-ok','Pago'],enviado:['b-pend','Enviado'],recebido_a_pagar:['b-late','Recebido — a pagar']};const b=badges[r.status]||badges.enviado;const acao=r.status==='recebido_a_pagar'?`<button class="btn-sm btn-ok" onclick="marcarRepassePago('${r.id}')">✓ marcar pago</button> `:'';return `<tr><td>${imovelNome(r.imovelId)}</td><td>${r.tipo}</td><td>${fmt(r.valor)}</td><td>${r.envio||'—'}</td><td><span class="badge ${b[0]}">${b[1]}</span></td><td>${comprovanteChip(r.comprovante)}</td><td>${acao}<button class="btn-sm" onclick="delItem('repasses','${r.id}')">excluir</button></td></tr>`}).join(''):`<tr><td colspan="7"><div class="empty">Nenhuma conta registrada neste mês.</div></td></tr>`}
+      ${lst.length?lst.map(r=>{const badges={pago:['b-ok','Pago'],enviado:['b-pend','Enviado'],recebido_a_pagar:['b-late','Recebido — a pagar']};const b=badges[r.status]||badges.enviado;const acao=r.status==='recebido_a_pagar'?`<button class="btn-sm btn-ok" onclick="marcarRepassePago('${r.id}')">✓ marcar pago</button> `:'';const rel=r.relatorioOrigem?`<div style="margin-top:3px">${comprovanteChip(r.relatorioOrigem)} <span class="dim" style="font-size:10px">(relatório)</span></div>`:'';return `<tr><td>${imovelNome(r.imovelId)}</td><td>${r.tipo}</td><td>${fmt(r.valor)}</td><td>${r.envio||'—'}</td><td><span class="badge ${b[0]}">${b[1]}</span></td><td>${comprovanteChip(r.boleto)}${rel}</td><td>${comprovanteChip(r.comprovantePagamento)}</td><td>${acao}<button class="btn-sm" onclick="delItem('repasses','${r.id}')">excluir</button></td></tr>`}).join(''):`<tr><td colspan="8"><div class="empty">Nenhuma conta registrada neste mês.</div></td></tr>`}
     </tbody>
   </table></div>`;
 }
@@ -601,13 +604,17 @@ function addRepasse(){
   if(!imovelId){notify('Cadastre e selecione um imóvel','err');return;}
   const tipo=document.getElementById('rp-tipo').value;
   const base={id:uuid(),imovelId,tipo,valor:+document.getElementById('rp-val').value||0,envio:document.getElementById('rp-envio').value,status:document.getElementById('rp-status').value};
-  const fileInput=document.getElementById('rp-file');
-  lerArquivo(fileInput,()=>nomeAutomatico(imovelNome(imovelId),tipo),(comp)=>{
-    base.comprovante=comp;
-    const lst=load(pkPeriodo('repasses'));
-    lst.push(base);
-    save(pkPeriodo('repasses'),lst);
-    notify('Conta registrada'+(comp?' com comprovante':''),'ok');render();
+  const fBoleto=document.getElementById('rp-file-boleto');
+  const fComp=document.getElementById('rp-file-comp');
+  lerArquivo(fBoleto,()=>nomeAutomatico(imovelNome(imovelId),tipo+'-BOLETO'),(boleto)=>{
+    base.boleto=boleto;
+    lerArquivo(fComp,()=>nomeAutomatico(imovelNome(imovelId),tipo+'-COMPROVANTE'),(comp)=>{
+      base.comprovantePagamento=comp;
+      const lst=load(pkPeriodo('repasses'));
+      lst.push(base);
+      save(pkPeriodo('repasses'),lst);
+      notify('Conta registrada','ok');render();
+    });
   });
 }
 
