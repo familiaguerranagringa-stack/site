@@ -326,7 +326,7 @@ function renderImoveis(){
   <div class="tbl-wrap"><table>
     <thead><tr><th>Imóvel</th><th>Inquilino</th><th>Corretor</th><th>Valor Contratado</th><th></th></tr></thead>
     <tbody>
-      ${ims.length?ims.map(i=>`<tr><td>${i.endereco?`<div>${i.nome}</div><div class="dim" style="font-size:11px">${i.endereco}</div>`:i.nome}</td><td>${i.inquilino||'—'}</td><td>${i.corretor||'—'}</td><td>${fmt(i.valor)}</td><td><button class="btn-sm" onclick="delImovel('${i.id}')">excluir</button></td></tr>`).join(''):`<tr><td colspan="5"><div class="empty">Nenhum imóvel cadastrado ainda.</div></td></tr>`}
+      ${ims.length?ims.map(i=>`<tr><td>${i.endereco?`<div>${i.nome}</div><div class="dim" style="font-size:11px">${i.endereco}</div>`:i.nome}</td><td>${i.inquilino||'—'}</td><td>${i.corretor||'—'}</td><td>${fmt(i.valor)}</td><td><button class="btn-sm btn-ok" onclick="abrirEdicaoImovel('${i.id}')">editar</button> <button class="btn-sm" onclick="delImovel('${i.id}')">excluir</button></td></tr>`).join(''):`<tr><td colspan="5"><div class="empty">Nenhum imóvel cadastrado ainda.</div></td></tr>`}
     </tbody>
   </table></div>`;
 }
@@ -342,6 +342,40 @@ function delImovel(id){
   if(!confirm('Excluir este imóvel? Lançamentos vinculados continuam existindo mas ficarão sem referência.'))return;
   save(pk('imoveis'),getImoveis().filter(i=>i.id!==id));render();
 }
+function abrirEdicaoImovel(id){
+  const im=getImoveis().find(i=>i.id===id);
+  if(!im)return;
+  document.getElementById('modal-root').innerHTML=`
+  <div class="modal-bg" onclick="if(event.target===this)fecharModal()">
+    <div class="modal">
+      <h2>Editar Imóvel</h2>
+      <p>O valor do aluguel muda com o tempo — atualize aqui sempre que reajustar ou trocar de inquilino. Isso não altera os lançamentos já registrados nos meses anteriores.</p>
+      <div class="fl" style="margin-bottom:12px"><label>Nome / Identificação</label><input class="fi" id="ed-nome" value="${(im.nome||'').replace(/"/g,'&quot;')}"></div>
+      <div class="fl" style="margin-bottom:12px"><label>Endereço</label><input class="fi" id="ed-end" value="${(im.endereco||'').replace(/"/g,'&quot;')}"></div>
+      <div class="fl" style="margin-bottom:12px"><label>Inquilino</label><input class="fi" id="ed-inq" value="${(im.inquilino||'').replace(/"/g,'&quot;')}"></div>
+      <div class="fl" style="margin-bottom:12px"><label>Imobiliária / Corretor</label><input class="fi" id="ed-corr" value="${(im.corretor||'').replace(/"/g,'&quot;')}"></div>
+      <div class="fl" style="margin-bottom:20px"><label>Valor Aluguel Contratado (atual)</label><input class="fi" id="ed-val" type="number" step="0.01" value="${im.valor||0}"></div>
+      <div style="display:flex;gap:10px">
+        <button class="btn-gold" style="flex:1" onclick="salvarEdicaoImovel('${id}')">Salvar Alterações</button>
+        <button class="btn-ghost" onclick="fecharModal()">Cancelar</button>
+      </div>
+    </div>
+  </div>`;
+}
+function salvarEdicaoImovel(id){
+  const ims=getImoveis();
+  const im=ims.find(i=>i.id===id);
+  if(!im)return;
+  im.nome=document.getElementById('ed-nome').value.trim()||im.nome;
+  im.endereco=document.getElementById('ed-end').value.trim();
+  im.inquilino=document.getElementById('ed-inq').value.trim();
+  im.corretor=document.getElementById('ed-corr').value.trim();
+  im.valor=+document.getElementById('ed-val').value||0;
+  save(pk('imoveis'),ims);
+  fecharModal();
+  notify('Imóvel atualizado','ok');render();
+}
+function fecharModal(){document.getElementById('modal-root').innerHTML='';}
 
 // ── ALUGUÉIS (entrada líquida por imóvel/mês) ──
 function renderAlugueis(){
