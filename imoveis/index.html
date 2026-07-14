@@ -499,7 +499,17 @@ function abrirPreviewImportPDF(p){
     <div class="modal" style="width:480px">
       <h2>Conferir Importação</h2>
       <p>Lido do relatório: <strong>${p.imovelAddr||'endereço não identificado'}</strong>${p.referente?` — referente a ${p.referente}`:''}. Confira e ajuste antes de lançar.</p>
-      <div class="fl" style="margin-bottom:12px"><label>Imóvel</label><select class="fi" id="pv-im">${ims.map(i=>`<option value="${i.id}"${match&&match.id===i.id?' selected':''}>${i.nome}</option>`).join('')||'<option value="">Cadastre um imóvel primeiro</option>'}</select></div>
+      <div class="fl" style="margin-bottom:6px"><label>Imóvel</label><select class="fi" id="pv-im">${ims.map(i=>`<option value="${i.id}"${match&&match.id===i.id?' selected':''}>${i.nome}</option>`).join('')||'<option value="">Nenhum imóvel cadastrado ainda</option>'}</select></div>
+      <div style="margin-bottom:14px">
+        <a href="#" style="font-size:11px;color:var(--gold);text-decoration:none" onclick="event.preventDefault();toggleNovoImovelImport()">${ims.length?'imóvel não está na lista? ':''}+ cadastrar novo imóvel agora</a>
+      </div>
+      <div id="pv-novo-imovel" style="display:none;background:var(--bg-sub);border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:16px">
+        <div class="fl" style="margin-bottom:10px"><label>Nome / Identificação</label><input class="fi" id="pv-ni-nome" placeholder="Ex: Travessa Gomes — Casa 104" value="${p.imovelAddr?p.imovelAddr.split(',').slice(0,3).join(',').trim().replace(/"/g,'&quot;'):''}"></div>
+        <div class="fl" style="margin-bottom:10px"><label>Endereço</label><input class="fi" id="pv-ni-end" value="${(p.imovelAddr||'').replace(/"/g,'&quot;')}"></div>
+        <div class="fl" style="margin-bottom:10px"><label>Inquilino</label><input class="fi" id="pv-ni-inq" value="${(p.locatario||'').replace(/"/g,'&quot;')}"></div>
+        <div class="fl" style="margin-bottom:10px"><label>Imobiliária / Corretor</label><input class="fi" id="pv-ni-corr" value="${(p.imobiliaria||'').replace(/"/g,'&quot;')}"></div>
+        <button type="button" class="btn-gold" style="width:100%" onclick="criarImovelInlineImport(${JSON.stringify(p).replace(/"/g,'&quot;')})">Cadastrar e Selecionar</button>
+      </div>
       <div class="fg" style="grid-template-columns:1fr 1fr">
         <div class="fl"><label>Valor Boleto (bruto)</label><input class="fi" id="pv-bruto" type="number" step="0.01" value="${p.alugCobrado||''}"></div>
         <div class="fl"><label>Valor Líquido Aluguel</label><input class="fi" id="pv-liquido" type="number" step="0.01" value="${p.alugTransf||''}"></div>
@@ -513,6 +523,21 @@ function abrirPreviewImportPDF(p){
       </div>
     </div>
   </div>`;
+}
+function toggleNovoImovelImport(){
+  const el=document.getElementById('pv-novo-imovel');
+  el.style.display=el.style.display==='none'?'block':'none';
+}
+function criarImovelInlineImport(p){
+  const nome=document.getElementById('pv-ni-nome').value.trim();
+  if(!nome){notify('Informe o nome do imóvel','err');return;}
+  const ims=getImoveis();
+  const novo={id:uuid(),nome,endereco:document.getElementById('pv-ni-end').value.trim(),inquilino:document.getElementById('pv-ni-inq').value.trim(),corretor:document.getElementById('pv-ni-corr').value.trim(),valor:0};
+  ims.push(novo);
+  save(pk('imoveis'),ims);
+  notify('Imóvel cadastrado','ok');
+  abrirPreviewImportPDF(p);
+  setTimeout(()=>{const sel=document.getElementById('pv-im');if(sel)sel.value=novo.id;},0);
 }
 function confirmarImportPDF(iptuTransf){
   const imovelId=document.getElementById('pv-im').value;
