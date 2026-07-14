@@ -561,7 +561,7 @@ function confirmarImportPDF(iptuTransf){
   save(pkPeriodo('alugueis'),lst);
   if(iptuTransf>0){
     const rp=load(pkPeriodo('repasses'));
-    rp.push({id:uuid(),imovelId,tipo:'IPTU',valor:iptuTransf,envio:document.getElementById('pv-data').value,status:'recebido_a_pagar',relatorioOrigem:comp});
+    rp.push({id:uuid(),imovelId,tipo:'IPTU',valor:iptuTransf,envio:document.getElementById('pv-data').value,status:'recebido_a_pagar'});
     save(pkPeriodo('repasses'),rp);
   }
   fecharModal();
@@ -619,11 +619,36 @@ function addRepasse(){
 }
 
 function marcarRepassePago(id){
+  document.getElementById('modal-root').innerHTML=`
+  <div class="modal-bg" onclick="if(event.target===this)fecharModal()">
+    <div class="modal" style="width:420px">
+      <h2>Marcar como Pago</h2>
+      <p>Anexe o comprovante de pagamento agora (opcional, mas recomendado para conferência futura).</p>
+      <div class="fl" style="margin-bottom:12px"><label>Boleto (opcional)</label><input class="fi" id="mp-boleto" type="file" accept=".pdf,image/*"></div>
+      <div class="fl" style="margin-bottom:20px"><label>Comprovante de Pagamento (opcional)</label><input class="fi" id="mp-comp" type="file" accept=".pdf,image/*"></div>
+      <div style="display:flex;gap:10px">
+        <button class="btn-gold" style="flex:1" onclick="confirmarRepassePago('${id}')">Confirmar Pagamento</button>
+        <button class="btn-ghost" onclick="fecharModal()">Cancelar</button>
+      </div>
+    </div>
+  </div>`;
+}
+function confirmarRepassePago(id){
   const lst=load(pkPeriodo('repasses'));
   const it=lst.find(r=>r.id===id);
-  if(it)it.status='pago';
-  save(pkPeriodo('repasses'),lst);
-  notify('Marcado como pago — sai do saldo pendente','ok');render();
+  if(!it)return;
+  const fBoleto=document.getElementById('mp-boleto');
+  const fComp=document.getElementById('mp-comp');
+  lerArquivo(fBoleto,()=>nomeAutomatico(imovelNome(it.imovelId),it.tipo+'-BOLETO'),(boleto)=>{
+    if(boleto)it.boleto=boleto;
+    lerArquivo(fComp,()=>nomeAutomatico(imovelNome(it.imovelId),it.tipo+'-COMPROVANTE'),(comp)=>{
+      if(comp)it.comprovantePagamento=comp;
+      it.status='pago';
+      save(pkPeriodo('repasses'),lst);
+      fecharModal();
+      notify('Marcado como pago','ok');render();
+    });
+  });
 }
 
 // ── DESPESAS DIRETAS (manutenção etc) — entra no saldo ──
