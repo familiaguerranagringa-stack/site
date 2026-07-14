@@ -837,6 +837,7 @@ function delRateioRegra(id){
 }
 function renderRateioLanc(regras,lanc){
   return `
+  <div class="sec-note">Ao lançar, o sistema calcula a cota de cada imóvel e já cria automaticamente uma despesa direta correspondente para cada um — assim o valor rateado entra certinho no saldo/DRE de cada imóvel.</div>
   <div class="form-card">
     <div class="sec-hdr"><h2>Lançar Conta deste Mês</h2><div class="sec-line"></div></div>
     <div class="fg">
@@ -844,28 +845,77 @@ function renderRateioLanc(regras,lanc){
       <div class="fl"><label>Valor Total da Conta</label><input class="fi" id="rl-val" type="number" step="0.01" placeholder="0,00"></div>
       <div class="fl"><label>Data</label><input class="fi" id="rl-data" type="date" value="${today()}"></div>
     </div>
-    <div class="fl" style="margin-bottom:14px"><label>Comprovante</label><input class="fi" id="rl-file" type="file" accept=".pdf,image/*"></div>
+    <div class="fl" style="margin-bottom:14px"><label>Comprovante (opcional — pode anexar mais depois)</label><input class="fi" id="rl-file" type="file" accept=".pdf,image/*"></div>
     <button class="btn-gold" onclick="addRateioLanc()">+ Lançar e Calcular Cotas</button>
   </div>
   <div class="tbl-wrap"><table>
-    <thead><tr><th>Conta</th><th>Total</th><th>Cotas Calculadas</th><th>Data</th><th>Comprovante</th><th></th></tr></thead>
+    <thead><tr><th>Conta</th><th>Total</th><th>Cotas Calculadas</th><th>Data</th><th>Comprovantes</th><th></th></tr></thead>
     <tbody>
-      ${lanc.length?lanc.map(r=>{const reg=regras.find(x=>x.id===r.regraId);const cotas=reg?reg.partes.map(p=>`${imovelNome(p.imovelId)}: ${fmt(r.valor*p.pct/100)}`).join(' · '):'regra excluída';return `<tr><td>${reg?reg.nome:'—'}</td><td>${fmt(r.valor)}</td><td style="font-size:11px">${cotas}</td><td>${r.data||'—'}</td><td>${comprovanteChip(r.comprovante)}</td><td><button class="btn-sm" onclick="delItem('rateio_lanc','${r.id}')">excluir</button></td></tr>`}).join(''):`<tr><td colspan="6"><div class="empty">Nenhuma conta rateada lançada neste mês.</div></td></tr>`}
+      ${lanc.length?lanc.map(r=>{const reg=regras.find(x=>x.id===r.regraId);const cotas=reg?reg.partes.map(p=>`${imovelNome(p.imovelId)}: ${fmt(r.valor*p.pct/100)}`).join(' · '):'regra excluída';return `<tr><td>${reg?reg.nome:'—'}</td><td>${fmt(r.valor)}</td><td style="font-size:11px">${cotas}</td><td>${r.data||'—'}</td><td>${comprovantesLista(r)}</td><td><button class="btn-sm btn-ok" onclick="abrirAnexarComprovanteRateio('${r.id}')">+ anexar</button> <button class="btn-sm" onclick="delRateioLanc('${r.id}')">excluir</button></td></tr>`}).join(''):`<tr><td colspan="6"><div class="empty">Nenhuma conta rateada lançada neste mês.</div></td></tr>`}
     </tbody>
   </table></div>`;
 }
 function addRateioLanc(){
   const regraId=document.getElementById('rl-regra').value;
   if(!regraId){notify('Crie uma regra de rateio primeiro','err');return;}
-  const base={id:uuid(),regraId,valor:+document.getElementById('rl-val').value||0,data:document.getElementById('rl-data').value};
-  const fileInput=document.getElementById('rl-file');
   const regra=load(pk('rateios')).find(r=>r.id===regraId);
-  lerArquivo(fileInput,()=>nomeAutomatico(regra?regra.nome:'RATEIO','CONTA'),(comp)=>{
-    base.comprovante=comp;
+  const valor=+document.getElementById('rl-val').value||0;
+  const data=document.getElementById('rl-data').value;
+  const base={id:uuid(),regraId,valor,data,comprovantes:[]};
+  const fileInput=document.getElementById('rl-file');
+  lerArquivo(fileInput,()=>nomeAutomatico(regra?regra.nome:'RATEIO','CONTA-1'),(comp)=>{
+    if(comp)base.comprovantes.push(comp);
     const lst=load(pkPeriodo('rateio_lanc'));
     lst.push(base);
     save(pkPeriodo('rateio_lanc'),lst);
-    notify('Conta rateada e cotas calculadas','ok');render();
+    // gera automaticamente uma despesa direta por imóvel, com a cota calculada
+    if(regra){
+      const desp=load(pkPeriodo('despesas'));
+      regra.partes.forEach(p=>{
+        const cota=valor*p.pct/100;
+        if(cota>0){
+          desp.push({id:uuid(),imovelId:p.imovelId,desc:`${regra.nome} (rateio ${p.pct}%)`,valor:cota,forma:'Rateio',data,comprovantes:[],rateioLancId:base.id});
+        }
+      });
+      save(pkPeriodo('despesas'),desp);
+    }
+    notify('Conta rateada, cotas calculadas e lançadas como despesa de cada imóvel','ok');render();
+  });
+}
+function delRateioLanc(id){
+  if(!confirm('Excluir esta conta rateada? As despesas que foram criadas automaticamente para cada imóvel também serão removidas.'))return;
+  save(pkPeriodo('rateio_lanc'),load(pkPeriodo('rateio_lanc')).filter(r=>r.id!==id));
+  save(pkPeriodo('despesas'),load(pkPeriodo('despesas')).filter(d=>d.rateioLancId!==id));
+  notify('Conta rateada e despesas vinculadas excluídas','ok');render();
+}
+function abrirAnexarComprovanteRateio(id){
+  document.getElementById('modal-root').innerHTML=`
+  <div class="modal-bg" onclick="if(event.target===this)fecharModal()">
+    <div class="modal" style="width:400px">
+      <h2>Anexar Comprovante</h2>
+      <p>Adiciona mais um comprovante a esta conta rateada, sem substituir os já anexados.</p>
+      <div class="fl" style="margin-bottom:20px"><label>Arquivo (PDF/imagem)</label><input class="fi" id="anr-file" type="file" accept=".pdf,image/*"></div>
+      <div style="display:flex;gap:10px">
+        <button class="btn-gold" style="flex:1" onclick="confirmarAnexarComprovanteRateio('${id}')">Anexar</button>
+        <button class="btn-ghost" onclick="fecharModal()">Cancelar</button>
+      </div>
+    </div>
+  </div>`;
+}
+function confirmarAnexarComprovanteRateio(id){
+  const lst=load(pkPeriodo('rateio_lanc'));
+  const it=lst.find(r=>r.id===id);
+  if(!it)return;
+  const fileInput=document.getElementById('anr-file');
+  if(!fileInput.files[0]){notify('Selecione um arquivo','err');return;}
+  const regra=load(pk('rateios')).find(r=>r.id===it.regraId);
+  const n=(it.comprovantes||[]).length+1;
+  lerArquivo(fileInput,()=>nomeAutomatico(regra?regra.nome:'RATEIO','CONTA-'+n),(comp)=>{
+    if(!it.comprovantes)it.comprovantes=[];
+    if(comp)it.comprovantes.push(comp);
+    save(pkPeriodo('rateio_lanc'),lst);
+    fecharModal();
+    notify('Comprovante anexado','ok');render();
   });
 }
 
