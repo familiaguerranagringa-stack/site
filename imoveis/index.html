@@ -676,12 +676,17 @@ function confirmarRepassePago(id){
 }
 
 // ── DESPESAS DIRETAS (manutenção etc) — entra no saldo ──
+function comprovantesLista(r){
+  const arr=[...(r.comprovantes||[]),...(r.comprovante?[r.comprovante]:[])];
+  if(!arr.length) return `<span class="dim" style="font-size:11px">sem comprovante</span>`;
+  return arr.map(c=>comprovanteChip(c)).join(' ');
+}
 function renderDespesas(){
   const ims=getImoveis();
   const lst=load(pkPeriodo('despesas'));
   const total=lst.reduce((s,r)=>s+(+r.valor||0),0);
   return `
-  <div class="sec-note">Gastos que <strong>você paga direto</strong> (não passam pelo corretor): manutenção, reparos, gastos diversos. Essas entram no saldo do imóvel.</div>
+  <div class="sec-note">Gastos que <strong>você paga direto</strong> (não passam pelo corretor): manutenção, reparos, gastos diversos. Essas entram no saldo do imóvel. Se o pagamento foi parcelado (ex: metade no início, metade no final), lance o valor total uma vez e anexe cada comprovante separadamente.</div>
   <div class="form-card">
     <div class="sec-hdr"><h2>Nova Despesa Direta</h2><div class="sec-line"></div></div>
     <div class="fg">
@@ -691,13 +696,13 @@ function renderDespesas(){
       <div class="fl"><label>Forma de Pagamento</label><select class="fi" id="ds-forma"><option>PIX</option><option>Boleto</option><option>Dinheiro</option><option>Cartão</option></select></div>
       <div class="fl"><label>Data</label><input class="fi" id="ds-data" type="date" value="${today()}"></div>
     </div>
-    <div class="fl" style="margin-bottom:14px"><label>Comprovante (opcional)</label><input class="fi" id="ds-file" type="file" accept=".pdf,image/*"></div>
+    <div class="fl" style="margin-bottom:14px"><label>Comprovante (opcional — pode anexar mais depois)</label><input class="fi" id="ds-file" type="file" accept=".pdf,image/*"></div>
     <button class="btn-gold" onclick="addDespesa()">+ Registrar Despesa</button>
   </div>
   <div class="tbl-wrap"><table>
-    <thead><tr><th>Imóvel</th><th>Descrição</th><th>Valor</th><th>Forma</th><th>Data</th><th>Comprovante</th><th></th></tr></thead>
+    <thead><tr><th>Imóvel</th><th>Descrição</th><th>Valor</th><th>Forma</th><th>Data</th><th>Comprovantes</th><th></th></tr></thead>
     <tbody>
-      ${lst.length?lst.map(r=>`<tr><td>${imovelNome(r.imovelId)}</td><td>${r.desc}</td><td class="neg">${fmt(r.valor)}</td><td>${r.forma}</td><td>${r.data||'—'}</td><td>${comprovanteChip(r.comprovante)}</td><td><button class="btn-sm" onclick="delItem('despesas','${r.id}')">excluir</button></td></tr>`).join(''):`<tr><td colspan="7"><div class="empty">Nenhuma despesa neste mês.</div></td></tr>`}
+      ${lst.length?lst.map(r=>`<tr><td>${imovelNome(r.imovelId)}</td><td>${r.desc}</td><td class="neg">${fmt(r.valor)}</td><td>${r.forma}</td><td>${r.data||'—'}</td><td>${comprovantesLista(r)}</td><td><button class="btn-sm btn-ok" onclick="abrirAnexarComprovanteDespesa('${r.id}')">+ anexar</button> <button class="btn-sm" onclick="delItem('despesas','${r.id}')">excluir</button></td></tr>`).join(''):`<tr><td colspan="7"><div class="empty">Nenhuma despesa neste mês.</div></td></tr>`}
     </tbody>
     <tfoot><tr class="tfoot"><td>Total Despesas Diretas</td><td></td><td class="neg">${fmt(total)}</td><td colspan="4"></td></tr></tfoot>
   </table></div>`;
@@ -706,14 +711,43 @@ function addDespesa(){
   const imovelId=document.getElementById('ds-im').value;
   if(!imovelId){notify('Cadastre e selecione um imóvel','err');return;}
   const desc=document.getElementById('ds-desc').value.trim()||'Despesa';
-  const base={id:uuid(),imovelId,desc,valor:+document.getElementById('ds-val').value||0,forma:document.getElementById('ds-forma').value,data:document.getElementById('ds-data').value};
+  const base={id:uuid(),imovelId,desc,valor:+document.getElementById('ds-val').value||0,forma:document.getElementById('ds-forma').value,data:document.getElementById('ds-data').value,comprovantes:[]};
   const fileInput=document.getElementById('ds-file');
-  lerArquivo(fileInput,()=>nomeAutomatico(imovelNome(imovelId),desc),(comp)=>{
-    base.comprovante=comp;
+  lerArquivo(fileInput,()=>nomeAutomatico(imovelNome(imovelId),desc+'-1'),(comp)=>{
+    if(comp)base.comprovantes.push(comp);
     const lst=load(pkPeriodo('despesas'));
     lst.push(base);
     save(pkPeriodo('despesas'),lst);
     notify('Despesa registrada','ok');render();
+  });
+}
+function abrirAnexarComprovanteDespesa(id){
+  document.getElementById('modal-root').innerHTML=`
+  <div class="modal-bg" onclick="if(event.target===this)fecharModal()">
+    <div class="modal" style="width:400px">
+      <h2>Anexar Comprovante</h2>
+      <p>Use isso quando o pagamento foi feito em partes (ex: sinal + final da manutenção) — cada comprovante fica salvo, sem substituir o anterior.</p>
+      <div class="fl" style="margin-bottom:20px"><label>Arquivo (PDF/imagem)</label><input class="fi" id="an-file" type="file" accept=".pdf,image/*"></div>
+      <div style="display:flex;gap:10px">
+        <button class="btn-gold" style="flex:1" onclick="confirmarAnexarComprovanteDespesa('${id}')">Anexar</button>
+        <button class="btn-ghost" onclick="fecharModal()">Cancelar</button>
+      </div>
+    </div>
+  </div>`;
+}
+function confirmarAnexarComprovanteDespesa(id){
+  const lst=load(pkPeriodo('despesas'));
+  const it=lst.find(r=>r.id===id);
+  if(!it)return;
+  const fileInput=document.getElementById('an-file');
+  if(!fileInput.files[0]){notify('Selecione um arquivo','err');return;}
+  const n=(it.comprovantes||[]).length+(it.comprovante?1:0)+1;
+  lerArquivo(fileInput,()=>nomeAutomatico(imovelNome(it.imovelId),it.desc+'-'+n),(comp)=>{
+    if(!it.comprovantes)it.comprovantes=[];
+    if(comp)it.comprovantes.push(comp);
+    save(pkPeriodo('despesas'),lst);
+    fecharModal();
+    notify('Comprovante anexado','ok');render();
   });
 }
 
@@ -871,8 +905,9 @@ function delItem(tipo,id){
 }
 
 // ── CÁLCULO CONSOLIDADO DO MÊS ──
-function calcMes(){
-  const ims=getImoveis();
+function calcMes(imovelIdFiltro){
+  let ims=getImoveis();
+  if(imovelIdFiltro) ims=ims.filter(i=>i.id===imovelIdFiltro);
   const alug=load(pkPeriodo('alugueis'));
   const desp=load(pkPeriodo('despesas'));
   const cond=load(pkPeriodo('condominio'));
@@ -923,10 +958,19 @@ function renderDash(){
 
 // ── DRE ──
 function renderDRE(){
-  const c=calcMes();
+  const ims=getImoveis();
+  const filtro=ST.dreImovelId||'';
+  const c=calcMes(filtro||undefined);
   const row=(l,v,cls)=>`<div class="dre-row"><div class="dre-l">${l}</div><div class="dre-v ${cls||''}">${fmt(v)}</div></div>`;
+  const nomeImovel=filtro?imovelNome(filtro):null;
   return `
-  <div class="dre-hdr"><div class="dre-row"><div class="dre-l">Faturamento</div></div></div>
+  <div class="form-card" style="padding:14px 18px;margin-bottom:20px">
+    <div class="fl"><label>Ver resultado de</label><select class="fi" id="dre-filtro-im" onchange="ST.dreImovelId=this.value;render()" style="max-width:320px">
+      <option value=""${!filtro?' selected':''}>Todos os Imóveis (consolidado)</option>
+      ${ims.map(i=>`<option value="${i.id}"${filtro===i.id?' selected':''}>${i.nome}</option>`).join('')}
+    </select></div>
+  </div>
+  <div class="dre-hdr"><div class="dre-row"><div class="dre-l">Faturamento${nomeImovel?' — '+nomeImovel:''}</div></div></div>
   ${row('Aluguéis (líquido recebido)',c.totalLiquido,'pos')}
   <div class="dre-sub"><div class="dre-row"><div class="dre-l">Total Entradas</div><div class="dre-v pos">${fmt(c.totalLiquido)}</div></div></div>
   <div class="dre-hdr"><div class="dre-row"><div class="dre-l">Despesas</div></div></div>
@@ -934,9 +978,10 @@ function renderDRE(){
   ${row('Condomínio pendente de devolução',c.totalCondPend,'neg')}
   <div class="dre-sub"><div class="dre-row"><div class="dre-l">Total Despesas</div><div class="dre-v neg">${fmt(c.totalDespesas+c.totalCondPend)}</div></div></div>
   <div class="dre-hdr"><div class="dre-row"><div class="dre-l">Resultado</div></div></div>
-  ${row('Saldo Imóveis do Mês',c.totalSaldo,vc(c.totalSaldo))}
-  ${row('(–) Transferido para Pessoal',c.totalTransf,'neg')}
-  <div class="dre-sub"><div class="dre-row"><div class="dre-l">Disponível Após Pessoal</div><div class="dre-v ${vc(c.disponivelAposPessoal)}">${fmt(c.disponivelAposPessoal)}</div></div></div>
+  ${row(filtro?`Lucro/Prejuízo — ${nomeImovel}`:'Saldo Imóveis do Mês',c.totalSaldo,vc(c.totalSaldo))}
+  ${filtro?'':row('(–) Transferido para Pessoal',c.totalTransf,'neg')}
+  ${filtro?'':`<div class="dre-sub"><div class="dre-row"><div class="dre-l">Disponível Após Pessoal</div><div class="dre-v ${vc(c.disponivelAposPessoal)}">${fmt(c.disponivelAposPessoal)}</div></div></div>`}
+  ${filtro?`<div class="sec-note" style="margin-top:8px">A transferência para Pessoal é um controle geral, não por imóvel — por isso não aparece neste recorte. Veja o consolidado em "Todos os Imóveis" para esse número.</div>`:''}
   ${c.totalIptuAPagar>0?`<div class="sec-note" style="margin-top:20px;color:var(--red)">⚠ Existe ${fmt(c.totalIptuAPagar)} de IPTU que a imobiliária repassou pra você (não descontou) e ainda não foi pago. Esse valor está fisicamente na sua conta mas não é seu — separe-o antes de mexer no saldo abaixo. Acompanhe em "IPTU / Água".</div>`:''}
   <div class="sec-note" style="margin-top:12px">IPTU e água descontados diretamente pela imobiliária não entram neste DRE porque nunca chegaram a compor o valor líquido recebido — evita contar a mesma despesa duas vezes. Ficam registrados na aba "IPTU / Água" só para conferência e comprovação.</div>
   `;
