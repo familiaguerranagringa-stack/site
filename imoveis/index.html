@@ -792,6 +792,14 @@ function marcarDevolvido(id){
 }
 
 // ── CONTAS RATEADAS (ex: água única para vários imóveis) ──
+function calcularCotasAjustadas(valor,partes){
+  const brutos=partes.map(p=>Math.round(valor*p.pct)/100);
+  const somaArred=brutos.reduce((s,v)=>s+v,0);
+  const diff=Math.round((valor-somaArred)*100)/100;
+  const cotas=partes.map((p,i)=>({imovelId:p.imovelId,pct:p.pct,cota:brutos[i]}));
+  if(diff!==0 && cotas.length) cotas[cotas.length-1].cota=Math.round((cotas[cotas.length-1].cota+diff)*100)/100;
+  return cotas;
+}
 function renderRateio(){
   const ims=getImoveis();
   const lst=load(pk('rateios')); // regras de rateio são fixas, não mudam por mês
@@ -851,7 +859,7 @@ function renderRateioLanc(regras,lanc){
   <div class="tbl-wrap"><table>
     <thead><tr><th>Conta</th><th>Total</th><th>Cotas Calculadas</th><th>Data</th><th>Comprovantes</th><th></th></tr></thead>
     <tbody>
-      ${lanc.length?lanc.map(r=>{const reg=regras.find(x=>x.id===r.regraId);const cotas=reg?reg.partes.map(p=>`${imovelNome(p.imovelId)}: ${fmt(r.valor*p.pct/100)}`).join(' · '):'regra excluída';return `<tr><td>${reg?reg.nome:'—'}</td><td>${fmt(r.valor)}</td><td style="font-size:11px">${cotas}</td><td>${r.data||'—'}</td><td>${comprovantesLista(r)}</td><td><button class="btn-sm btn-ok" onclick="abrirAnexarComprovanteRateio('${r.id}')">+ anexar</button> <button class="btn-sm" onclick="delRateioLanc('${r.id}')">excluir</button></td></tr>`}).join(''):`<tr><td colspan="6"><div class="empty">Nenhuma conta rateada lançada neste mês.</div></td></tr>`}
+      ${lanc.length?lanc.map(r=>{const reg=regras.find(x=>x.id===r.regraId);const cotas=reg?calcularCotasAjustadas(r.valor,reg.partes).map(c=>`${imovelNome(c.imovelId)}: ${fmt(c.cota)}`).join(' · '):'regra excluída';return `<tr><td>${reg?reg.nome:'—'}</td><td>${fmt(r.valor)}</td><td style="font-size:11px">${cotas}</td><td>${r.data||'—'}</td><td>${comprovantesLista(r)}</td><td><button class="btn-sm btn-ok" onclick="abrirAnexarComprovanteRateio('${r.id}')">+ anexar</button> <button class="btn-sm" onclick="delRateioLanc('${r.id}')">excluir</button></td></tr>`}).join(''):`<tr><td colspan="6"><div class="empty">Nenhuma conta rateada lançada neste mês.</div></td></tr>`}
     </tbody>
   </table></div>`;
 }
@@ -871,10 +879,9 @@ function addRateioLanc(){
     // gera automaticamente uma despesa direta por imóvel, com a cota calculada
     if(regra){
       const desp=load(pkPeriodo('despesas'));
-      regra.partes.forEach(p=>{
-        const cota=valor*p.pct/100;
-        if(cota>0){
-          desp.push({id:uuid(),imovelId:p.imovelId,desc:`${regra.nome} (rateio ${p.pct}%)`,valor:cota,forma:'Rateio',data,comprovantes:[],rateioLancId:base.id});
+      calcularCotasAjustadas(valor,regra.partes).forEach(c=>{
+        if(c.cota>0){
+          desp.push({id:uuid(),imovelId:c.imovelId,desc:`${regra.nome} (rateio ${c.pct}%)`,valor:c.cota,forma:'Rateio',data,comprovantes:[],rateioLancId:base.id});
         }
       });
       save(pkPeriodo('despesas'),desp);
