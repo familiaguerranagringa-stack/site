@@ -414,7 +414,7 @@ function renderAlugueis(){
   <div class="tbl-wrap"><table>
     <thead><tr><th>Imóvel</th><th>Bruto</th><th>Líquido</th><th>Data</th><th>Obs</th><th></th></tr></thead>
     <tbody>
-      ${lst.length?lst.map(r=>`<tr><td>${imovelNome(r.imovelId)}</td><td>${fmt(r.bruto)}</td><td class="pos">${fmt(r.liquido)}</td><td>${r.data||'—'}</td><td class="dim">${r.obs||'—'}</td><td><button class="btn-sm" onclick="delItem('alugueis','${r.id}')">excluir</button></td></tr>`).join(''):`<tr><td colspan="6"><div class="empty">Nenhum recebimento neste mês.</div></td></tr>`}
+      ${lst.length?lst.map(r=>`<tr><td>${imovelNome(r.imovelId)}</td><td>${fmt(r.bruto)}</td><td class="pos">${fmt(r.liquido)}</td><td>${r.data||'—'}</td><td class="dim">${r.obs||'—'}</td><td><button class="btn-sm btn-ok" onclick="abrirEdicaoAluguel('${r.id}')">editar</button> <button class="btn-sm" onclick="delItem('alugueis','${r.id}')">excluir</button></td></tr>`).join(''):`<tr><td colspan="6"><div class="empty">Nenhum recebimento neste mês.</div></td></tr>`}
     </tbody>
     <tfoot><tr class="tfoot"><td>Total Líquido do Mês</td><td></td><td class="pos">${fmt(total)}</td><td colspan="3"></td></tr></tfoot>
   </table></div>`;
@@ -426,6 +426,42 @@ function addAluguel(){
   lst.push({id:uuid(),imovelId,bruto:+document.getElementById('al-bruto').value||0,liquido:+document.getElementById('al-liquido').value||0,data:document.getElementById('al-data').value,obs:document.getElementById('al-obs').value.trim()});
   save(pkPeriodo('alugueis'),lst);
   notify('Recebimento registrado','ok');render();
+}
+function abrirEdicaoAluguel(id){
+  const lst=load(pkPeriodo('alugueis'));
+  const r=lst.find(x=>x.id===id);
+  if(!r)return;
+  document.getElementById('modal-root').innerHTML=`
+  <div class="modal-bg" onclick="if(event.target===this)fecharModal()">
+    <div class="modal">
+      <h2>Editar Recebimento</h2>
+      <p>Corrija valores lidos errado (ex: juros/multa que não entraram) sem precisar excluir e relançar.</p>
+      <div class="fl" style="margin-bottom:12px"><label>Imóvel</label><select class="fi" id="ea-im">${selectImoveis(r.imovelId)}</select></div>
+      <div class="fg" style="grid-template-columns:1fr 1fr;margin-bottom:12px">
+        <div class="fl"><label>Valor Boleto (bruto)</label><input class="fi" id="ea-bruto" type="number" step="0.01" value="${r.bruto||0}"></div>
+        <div class="fl"><label>Valor Líquido Recebido</label><input class="fi" id="ea-liquido" type="number" step="0.01" value="${r.liquido||0}"></div>
+      </div>
+      <div class="fl" style="margin-bottom:12px"><label>Data do Repasse</label><input class="fi" id="ea-data" type="date" value="${r.data||today()}"></div>
+      <div class="fl" style="margin-bottom:20px"><label>Observação</label><input class="fi" id="ea-obs" value="${(r.obs||'').replace(/"/g,'&quot;')}"></div>
+      <div style="display:flex;gap:10px">
+        <button class="btn-gold" style="flex:1" onclick="salvarEdicaoAluguel('${id}')">Salvar Alterações</button>
+        <button class="btn-ghost" onclick="fecharModal()">Cancelar</button>
+      </div>
+    </div>
+  </div>`;
+}
+function salvarEdicaoAluguel(id){
+  const lst=load(pkPeriodo('alugueis'));
+  const r=lst.find(x=>x.id===id);
+  if(!r)return;
+  r.imovelId=document.getElementById('ea-im').value;
+  r.bruto=+document.getElementById('ea-bruto').value||0;
+  r.liquido=+document.getElementById('ea-liquido').value||0;
+  r.data=document.getElementById('ea-data').value;
+  r.obs=document.getElementById('ea-obs').value.trim();
+  save(pkPeriodo('alugueis'),lst);
+  fecharModal();
+  notify('Recebimento atualizado','ok');render();
 }
 
 // ── IMPORTAÇÃO DE RELATÓRIO PDF (Aprisco/Alude) ──
@@ -449,7 +485,10 @@ function parseRelatorioAlude(text){
   const iptuCobrado=parseBRNum((cobradoSection.match(/IPTU\s+R\$\s?([\d.,]+)/)||[])[1]);
   const alugTransf=parseBRNum((transferSection.match(/Aluguel\s+R\$\s?([\d.,]+)/)||[])[1]);
   const iptuTransf=parseBRNum((transferSection.match(/IPTU\s+R\$\s?([\d.,]+)/)||[])[1]);
-  return {valorRepassado,dataRepasse,referente,imovelAddr,locatario,imobiliaria,alugCobrado,iptuCobrado,alugTransf,iptuTransf};
+  // Juros e multa por atraso — podem aparecer cobrados e/ou repassados ao proprietário
+  const jurosCobrado=parseBRNum((cobradoSection.match(/(?:Juros|Multa)[^\n\d]*R\$\s?([\d.,]+)/)||[])[1]);
+  const jurosTransf=parseBRNum((transferSection.match(/(?:Juros|Multa)[^\n\d]*R\$\s?([\d.,]+)/)||[])[1]);
+  return {valorRepassado,dataRepasse,referente,imovelAddr,locatario,imobiliaria,alugCobrado,iptuCobrado,alugTransf,iptuTransf,jurosCobrado,jurosTransf};
 }
 function matchImovel(addr){
   if(!addr)return null;
@@ -534,11 +573,12 @@ function abrirPreviewImportPDF(p){
       </div>
       <div class="fg" style="grid-template-columns:1fr 1fr">
         <div class="fl"><label>Valor Boleto (bruto)</label><input class="fi" id="pv-bruto" type="number" step="0.01" value="${p.alugCobrado||''}"></div>
-        <div class="fl"><label>Valor Líquido Aluguel</label><input class="fi" id="pv-liquido" type="number" step="0.01" value="${p.alugTransf||''}"></div>
+        <div class="fl"><label>Valor Líquido Aluguel${p.jurosTransf?' (com juros)':''}</label><input class="fi" id="pv-liquido" type="number" step="0.01" value="${((p.alugTransf||0)+(p.jurosTransf||0))||''}"></div>
       </div>
       <div class="fl" style="margin-bottom:12px"><label>Data do Repasse</label><input class="fi" id="pv-data" type="date" value="${ddmmyyyy2iso(p.dataRepasse)}"></div>
+      ${p.jurosTransf?`<div class="sec-note" style="margin:0 0 12px;color:var(--amber)">⚠ Este relatório mostra <strong>${fmt(p.jurosTransf)}</strong> de juros/multa por atraso — já somei ao "Valor Líquido Aluguel" acima, porque esse valor é seu (é receita a mais, diferente do IPTU repassado). Confira se bateu certo antes de lançar.</div>`:''}
       ${p.iptuTransf?`<div class="sec-note" style="margin:0 0 12px">Este relatório mostra <strong>${fmt(p.iptuTransf)}</strong> de IPTU que a imobiliária repassou pra você (não descontou). Esse valor caiu na sua conta, mas não é seu — o IPTU ainda precisa ser pago. Por isso ele <strong>não</strong> entra no campo "Valor Líquido Aluguel" acima; vou registrar separado, como pendente, na aba IPTU/Água.</div>`:''}
-      <div class="fl" style="margin-bottom:20px"><label>Observação</label><input class="fi" id="pv-obs" value="Importado do relatório Aprisco/Alude${p.locatario?' — inquilino '+p.locatario:''}"></div>
+      <div class="fl" style="margin-bottom:20px"><label>Observação</label><input class="fi" id="pv-obs" value="Importado do relatório Aprisco/Alude${p.locatario?' — inquilino '+p.locatario:''}${p.jurosTransf?' (com juros de atraso '+fmt(p.jurosTransf)+')':''}"></div>
       <div style="display:flex;gap:10px">
         <button class="btn-gold" style="flex:1" onclick="confirmarImportPDF(${p.iptuTransf||0})">Confirmar e Lançar</button>
         <button class="btn-ghost" onclick="fecharModal()">Cancelar</button>
