@@ -488,7 +488,9 @@ function parseRelatorioAlude(text){
   // Juros e multa por atraso — podem aparecer cobrados e/ou repassados ao proprietário
   const jurosCobrado=parseBRNum((cobradoSection.match(/(?:Juros|Multa)[^\n\d]*R\$\s?([\d.,]+)/)||[])[1]);
   const jurosTransf=parseBRNum((transferSection.match(/(?:Juros|Multa)[^\n\d]*R\$\s?([\d.,]+)/)||[])[1]);
-  return {valorRepassado,dataRepasse,referente,imovelAddr,locatario,imobiliaria,alugCobrado,iptuCobrado,alugTransf,iptuTransf,jurosCobrado,jurosTransf};
+  // Taxa de manutenção/administração cobrada do inquilino mas retida pela imobiliária (não repassada ao proprietário)
+  const taxaManutCobrado=parseBRNum((cobradoSection.match(/Taxa de manuten[cç][aã]o[^\n\d]*R\$\s?([\d.,]+)/i)||[])[1]);
+  return {valorRepassado,dataRepasse,referente,imovelAddr,locatario,imobiliaria,alugCobrado,iptuCobrado,alugTransf,iptuTransf,jurosCobrado,jurosTransf,taxaManutCobrado};
 }
 function matchImovel(addr){
   if(!addr)return null;
@@ -577,6 +579,7 @@ function abrirPreviewImportPDF(p){
       </div>
       <div class="fl" style="margin-bottom:12px"><label>Data do Repasse</label><input class="fi" id="pv-data" type="date" value="${ddmmyyyy2iso(p.dataRepasse)}"></div>
       ${p.jurosTransf?`<div class="sec-note" style="margin:0 0 12px;color:var(--amber)">⚠ Este relatório mostra <strong>${fmt(p.jurosTransf)}</strong> de juros/multa por atraso — já somei ao "Valor Líquido Aluguel" acima, porque esse valor é seu (é receita a mais, diferente do IPTU repassado). Confira se bateu certo antes de lançar.</div>`:''}
+      ${p.taxaManutCobrado?`<div class="sec-note" style="margin:0 0 12px">Este relatório mostra <strong>${fmt(p.taxaManutCobrado)}</strong> de taxa de manutenção cobrada do inquilino — ela fica retida com a imobiliária (não é repassada pra você), por isso não entra no "Valor Líquido Aluguel". É só informativo.</div>`:''}
       ${p.iptuTransf?`<div class="sec-note" style="margin:0 0 12px">Este relatório mostra <strong>${fmt(p.iptuTransf)}</strong> de IPTU que a imobiliária repassou pra você (não descontou). Esse valor caiu na sua conta, mas não é seu — o IPTU ainda precisa ser pago. Por isso ele <strong>não</strong> entra no campo "Valor Líquido Aluguel" acima; vou registrar separado, como pendente, na aba IPTU/Água.</div>`:''}
       <div class="fl" style="margin-bottom:20px"><label>Observação</label><input class="fi" id="pv-obs" value="Importado do relatório Aprisco/Alude${p.locatario?' — inquilino '+p.locatario:''}${p.jurosTransf?' (com juros de atraso '+fmt(p.jurosTransf)+')':''}"></div>
       <div style="display:flex;gap:10px">
