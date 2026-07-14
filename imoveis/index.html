@@ -444,13 +444,26 @@ function parseRelatorioAlude(text){
 }
 function matchImovel(addr){
   if(!addr)return null;
-  const na=normTxt(addr);
+  const na=normTxt(addr).replace(/[^A-Z0-9]+/g,' ').trim();
   const ims=getImoveis();
+  // 1) match exato/quase exato pelo campo Endereço (o mais confiável — é o texto cru do relatório)
+  const exato=ims.find(im=>im.endereco && normTxt(im.endereco).replace(/[^A-Z0-9]+/g,' ').trim()===na);
+  if(exato)return exato;
+  // 2) match por maioria das palavras do endereço (caso o endereço cadastrado esteja levemente diferente)
+  const palavrasAddr=na.split(' ').filter(w=>w.length>2);
   let best=null,bestScore=0;
   ims.forEach(im=>{
+    if(!im.endereco)return;
+    const alvo=normTxt(im.endereco).replace(/[^A-Z0-9]+/g,' ');
+    const score=palavrasAddr.filter(w=>alvo.includes(w)).length/palavrasAddr.length;
+    if(score>bestScore){bestScore=score;best=im;}
+  });
+  if(best && bestScore>=0.7)return best;
+  // 3) fallback: nome + endereço combinados, contagem simples de palavras em comum
+  best=null;bestScore=0;
+  ims.forEach(im=>{
     const alvo=normTxt(im.nome+' '+(im.endereco||''));
-    const palavras=na.split(/[^A-Z0-9]+/).filter(w=>w.length>3);
-    const score=palavras.filter(w=>alvo.includes(w)).length;
+    const score=palavrasAddr.filter(w=>alvo.includes(w)).length;
     if(score>bestScore){bestScore=score;best=im;}
   });
   return bestScore>0?best:null;
