@@ -584,7 +584,9 @@ function confirmarImportPDF(iptuTransf){
 function renderRepasses(){
   const ims=getImoveis();
   const lst=load(pkPeriodo('repasses'));
+  const temRelatorioAntigo=Object.keys(localStorage).some(k=>k.startsWith('imoveisfg_repasses_')&&load(k).some(r=>r.relatorioOrigem));
   return `
+  ${temRelatorioAntigo?`<div class="sec-note" style="background:var(--gold-bg);border:1px solid var(--gold-dim);border-radius:8px;padding:12px 14px;color:var(--text)">Existem relatórios antigos anexados automaticamente (de antes da correção). <button class="btn-sm btn-ok" onclick="limparRelatoriosAntigos()">🧹 Remover relatórios antigos</button></div>`:''}
   <div class="sec-note">Contas que você manda para o corretor pagar com o próprio aluguel (IPTU, água, condomínio). Ficam registradas com boleto e comprovante para conferência — <strong>não entram no cálculo do seu saldo</strong>, porque já saem do valor líquido repassado.</div>
   <div class="form-card">
     <div class="sec-hdr"><h2>Nova Conta Enviada ao Corretor</h2><div class="sec-line"></div></div>
@@ -604,7 +606,7 @@ function renderRepasses(){
   <div class="tbl-wrap"><table>
     <thead><tr><th>Imóvel</th><th>Tipo</th><th>Valor</th><th>Envio</th><th>Status</th><th>Boleto</th><th>Comprovante Pgto</th><th></th></tr></thead>
     <tbody>
-      ${lst.length?lst.map(r=>{const badges={pago:['b-ok','Pago'],enviado:['b-pend','Enviado'],recebido_a_pagar:['b-late','Recebido — a pagar']};const b=badges[r.status]||badges.enviado;const acao=r.status==='recebido_a_pagar'?`<button class="btn-sm btn-ok" onclick="marcarRepassePago('${r.id}')">✓ marcar pago</button> `:'';const rel=r.relatorioOrigem?`<div style="margin-top:3px">${comprovanteChip(r.relatorioOrigem)} <span class="dim" style="font-size:10px">(relatório)</span></div>`:'';return `<tr><td>${imovelNome(r.imovelId)}</td><td>${r.tipo}</td><td>${fmt(r.valor)}</td><td>${r.envio||'—'}</td><td><span class="badge ${b[0]}">${b[1]}</span></td><td>${comprovanteChip(r.boleto)}${rel}</td><td>${comprovanteChip(r.comprovantePagamento)}</td><td>${acao}<button class="btn-sm" onclick="delItem('repasses','${r.id}')">excluir</button></td></tr>`}).join(''):`<tr><td colspan="8"><div class="empty">Nenhuma conta registrada neste mês.</div></td></tr>`}
+      ${lst.length?lst.map(r=>{const badges={pago:['b-ok','Pago'],enviado:['b-pend','Enviado'],recebido_a_pagar:['b-late','Recebido — a pagar']};const b=badges[r.status]||badges.enviado;const acao=r.status==='recebido_a_pagar'?`<button class="btn-sm btn-ok" onclick="marcarRepassePago('${r.id}')">✓ marcar pago</button> `:'';return `<tr><td>${imovelNome(r.imovelId)}</td><td>${r.tipo}</td><td>${fmt(r.valor)}</td><td>${r.envio||'—'}</td><td><span class="badge ${b[0]}">${b[1]}</span></td><td>${comprovanteChip(r.boleto)}</td><td>${comprovanteChip(r.comprovantePagamento)}</td><td>${acao}<button class="btn-sm" onclick="delItem('repasses','${r.id}')">excluir</button></td></tr>`}).join(''):`<tr><td colspan="8"><div class="empty">Nenhuma conta registrada neste mês.</div></td></tr>`}
     </tbody>
   </table></div>`;
 }
@@ -625,6 +627,19 @@ function addRepasse(){
       notify('Conta registrada','ok');render();
     });
   });
+}
+
+function limparRelatoriosAntigos(){
+  if(!confirm('Remover os relatórios anexados automaticamente por engano (de antes da correção) em todos os meses? O lançamento em si não será excluído, só o anexo do relatório.'))return;
+  let count=0;
+  Object.keys(localStorage).filter(k=>k.startsWith('imoveisfg_repasses_')).forEach(k=>{
+    const arr=load(k);
+    let mudou=false;
+    arr.forEach(r=>{if(r.relatorioOrigem){delete r.relatorioOrigem;mudou=true;count++;}});
+    if(mudou)localStorage.setItem(k,JSON.stringify(arr));
+  });
+  pushToFB();
+  notify(`${count} relatório(s) removido(s)`,'ok');render();
 }
 
 function marcarRepassePago(id){
