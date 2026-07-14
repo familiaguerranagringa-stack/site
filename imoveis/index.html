@@ -111,6 +111,7 @@ tr:hover td{background:var(--bg-hover)}
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 </head>
 <body>
 <div id="notif"></div>
@@ -384,8 +385,14 @@ function renderAlugueis(){
   const total=lst.reduce((s,r)=>s+(+r.liquido||0),0);
   return `
   <div class="sec-note">Lance aqui o valor <strong>líquido</strong> que a imobiliária de fato repassou — já descontado o que ela paga direto (IPTU/água, quando for o caso). O bruto é só referência.</div>
+  <div class="form-card" style="border-color:var(--gold-dim)">
+    <div class="sec-hdr"><h2>Importar Relatório da Imobiliária</h2><div class="sec-line"></div></div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.6">Suba o PDF do relatório de administração (Aprisco/Alude) e o sistema lê o imóvel, os valores cobrados e o que foi repassado automaticamente — você só confere antes de lançar.</p>
+    <input class="fi" type="file" id="pdf-import-input" accept="application/pdf" onchange="handlePDFFile(this)">
+    <div id="pdf-import-status" style="font-size:12px;color:var(--dim);margin-top:8px"></div>
+  </div>
   <div class="form-card">
-    <div class="sec-hdr"><h2>Novo Recebimento</h2><div class="sec-line"></div></div>
+    <div class="sec-hdr"><h2>Novo Recebimento (manual)</h2><div class="sec-line"></div></div>
     <div class="fg">
       <div class="fl"><label>Imóvel</label><select class="fi" id="al-im">${selectImoveis()}</select></div>
       <div class="fl"><label>Valor Boleto (bruto)</label><input class="fi" id="al-bruto" type="number" step="0.01" placeholder="0,00"></div>
@@ -412,6 +419,120 @@ function addAluguel(){
   notify('Recebimento registrado','ok');render();
 }
 
+// ── IMPORTAÇÃO DE RELATÓRIO PDF (Aprisco/Alude) ──
+if(window.pdfjsLib){pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';}
+function parseBRNum(s){
+  if(!s)return 0;
+  return parseFloat(String(s).replace(/\./g,'').replace(',','.'))||0;
+}
+function normTxt(s){return (s||'').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')}
+function parseRelatorioAlude(text){
+  const g=(re)=>{const m=text.match(re);return m?m[1].trim():null};
+  const valorRepassado=parseBRNum(g(/Valor repassado[\s\S]{0,40}?R\$\s?([\d.,]+)/));
+  const dataRepasse=g(/(\d{2}\/\d{2}\/\d{4})\s*(?:às|as)/);
+  const referente=g(/Referente a\s+([A-Za-zçÇéÉ]+\/\d{4})/);
+  const imovelAddr=g(/Im[oó]vel\s+([\s\S]+?)\s+Locat[aá]rio/);
+  const locatario=g(/Locat[aá]rio\s+([^\n(]+?)\s*\(/);
+  const imobiliaria=g(/Imobili[aá]ria\s+([^\n(]+?)\s*\(/);
+  const cobradoSection=(text.split(/O QUE FOI COBRADO/)[1]||'').split(/O QUE FOI TRANSFERIDO/)[0];
+  const transferSection=text.split(/O QUE FOI TRANSFERIDO/)[1]||'';
+  const alugCobrado=parseBRNum((cobradoSection.match(/Aluguel\s*(?:\([^)]*\))?\s*R\$\s?([\d.,]+)/)||[])[1]);
+  const iptuCobrado=parseBRNum((cobradoSection.match(/IPTU\s+R\$\s?([\d.,]+)/)||[])[1]);
+  const alugTransf=parseBRNum((transferSection.match(/Aluguel\s+R\$\s?([\d.,]+)/)||[])[1]);
+  const iptuTransf=parseBRNum((transferSection.match(/IPTU\s+R\$\s?([\d.,]+)/)||[])[1]);
+  return {valorRepassado,dataRepasse,referente,imovelAddr,locatario,imobiliaria,alugCobrado,iptuCobrado,alugTransf,iptuTransf};
+}
+function matchImovel(addr){
+  if(!addr)return null;
+  const na=normTxt(addr);
+  const ims=getImoveis();
+  let best=null,bestScore=0;
+  ims.forEach(im=>{
+    const alvo=normTxt(im.nome+' '+(im.endereco||''));
+    const palavras=na.split(/[^A-Z0-9]+/).filter(w=>w.length>3);
+    const score=palavras.filter(w=>alvo.includes(w)).length;
+    if(score>bestScore){bestScore=score;best=im;}
+  });
+  return bestScore>0?best:null;
+}
+let _pdfPendingFile=null;
+function ddmmyyyy2iso(d){
+  if(!d)return today();
+  const [dd,mm,yy]=d.split('/');
+  return `${yy}-${mm}-${dd}`;
+}
+function handlePDFFile(input){
+  const f=input.files[0];
+  if(!f)return;
+  document.getElementById('pdf-import-status').textContent='⟳ Lendo PDF...';
+  const readerBin=new FileReader();
+  readerBin.onload=async()=>{
+    try{
+      const typedarray=new Uint8Array(readerBin.result);
+      const pdf=await pdfjsLib.getDocument({data:typedarray}).promise;
+      let fullText='';
+      for(let p=1;p<=pdf.numPages;p++){
+        const page=await pdf.getPage(p);
+        const tc=await page.getTextContent();
+        fullText+=tc.items.map(it=>it.str).join(' ')+' ';
+      }
+      const parsed=parseRelatorioAlude(fullText);
+      const readerB64=new FileReader();
+      readerB64.onload=()=>{
+        _pdfPendingFile={nomeOriginal:f.name,mime:f.type,data:readerB64.result,tamanho:f.size};
+        abrirPreviewImportPDF(parsed);
+        document.getElementById('pdf-import-status').textContent='✓ PDF lido — confira os dados abaixo antes de lançar.';
+      };
+      readerB64.readAsDataURL(f);
+    }catch(e){
+      console.error(e);
+      document.getElementById('pdf-import-status').textContent='⚠ Não consegui ler este PDF automaticamente. Lance manualmente abaixo.';
+    }
+  };
+  readerBin.readAsArrayBuffer(f);
+}
+function abrirPreviewImportPDF(p){
+  const ims=getImoveis();
+  const match=matchImovel(p.imovelAddr);
+  document.getElementById('modal-root').innerHTML=`
+  <div class="modal-bg" onclick="if(event.target===this)fecharModal()">
+    <div class="modal" style="width:480px">
+      <h2>Conferir Importação</h2>
+      <p>Lido do relatório: <strong>${p.imovelAddr||'endereço não identificado'}</strong>${p.referente?` — referente a ${p.referente}`:''}. Confira e ajuste antes de lançar.</p>
+      <div class="fl" style="margin-bottom:12px"><label>Imóvel</label><select class="fi" id="pv-im">${ims.map(i=>`<option value="${i.id}"${match&&match.id===i.id?' selected':''}>${i.nome}</option>`).join('')||'<option value="">Cadastre um imóvel primeiro</option>'}</select></div>
+      <div class="fg" style="grid-template-columns:1fr 1fr">
+        <div class="fl"><label>Valor Boleto (bruto)</label><input class="fi" id="pv-bruto" type="number" step="0.01" value="${p.alugCobrado||''}"></div>
+        <div class="fl"><label>Valor Líquido Aluguel</label><input class="fi" id="pv-liquido" type="number" step="0.01" value="${p.alugTransf||''}"></div>
+      </div>
+      <div class="fl" style="margin-bottom:12px"><label>Data do Repasse</label><input class="fi" id="pv-data" type="date" value="${ddmmyyyy2iso(p.dataRepasse)}"></div>
+      ${p.iptuTransf?`<div class="sec-note" style="margin:0 0 12px">Este relatório mostra <strong>${fmt(p.iptuTransf)}</strong> de IPTU que a imobiliária repassou pra você (não descontou). Esse valor caiu na sua conta, mas não é seu — o IPTU ainda precisa ser pago. Por isso ele <strong>não</strong> entra no campo "Valor Líquido Aluguel" acima; vou registrar separado, como pendente, na aba IPTU/Água.</div>`:''}
+      <div class="fl" style="margin-bottom:20px"><label>Observação</label><input class="fi" id="pv-obs" value="Importado do relatório Aprisco/Alude${p.locatario?' — inquilino '+p.locatario:''}"></div>
+      <div style="display:flex;gap:10px">
+        <button class="btn-gold" style="flex:1" onclick="confirmarImportPDF(${p.iptuTransf||0})">Confirmar e Lançar</button>
+        <button class="btn-ghost" onclick="fecharModal()">Cancelar</button>
+      </div>
+    </div>
+  </div>`;
+}
+function confirmarImportPDF(iptuTransf){
+  const imovelId=document.getElementById('pv-im').value;
+  if(!imovelId){notify('Selecione um imóvel','err');return;}
+  const comp=_pdfPendingFile?{...(_pdfPendingFile),nomeFinal:nomeAutomatico(imovelNome(imovelId),'RELATORIO')+'.pdf'}:null;
+  const lst=load(pkPeriodo('alugueis'));
+  lst.push({id:uuid(),imovelId,bruto:+document.getElementById('pv-bruto').value||0,liquido:+document.getElementById('pv-liquido').value||0,data:document.getElementById('pv-data').value,obs:document.getElementById('pv-obs').value.trim(),comprovante:comp});
+  save(pkPeriodo('alugueis'),lst);
+  if(iptuTransf>0){
+    const rp=load(pkPeriodo('repasses'));
+    rp.push({id:uuid(),imovelId,tipo:'IPTU',valor:iptuTransf,envio:document.getElementById('pv-data').value,status:'recebido_a_pagar',comprovante:comp});
+    save(pkPeriodo('repasses'),rp);
+  }
+  fecharModal();
+  document.getElementById('pdf-import-input').value='';
+  document.getElementById('pdf-import-status').textContent='';
+  _pdfPendingFile=null;
+  notify('Importado e lançado com sucesso','ok');render();
+}
+
 // ── REPASSES AO CORRETOR (IPTU/Água) — informativo, NÃO entra no saldo ──
 function renderRepasses(){
   const ims=getImoveis();
@@ -425,7 +546,7 @@ function renderRepasses(){
       <div class="fl"><label>Tipo</label><select class="fi" id="rp-tipo"><option>IPTU</option><option>Água</option><option>Luz</option><option>Outro</option></select></div>
       <div class="fl"><label>Valor</label><input class="fi" id="rp-val" type="number" step="0.01" placeholder="0,00"></div>
       <div class="fl"><label>Data Envio ao Corretor</label><input class="fi" id="rp-envio" type="date" value="${today()}"></div>
-      <div class="fl"><label>Status</label><select class="fi" id="rp-status"><option value="enviado">Enviado</option><option value="pago">Pago</option></select></div>
+      <div class="fl"><label>Status</label><select class="fi" id="rp-status"><option value="enviado">Enviado ao corretor</option><option value="pago">Pago</option><option value="recebido_a_pagar">Recebido — a pagar por mim</option></select></div>
     </div>
     <div class="fl" style="margin-bottom:14px"><label>Comprovante de Pagamento (PDF/imagem, até 4MB)</label><input class="fi" id="rp-file" type="file" accept=".pdf,image/*"></div>
     <button class="btn-gold" onclick="addRepasse()">+ Registrar</button>
@@ -433,7 +554,7 @@ function renderRepasses(){
   <div class="tbl-wrap"><table>
     <thead><tr><th>Imóvel</th><th>Tipo</th><th>Valor</th><th>Envio</th><th>Status</th><th>Comprovante</th><th></th></tr></thead>
     <tbody>
-      ${lst.length?lst.map(r=>`<tr><td>${imovelNome(r.imovelId)}</td><td>${r.tipo}</td><td>${fmt(r.valor)}</td><td>${r.envio||'—'}</td><td><span class="badge ${r.status==='pago'?'b-ok':'b-pend'}">${r.status==='pago'?'Pago':'Enviado'}</span></td><td>${comprovanteChip(r.comprovante)}</td><td><button class="btn-sm" onclick="delItem('repasses','${r.id}')">excluir</button></td></tr>`).join(''):`<tr><td colspan="7"><div class="empty">Nenhuma conta registrada neste mês.</div></td></tr>`}
+      ${lst.length?lst.map(r=>{const badges={pago:['b-ok','Pago'],enviado:['b-pend','Enviado'],recebido_a_pagar:['b-late','Recebido — a pagar']};const b=badges[r.status]||badges.enviado;const acao=r.status==='recebido_a_pagar'?`<button class="btn-sm btn-ok" onclick="marcarRepassePago('${r.id}')">✓ marcar pago</button> `:'';return `<tr><td>${imovelNome(r.imovelId)}</td><td>${r.tipo}</td><td>${fmt(r.valor)}</td><td>${r.envio||'—'}</td><td><span class="badge ${b[0]}">${b[1]}</span></td><td>${comprovanteChip(r.comprovante)}</td><td>${acao}<button class="btn-sm" onclick="delItem('repasses','${r.id}')">excluir</button></td></tr>`}).join(''):`<tr><td colspan="7"><div class="empty">Nenhuma conta registrada neste mês.</div></td></tr>`}
     </tbody>
   </table></div>`;
 }
@@ -450,6 +571,14 @@ function addRepasse(){
     save(pkPeriodo('repasses'),lst);
     notify('Conta registrada'+(comp?' com comprovante':''),'ok');render();
   });
+}
+
+function marcarRepassePago(id){
+  const lst=load(pkPeriodo('repasses'));
+  const it=lst.find(r=>r.id===id);
+  if(it)it.status='pago';
+  save(pkPeriodo('repasses'),lst);
+  notify('Marcado como pago — sai do saldo pendente','ok');render();
 }
 
 // ── DESPESAS DIRETAS (manutenção etc) — entra no saldo ──
@@ -654,19 +783,25 @@ function calcMes(){
   const desp=load(pkPeriodo('despesas'));
   const cond=load(pkPeriodo('condominio'));
   const transf=load(pkPeriodo('transferencias'));
+  const rep=load(pkPeriodo('repasses'));
   const porImovel=ims.map(im=>{
     const liquido=alug.filter(r=>r.imovelId===im.id).reduce((s,r)=>s+(+r.liquido||0),0);
     const despesas=desp.filter(r=>r.imovelId===im.id).reduce((s,r)=>s+(+r.valor||0),0);
     const condPend=cond.filter(r=>r.imovelId===im.id && !r.devolvido).reduce((s,r)=>s+(+r.valor||0),0);
+    const iptuAPagar=rep.filter(r=>r.imovelId===im.id && r.status==='recebido_a_pagar').reduce((s,r)=>s+(+r.valor||0),0);
+    // Nota: o valor de IPTU repassado ao proprietário (recebido_a_pagar) NÃO entra no líquido
+    // acima nem é descontado aqui — ele nunca foi contado como renda, então fica só como
+    // alerta informativo (dinheiro que está na conta mas é reservado para o IPTU).
     const saldo=liquido-despesas-condPend;
-    return {imovel:im,liquido,despesas,condPend,saldo};
+    return {imovel:im,liquido,despesas,condPend,iptuAPagar,saldo};
   });
   const totalLiquido=porImovel.reduce((s,p)=>s+p.liquido,0);
   const totalDespesas=porImovel.reduce((s,p)=>s+p.despesas,0);
   const totalCondPend=porImovel.reduce((s,p)=>s+p.condPend,0);
+  const totalIptuAPagar=porImovel.reduce((s,p)=>s+p.iptuAPagar,0);
   const totalSaldo=porImovel.reduce((s,p)=>s+p.saldo,0);
   const totalTransf=transf.reduce((s,r)=>s+(+r.valor||0),0);
-  return {porImovel,totalLiquido,totalDespesas,totalCondPend,totalSaldo,totalTransf,disponivelAposPessoal:totalSaldo-totalTransf};
+  return {porImovel,totalLiquido,totalDespesas,totalCondPend,totalIptuAPagar,totalSaldo,totalTransf,disponivelAposPessoal:totalSaldo-totalTransf};
 }
 
 // ── DASHBOARD ──
@@ -677,17 +812,18 @@ function renderDash(){
     <div class="kpi"><div class="kpi-accent" style="background:var(--gold)"></div><div class="kpi-label">Líquido Recebido</div><div class="kpi-value pos">${fmt(c.totalLiquido)}</div></div>
     <div class="kpi"><div class="kpi-accent" style="background:var(--red)"></div><div class="kpi-label">Despesas Diretas</div><div class="kpi-value neg">${fmt(c.totalDespesas)}</div></div>
     <div class="kpi"><div class="kpi-accent" style="background:var(--amber)"></div><div class="kpi-label">Condomínio Pendente</div><div class="kpi-value" style="color:var(--amber)">${fmt(c.totalCondPend)}</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--red)"></div><div class="kpi-label">IPTU Recebido a Pagar</div><div class="kpi-value" style="color:var(--red)">${fmt(c.totalIptuAPagar)}</div></div>
     <div class="kpi"><div class="kpi-accent" style="background:var(--blue)"></div><div class="kpi-label">Saldo Imóveis</div><div class="kpi-value ${vc(c.totalSaldo)}">${fmt(c.totalSaldo)}</div></div>
     <div class="kpi"><div class="kpi-accent" style="background:var(--dim)"></div><div class="kpi-label">Transferido p/ Pessoal</div><div class="kpi-value neg">${fmt(c.totalTransf)}</div></div>
     <div class="kpi"><div class="kpi-accent" style="background:var(--green)"></div><div class="kpi-label">Disponível Após Pessoal</div><div class="kpi-value ${vc(c.disponivelAposPessoal)}">${fmt(c.disponivelAposPessoal)}</div></div>
   </div>
   <div class="sec-hdr"><h2>Saldo por Imóvel</h2><div class="sec-line"></div></div>
   <div class="tbl-wrap"><table>
-    <thead><tr><th>Imóvel</th><th>Líquido</th><th>Despesas</th><th>Condomínio Pendente</th><th>Saldo</th></tr></thead>
+    <thead><tr><th>Imóvel</th><th>Líquido</th><th>Despesas</th><th>Condomínio Pendente</th><th>IPTU a Pagar</th><th>Saldo</th></tr></thead>
     <tbody>
-      ${c.porImovel.length?c.porImovel.map(p=>`<tr><td>${p.imovel.nome}</td><td class="pos">${fmt(p.liquido)}</td><td class="neg">${fmt(p.despesas)}</td><td style="color:var(--amber)">${fmt(p.condPend)}</td><td class="${vc(p.saldo)}"><strong>${fmt(p.saldo)}</strong></td></tr>`).join(''):`<tr><td colspan="5"><div class="empty">Cadastre imóveis e lance o mês para ver o resultado aqui.</div></td></tr>`}
+      ${c.porImovel.length?c.porImovel.map(p=>`<tr><td>${p.imovel.nome}</td><td class="pos">${fmt(p.liquido)}</td><td class="neg">${fmt(p.despesas)}</td><td style="color:var(--amber)">${fmt(p.condPend)}</td><td style="color:var(--red)">${fmt(p.iptuAPagar)}</td><td class="${vc(p.saldo)}"><strong>${fmt(p.saldo)}</strong></td></tr>`).join(''):`<tr><td colspan="6"><div class="empty">Cadastre imóveis e lance o mês para ver o resultado aqui.</div></td></tr>`}
     </tbody>
-    <tfoot><tr class="tfoot"><td>Total</td><td class="pos">${fmt(c.totalLiquido)}</td><td class="neg">${fmt(c.totalDespesas)}</td><td style="color:var(--amber)">${fmt(c.totalCondPend)}</td><td class="${vc(c.totalSaldo)}">${fmt(c.totalSaldo)}</td></tr></tfoot>
+    <tfoot><tr class="tfoot"><td>Total</td><td class="pos">${fmt(c.totalLiquido)}</td><td class="neg">${fmt(c.totalDespesas)}</td><td style="color:var(--amber)">${fmt(c.totalCondPend)}</td><td style="color:var(--red)">${fmt(c.totalIptuAPagar)}</td><td class="${vc(c.totalSaldo)}">${fmt(c.totalSaldo)}</td></tr></tfoot>
   </table></div>`;
 }
 
@@ -707,7 +843,8 @@ function renderDRE(){
   ${row('Saldo Imóveis do Mês',c.totalSaldo,vc(c.totalSaldo))}
   ${row('(–) Transferido para Pessoal',c.totalTransf,'neg')}
   <div class="dre-sub"><div class="dre-row"><div class="dre-l">Disponível Após Pessoal</div><div class="dre-v ${vc(c.disponivelAposPessoal)}">${fmt(c.disponivelAposPessoal)}</div></div></div>
-  <div class="sec-note" style="margin-top:20px">IPTU e água repassados ao corretor não entram neste DRE porque já foram descontados antes do valor líquido chegar até você — evita contar a mesma despesa duas vezes. Eles ficam registrados na aba "IPTU / Água" só para conferência e comprovação.</div>
+  ${c.totalIptuAPagar>0?`<div class="sec-note" style="margin-top:20px;color:var(--red)">⚠ Existe ${fmt(c.totalIptuAPagar)} de IPTU que a imobiliária repassou pra você (não descontou) e ainda não foi pago. Esse valor está fisicamente na sua conta mas não é seu — separe-o antes de mexer no saldo abaixo. Acompanhe em "IPTU / Água".</div>`:''}
+  <div class="sec-note" style="margin-top:12px">IPTU e água descontados diretamente pela imobiliária não entram neste DRE porque nunca chegaram a compor o valor líquido recebido — evita contar a mesma despesa duas vezes. Ficam registrados na aba "IPTU / Água" só para conferência e comprovação.</div>
   `;
 }
 
