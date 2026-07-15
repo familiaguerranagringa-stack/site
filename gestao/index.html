@@ -542,6 +542,7 @@ function renderEntradas(){
         <td class="pos">${r.din?fmt(r.din):'—'}</td>
         <td class="pos">${r.pix?fmt(r.pix):'—'}</td>
         <td class="pos">${r.cart?fmt(r.cart):'—'}</td>
+        <td class="pos">${r.getnet?fmt(r.getnet):'—'}</td>
         <td class="neg">${taxa?fmt(taxa):'—'}</td>
         <td class="neg" style="font-family:'Syne',sans-serif;font-size:12px">${cmvDia?fmt(cmvDia):'—'}</td>
         <td class="dim" style="font-size:11px;text-align:left">${r.obs||'—'}</td>
@@ -1346,7 +1347,7 @@ function renderDRE(){
   const fatTotal=t.din+t.pix+t.cart+(t.getnet||0)+t.finVendas+t.rend+t.cred;
 
   // ── DRE
-  const cmvManual=loadO('recompra_meta').cmvOrc||0;
+  const cmvManual=t.cmvEntradas||0; // CMV acumulado das Entradas
   const lucroBruto=fatTotal-cmvManual;
   const despesas=verifMensal+bancoSaidas; // tudo exceto compras
   const lucroLiq=lucroBruto-t.taxas-despesas-t.cred;
@@ -1410,7 +1411,7 @@ function renderDRE(){
     <!-- ESQUERDA: SALDO DE RECOMPRA + CONFERÊNCIA -->
     <div style="display:flex;flex-direction:column;gap:12px">
       ${card(`${H('🔄 Saldo de Recompra','var(--amber)')}
-        ${R('CMV',cmvManual,'gold')}
+        ${R('CMV (acum. Entradas)',cmvManual,'gold')}
         ${R('(-) Compra',t.compras,'neg')}
         ${R('(-) Perdas',t.perdas,'neg')}
         ${Rtot('Disponível',disponivel,disponivel>=0?'pos':'neg')}`)}
@@ -1682,12 +1683,31 @@ function renderMarkup(){
       return'<tr><td><strong>'+nome+'</strong><br><span style="font-size:10px;color:var(--gold)">'+fmt(metaVendInd)+'</span></td>'+catCols+'</tr>';
     }).join('');
 
+
+    // Vendas diárias direto das entradas (com getnet + financeiras)
+    const vendasPorDia={};
+    en.forEach(r=>{
+      const tb=(+r.din||0)+(+r.pix||0)+(+r.cart||0)+(+r.getnet||0)+(+r.rend||0)+(+r.cred||0)+(finDia[r.data]||0);
+      if(tb>0) vendasPorDia[r.data]=(vendasPorDia[r.data]||0)+tb;
+    });
+    Object.keys(finDia).forEach(dt=>{if(!vendasPorDia[dt]&&finDia[dt]>0)vendasPorDia[dt]=finDia[dt];});
+    const vendasDiariaArr2=Object.entries(vendasPorDia).sort(([a],[b])=>a.localeCompare(b))
+      .map(([dt,v])=>({d:new Date(dt+'T12:00:00').getDate(),v})).filter(r=>r.v>0);
+    const maxVD=Math.max(...vendasDiariaArr2.map(r=>r.v),1);
+    const barrasD=vendasDiariaArr2.map(r=>{
+      const h2=Math.max(Math.round(r.v/maxVD*80),2);
+      const vF=r.v>=1000?(r.v/1000).toFixed(1)+'k':Math.round(r.v)+'';
+      return'<div style="display:flex;flex-direction:column;align-items:center;gap:1px;flex-shrink:0;min-width:28px">'
+        +'<div style="font-size:8px;color:var(--muted);white-space:nowrap">'+vF+'</div>'
+        +'<div style="width:18px;height:'+h2+'px;background:var(--gold);border-radius:2px 2px 0 0" title="'+vF+'"></div>'
+        +'<div style="font-size:9px;color:var(--dim)">'+r.d+'</div></div>';
+    }).join('');
     // Render final
     const c=document.getElementById('content');
     let h='';
 
     // GRID PRINCIPAL: 3 colunas
-    h+='<div style="display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:14px;align-items:start;margin-bottom:20px">';
+    h+='<div style="display:grid;grid-template-columns:1.4fr 1fr;gap:14px;align-items:start;margin-bottom:20px">';
 
     // COL 1: Markup Acumulativo
     h+='<div>';
@@ -1697,8 +1717,9 @@ function renderMarkup(){
     h+='</table></div>';
     h+='</div>';
 
-    // COL 2: Meta + Categoria + Leão
+    // COL 2: Right Panel (Meta+Vendedor lado a lado, depois Categoria e Leão)
     h+='<div style="display:flex;flex-direction:column;gap:14px">';
+    h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start">';
 
     // Bloco META
     h+='<div style="display:grid;grid-template-columns:1fr;gap:0">'; // wrapper col2 meta
@@ -1763,15 +1784,16 @@ function renderMarkup(){
     });
     h+='</div>';
 
-    // [Markup Acumulativo já está no início - REMOVIDO daqui]
-    // h+='SKIP_ACUMULATIVO — '+MESES[ST.mes-1]+' '+ST.ano+'</h2><div class="sec-line"></div></div>';
-    h+='<div class="tbl-wrap" style="margin-bottom:20px"><table><tr><th>Data</th><th>CMV Acum.</th><th>Venda Acum.</th><th>Taxas Acum.</th><th>Gastos Acum.</th><th>Imposto 9%</th><th>%</th></tr>';
+    // [Markup Acumulativo já no início - skip]
+    h+='<!-- skipcum.</th><th>Gastos Acum.</th><th>Imposto 9%</th><th>%</th></tr>';
     // Gráficos
     h+='<div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:14px;margin-bottom:24px">';
-    h+='<div class="chart-block"><div class="chart-lbl">Vendas Diárias</div><div style="display:flex;align-items:flex-end;gap:3px;height:90px;overflow-x:auto;padding-bottom:18px">'+(barrasH||'<div style="color:var(--dim);font-size:12px">Sem dados</div>')+'</div></div>';
+    h+='<div class="chart-block"><div class="chart-lbl">Vendas Diárias</div><div style="display:flex;align-items:flex-end;gap:3px;height:100px;overflow-x:auto;padding-bottom:4px">'+( barrasD||'<div class="dim">Sem dados</div>')+'</div></div>';
     h+='<div class="chart-block"><div class="chart-lbl">Categorias</div><div style="display:flex;flex-direction:column;align-items:center;gap:8px"><svg viewBox="0 0 120 120" width="100" height="100">'+pizzaCat+'</svg><div style="display:flex;flex-direction:column;gap:3px">'+legCat+'</div></div></div>';
     h+='<div class="chart-block"><div class="chart-lbl">Por Vendedor</div><div style="text-align:center"><svg viewBox="0 0 120 120" width="90" height="90">'+pizzaVend+'</svg></div><div style="display:flex;flex-direction:column;gap:3px">'+legVend+'</div></div>';
-    h+='<div class="chart-block"><div class="chart-lbl">SKIP_ORIG_VENDEDOR (pizza)</div><div style="display:flex;flex-direction:column;align-items:center;gap:8px"><svg viewBox="0 0 120 120" width="100" height="100">'+pizzaVend+'</svg><div style="display:flex;flex-direction:column;gap:3px">'+(legVend||'<div style="font-size:11px;color:var(--dim)">Sem dados</div>')+'</div></div></div>';
+    // h+='SKIP_ORIG_VENDEDOR - removido
+    h+='<!-- removidolumn;align-items:center;gap:8px"><svg viewBox="0 0 120 120" width="100" height="100">'+pizzaVend+'</svg><div style="display:flex;flex-direction:column;gap:3px">'+(legVend||'<div style="font-size:11px;color:var(--dim)">Sem dados</div>')+'</div></div></div>';
+    h+='-->';
     h+='</div>';
 
     c.innerHTML=h;
