@@ -1425,15 +1425,7 @@ function renderDRE(){
     <!-- DIREITA: DRE -->
     ${card(`${H('DRE — Resultado do Mês')}
       ${R('Receitas (Faturamento)',fatTotal,'pos')}
-      <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 14px;border-bottom:1px solid var(--border-lite)">
-        <span style="font-size:12px;color:var(--muted)">CMV <span style="font-size:9px;color:var(--gold)">(editável)</span></span>
-        <div style="display:flex;align-items:center;gap:6px">
-          <span style="font-size:11px;color:var(--dim)">R$</span>
-          <input type="number" step="0.01" value="${cmvManual||''}" placeholder="0,00"
-            style="width:110px;background:var(--bg);border:1px solid var(--gold-dim);border-radius:6px;padding:3px 8px;color:var(--gold);font-size:12px;font-variant-numeric:tabular-nums;text-align:right"
-            oninput="const d=loadO('recompra_meta');d.cmvOrc=+this.value||0;saveO('recompra_meta',d);renderDRE()">
-        </div>
-      </div>
+      ${R('CMV (acum. Entradas)',cmvManual,'neg')}
       ${R('Lucro Bruto',lucroBruto,lucroBruto>=0?'pos':'neg',true)}
       ${R('(-) Taxas',-t.taxas,'neg')}
       ${R('(-) Despesas',-despesas,'neg')}
@@ -1702,99 +1694,123 @@ function renderMarkup(){
         +'<div style="width:18px;height:'+h2+'px;background:var(--gold);border-radius:2px 2px 0 0" title="'+vF+'"></div>'
         +'<div style="font-size:9px;color:var(--dim)">'+r.d+'</div></div>';
     }).join('');
-    // Render final
+    // ─── RENDER FINAL ────────────────────────────────────
     const c=document.getElementById('content');
     let h='';
 
-    // GRID PRINCIPAL: 3 colunas
-    h+='<div style="display:grid;grid-template-columns:1.4fr 1fr;gap:14px;align-items:start;margin-bottom:20px">';
+    // ── GRID 3 COLUNAS: Acumulativo | Centro | Direita ──
+    h+='<div style="display:grid;grid-template-columns:2fr 1.6fr 1.2fr;gap:14px;align-items:start;margin-bottom:16px">';
 
-    // COL 1: Markup Acumulativo
+    // ═══ COL 1: MARKUP ACUMULATIVO ═══
     h+='<div>';
-    h+='<div class="sec-hdr" style="margin-bottom:10px"><h2>Markup Acumulativo &mdash; '+MESES[ST.mes-1]+' '+ST.ano+'</h2><div class="sec-line"></div></div>';
-    h+='<div class="tbl-wrap"><table style="font-size:11px"><tr><th>Data</th><th>CMV Ac.</th><th>Venda Ac.</th><th>Taxas Ac.</th><th>Mk%</th><th style="min-width:70px">Projeção</th><th>Meta</th></tr>';
+    h+='<div class="sec-hdr" style="margin-bottom:8px"><h2>Markup Acumulativo — '+MESES[ST.mes-1]+' '+ST.ano+'</h2><div class="sec-line"></div></div>';
+    h+='<div class="tbl-wrap"><table style="font-size:11px"><tr><th>Data</th><th>CMV Ac.</th><th>Venda Ac.</th><th>Taxas Ac.</th><th>Gastos Ac.</th><th>Imposto 9%</th><th>%</th></tr>';
     h+=mkTblRows||'<tr><td colspan="7" class="dim" style="padding:20px;text-align:center">Sem dados. Lance o CMV nas Entradas.</td></tr>';
     h+='</table></div>';
     h+='</div>';
 
-    // COL 2: Right Panel (Meta+Vendedor lado a lado, depois Categoria e Leão)
-    h+='<div style="display:flex;flex-direction:column;gap:14px">';
-    h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start">';
+    // ═══ COL 2: META + CATEGORIA + LEÃO ═══
+    h+='<div style="display:flex;flex-direction:column;gap:12px">';
 
-    // Bloco META
-    h+='<div style="display:grid;grid-template-columns:1fr;gap:0">'; // wrapper col2 meta
-    h+='<div class="form-card"><div class="sec-hdr" style="margin-bottom:12px"><h2>Meta do Mês</h2><div class="sec-line"></div></div>';
-    h+='<div class="fg" style="grid-template-columns:1fr 1fr">';
-    h+='<div class="fl"><label>Meta Base R$</label><input class="fi" type="number" step="0.01" value="'+(metaDigitada||'')+'" placeholder="0,00" onchange="saveMkField(\'metaMes\',+this.value);renderMarkup()"></div>';
-    h+='<div class="fl"><label>Dias a Abrir</label><input class="fi" type="number" value="'+diasAbrir+'" min="1" max="31" onchange="saveMkField(\'diasAbrir\',+this.value);renderMarkup()"></div></div>';
-    h+='<div style="margin:8px 0;background:var(--gold-bg);border:1px solid var(--gold-dim);border-radius:8px;padding:12px 14px"><div style="font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:4px">META DO MÊS (markup '+(pctAtual*100).toFixed(1)+'%)</div><div style="font-family:\'Syne\',sans-serif;font-size:28px;font-weight:800;color:var(--gold)">'+fmt(metaMes)+'</div><div style="font-size:10px;color:var(--dim);margin-top:2px">Base: '+fmt(metaDigitada)+'</div></div>';
-    h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
-    h+='<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px"><div style="font-size:9px;color:var(--muted);text-transform:uppercase;margin-bottom:4px">Total Vendido</div><div style="font-family:\'Syne\',sans-serif;font-size:15px;font-weight:700;color:var(--green)">'+fmt(totalVendido)+'</div></div>';
-    h+='<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px"><div style="font-size:9px;color:var(--muted);text-transform:uppercase;margin-bottom:4px">Média de Venda</div><div style="font-family:\'Syne\',sans-serif;font-size:15px;font-weight:700;color:var(--text)">'+fmt(media)+'</div></div>';
-    h+='<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px"><div style="font-size:9px;color:var(--muted);text-transform:uppercase;margin-bottom:4px">Projeção de Venda</div><div style="font-family:\'Syne\',sans-serif;font-size:15px;font-weight:700;color:var(--blue)">'+fmt(projecao)+'</div></div>';
-    h+='<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px"><div style="font-size:9px;color:var(--muted);text-transform:uppercase;margin-bottom:4px">Venda p/ o Dia</div><div style="font-family:\'Syne\',sans-serif;font-size:15px;font-weight:700;color:var(--amber)">'+fmt(vendaDia)+'</div></div>';
+    // Meta do Mês (compacto — inspirado na planilha)
+    h+='<div class="form-card" style="padding:10px 12px">';
+    h+='<div class="sec-hdr" style="margin-bottom:8px"><h2>Meta do Mês</h2><div class="sec-line"></div></div>';
+    h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">';
+    h+='<div class="fl" style="margin:0"><label style="font-size:10px">Meta Base R$</label>';
+    h+='<input class="fi" type="number" step="0.01" value="'+(metaDigitada||'')+'" placeholder="0,00" id="mk-meta" oninput="mkSaveField(this)" style="padding:4px 6px;font-size:12px"></div>';
+    h+='<div class="fl" style="margin:0"><label style="font-size:10px">Dias a Abrir</label>';
+    h+='<input class="fi" type="number" value="'+diasAbrir+'" min="1" max="31" id="mk-dias" onchange="mkSaveField(this)" style="padding:4px 6px;font-size:12px"></div>';
     h+='</div>';
-    h+='<div style="margin-top:8px;background:var(--bg);border-radius:6px;overflow:hidden"><div style="height:5px;background:var(--border)"><div style="height:100%;background:'+(pctMeta>=1?'var(--green)':'var(--gold)')+';width:'+Math.min(pctMeta*100,100).toFixed(1)+'%"></div></div>';
-    h+='<div style="font-size:10px;color:var(--muted);padding:3px 6px">'+(pctMeta*100).toFixed(1)+'% da meta</div></div></div>';
+    // Tabela compacta de indicadores (estilo planilha)
+    var metaRow=(lbl,val,cls)=>'<tr><td style="font-size:11px;color:var(--muted);padding:3px 0">'+lbl+'</td>'
+      +'<td style="font-size:12px;font-weight:700;text-align:right;color:'+(cls||'var(--gold)')+'">'+fmt(val)+'</td></tr>';
+    h+='<table style="width:100%;border-collapse:collapse">';
+    h+=metaRow('META DO MÊS',metaMes,'var(--gold)');
+    h+=metaRow('TOTAL VENDIDO',totalVendido,'var(--green)');
+    h+=metaRow('MÉDIA VENDA / DIA',media||0,'var(--text)');
+    h+=metaRow('PROJEÇÃO VENDA',projecao||0,projecao>=metaMes?'var(--green)':'var(--amber)');
+    h+=metaRow('VENDA PARA O DIA',vendaDia||0,'var(--text)');
+    h+='</table>';
+    h+='<div style="margin-top:6px;background:var(--bg);border-radius:4px;overflow:hidden"><div style="height:4px;background:var(--gold);width:'+(Math.min(pctMeta,1)*100).toFixed(1)+'%;border-radius:2px"></div></div>';
+    h+='<div style="font-size:10px;color:var(--muted);margin-top:2px">'+(pctMeta*100).toFixed(1)+'% da meta</div>';
+    h+='</div>';
 
-    // Meta por categoria
-    h+='<div class="form-card"><div class="sec-hdr" style="margin-bottom:12px"><h2>Meta por Categoria</h2><div class="sec-line"></div></div>';
-    h+='<div class="tbl-wrap"><table style="min-width:0"><tr><th style="text-align:left">Categoria</th><th>%</th><th>Meta R$</th></tr>';
+    // Meta por Categoria (compacto)
+    h+='<div class="form-card" style="padding:10px 12px">';
+    h+='<div class="sec-hdr" style="margin-bottom:8px"><h2>Meta por Categoria</h2><div class="sec-line"></div></div>';
+    h+='<table style="width:100%;border-collapse:collapse">';
     CAT_PRODUTO.forEach(cat=>{
       const pp=CAT_PCTS[cat]||0;
-      h+='<tr><td>'+cat+'</td><td class="gold" style="text-align:right">'+pp+'%</td><td class="gold" style="font-family:\'Syne\',sans-serif;font-weight:700">'+fmt(metaMes*(pp/100))+'</td></tr>';
+      h+='<tr><td style="font-size:11px;color:var(--muted);padding:3px 0">'+cat+'</td>'
+        +'<td style="font-size:11px;color:var(--gold);text-align:right">'+pp+'%</td>'
+        +'<td style="font-size:11px;font-weight:700;color:var(--gold);text-align:right;padding-left:8px">'+fmt(metaMes*pp/100)+'</td></tr>';
     });
-    h+='</table></div></div>';
+    h+='</table>';
+    h+='</div>';
 
     // Corrida do Leão
-    h+='<div class="sec-hdr" style="margin:20px 0 10px"><h2>🦁 Corrida do Leão — '+MESES[ST.mes-1]+' '+ST.ano+'</h2><div class="sec-line"></div></div>';
-    h+='<div style="font-size:11px;color:var(--muted);margin-bottom:12px">Clique no dia de um vendedor para marcar ★ vencedor. Domingos em vermelho (D). Pontos por semana ao lado.</div>';
-    if(nomes.length>0){
-      h+=leaoHtml;
-
-    } else {
-      h+='<div class="empty">👥 Adicione funcionários na Verificação Mensal.</div>';
-    }
+    h+='<div class="form-card" style="padding:10px 12px">';
+    h+='<div class="sec-hdr" style="margin-bottom:6px"><h2>🦁 Corrida do Leão</h2><div class="sec-line"></div></div>';
+    h+='<div style="font-size:10px;color:var(--muted);margin-bottom:8px">Clique para marcar ★ vencedor. Dom. = dia de folga.</div>';
+    if(nomes.length>0){h+=leaoHtml;}else{h+='<div class="empty" style="font-size:11px">Adicione funcionários.</div>';}
+    h+='</div>';
 
     h+='</div>'; // fecha col2
 
-    // COL 3: Meta por Vendedor
-    h+='<div>';
+    // ═══ COL 3: VENDEDORES + INFORMATIVOS ═══
+    h+='<div style="display:flex;flex-direction:column;gap:12px">';
+
+    // Meta por Vendedor
     if(nomes.length>0){
-      h+='<div class="sec-hdr" style="margin-bottom:10px"><h2>Meta por Vendedor</h2><div class="sec-line"></div></div>';
-      h+='<div style="font-size:11px;color:var(--muted);margin-bottom:8px">Meta individual: '+fmt(metaVendInd)+' ('+fmt(metaMes)+' ÷ '+nVend+' vendedor'+(nVend>1?'es':'')+')</div>';
-      h+='<div class="tbl-wrap" style="margin-bottom:16px"><table><tr><th style="text-align:left">Vendedor</th>';
-      CAT_PRODUTO.forEach(cat=>{h+='<th>'+cat+'</th>';});
-      h+='</tr>'+vendTblRows+'</table></div>';
-      h+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">';
-      nomes.forEach(nome=>{h+='<button class="btn-ghost" onclick="editVendCats(\''+nome+'\')" style="font-size:11px">✏ '+nome+'</button>';});
+      h+='<div class="form-card" style="padding:10px 12px">';
+      h+='<div class="sec-hdr" style="margin-bottom:6px"><h2>Meta por Vendedor</h2><div class="sec-line"></div></div>';
+      h+='<div style="font-size:10px;color:var(--muted);margin-bottom:6px">Meta ind.: '+fmt(metaVendInd)+'</div>';
+      h+='<div class="tbl-wrap"><table style="font-size:10px"><tr><th style="text-align:left">Vendedor</th>';
+      CAT_PRODUTO.forEach(cat=>{h+='<th style="font-size:10px">'+cat.slice(0,4)+'.</th>';});
+      h+='<th>Total</th></tr>'+vendTblRows+'</table></div>';
+      h+='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">';
+      nomes.forEach(nome=>{h+='<button class="btn-ghost" onclick="editVendCats(\''+nome+'\')" style="font-size:10px">✏ '+nome+'</button>';});
       h+='</div><div id="vend-cat-editor"></div>';
+      h+='</div>';
     }
 
     // Informativos
-    h+='<div class="sec-hdr" style="margin-bottom:10px"><h2>Informativos</h2><div class="sec-line"></div></div>';
-    h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px">';
+    h+='<div class="form-card" style="padding:10px 12px">';
+    h+='<div class="sec-hdr" style="margin-bottom:8px"><h2>Informativos</h2><div class="sec-line"></div></div>';
     [
-      ['💰 Vendedor Olhando de Cima','R$5.000 no dia → R$50 no dia seguinte. R$7.000 → R$100.'],
-      ['⭐ Mais Avaliado','Mais avaliações positivas no Google → R$200 (mín. 20 avaliações).'],
-      ['💳 Bônus UME','R$10 por contrato. Pago no 8º do mês seguinte. Sem preço promocional.'],
-      ['💳 Bônus Payjoy','R$10 por contrato + película Hidrogel. Pago no 8º do mês seguinte.'],
-    ].forEach(([t,d])=>{
-      h+='<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:12px"><div style="font-family:\'Syne\',sans-serif;font-size:10px;font-weight:700;color:var(--gold);margin-bottom:5px">'+t+'</div><div style="font-size:11px;color:var(--muted);line-height:1.5">'+d+'</div></div>';
+      ['💰 Olhando de Cima','R$5k/dia → R$50 no próximo. R$7k → R$100.'],
+      ['⭐ Mais Avaliado','Mais avaliações Google → R$200 (mín. 20).'],
+      ['💳 Bônus UME','R$10/contrato. Pago no 8º do mês seguinte.'],
+      ['💳 Bônus Payjoy','R$10/contrato + película Hidrogel.'],
+    ].forEach(([ti,di])=>{
+      h+='<div style="border-bottom:1px solid var(--border-lite);padding:6px 0">'
+        +'<div style="font-size:10px;font-weight:700;color:var(--gold)">'+ti+'</div>'
+        +'<div style="font-size:10px;color:var(--dim)">'+di+'</div></div>';
     });
     h+='</div>';
 
-    // [Markup Acumulativo já no início - skip]
-    h+='<!-- skipcum.</th><th>Gastos Acum.</th><th>Imposto 9%</th><th>%</th></tr>';
-    // Gráficos
-    h+='<div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:14px;margin-bottom:24px">';
-    h+='<div class="chart-block"><div class="chart-lbl">Vendas Diárias</div><div style="display:flex;align-items:flex-end;gap:3px;height:100px;overflow-x:auto;padding-bottom:4px">'+( barrasD||'<div class="dim">Sem dados</div>')+'</div></div>';
-    h+='<div class="chart-block"><div class="chart-lbl">Categorias</div><div style="display:flex;flex-direction:column;align-items:center;gap:8px"><svg viewBox="0 0 120 120" width="100" height="100">'+pizzaCat+'</svg><div style="display:flex;flex-direction:column;gap:3px">'+legCat+'</div></div></div>';
-    h+='<div class="chart-block"><div class="chart-lbl">Por Vendedor</div><div style="text-align:center"><svg viewBox="0 0 120 120" width="90" height="90">'+pizzaVend+'</svg></div><div style="display:flex;flex-direction:column;gap:3px">'+legVend+'</div></div>';
-    // h+='SKIP_ORIG_VENDEDOR - removido
-    h+='<!-- removidolumn;align-items:center;gap:8px"><svg viewBox="0 0 120 120" width="100" height="100">'+pizzaVend+'</svg><div style="display:flex;flex-direction:column;gap:3px">'+(legVend||'<div style="font-size:11px;color:var(--dim)">Sem dados</div>')+'</div></div></div>';
-    h+='-->';
-    h+='</div>';
+    h+='</div>'; // fecha col3
+    h+='</div>'; // fecha grid principal
+
+    // ── GRÁFICOS (linha abaixo, full-width) ──
+    h+='<div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:14px;margin-top:8px">';
+    // Vendas Diárias
+    h+='<div class="chart-block"><div class="chart-lbl">Vendas Diárias</div>';
+    h+='<div style="display:flex;align-items:flex-end;gap:3px;height:90px;overflow-x:auto;padding-bottom:4px">'+(barrasD||'<div class="dim">Sem dados</div>')+'</div></div>';
+    // Categorias
+    h+='<div class="chart-block"><div class="chart-lbl">Categorias</div>';
+    h+='<div style="display:flex;flex-direction:column;align-items:center;gap:6px">';
+    h+='<svg viewBox="0 0 120 120" width="80" height="80">'+pizzaCat+'</svg>';
+    h+='<div style="display:flex;flex-direction:column;gap:2px;width:100%">'+legCat+'</div></div></div>';
+    // Por Vendedor
+    h+='<div class="chart-block"><div class="chart-lbl">Por Vendedor</div>';
+    h+='<div style="display:flex;flex-direction:column;align-items:center;gap:6px">';
+    if(totalVA>0){
+      h+='<svg viewBox="0 0 120 120" width="80" height="80">'+pizzaVend+'</svg>';
+      h+='<div style="display:flex;flex-direction:column;gap:2px;width:100%">'+legVend+'</div>';
+    }else{h+='<div class="dim" style="font-size:11px">Sem dados</div>';}
+    h+='</div></div>';
+    h+='</div>'; // fecha gráficos
 
     c.innerHTML=h;
   } catch(err){
