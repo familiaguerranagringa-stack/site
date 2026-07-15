@@ -480,7 +480,9 @@ function parseRelatorioAlude(text){
   const locatario=g(/Locat[aá]rio\s+([^\n(]+?)\s*\(/);
   const imobiliaria=g(/Imobili[aá]ria\s+([^\n(]+?)\s*\(/);
   const cobradoSection=(text.split(/O QUE FOI COBRADO/)[1]||'').split(/O QUE FOI TRANSFERIDO/)[0];
-  const transferSection=text.split(/O QUE FOI TRANSFERIDO/)[1]||'';
+  // Relatórios com 2+ páginas repetem o cabeçalho "O QUE FOI TRANSFERIDO" na página seguinte —
+  // por isso juntamos TODAS as partes que vêm depois de cada ocorrência, não só até a próxima.
+  const transferSection=text.split(/O QUE FOI TRANSFERIDO/).slice(1).join(' ');
   const alugCobrado=parseBRNum((cobradoSection.match(/Aluguel\s*(?:\([^)]*\))?\s*R\$\s?([\d.,]+)/)||[])[1]);
   const iptuCobrado=parseBRNum((cobradoSection.match(/IPTU\s+R\$\s?([\d.,]+)/)||[])[1]);
   const alugTransf=parseBRNum((transferSection.match(/Aluguel\s+R\$\s?([\d.,]+)/)||[])[1]);
