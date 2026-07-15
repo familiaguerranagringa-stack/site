@@ -45,12 +45,12 @@ html,body{min-height:100vh;background:var(--bg);color:var(--text);font-family:'D
 .btn-sm:hover{border-color:var(--red);color:var(--red)}
 .btn-ok{border-color:transparent;color:var(--muted)}
 .btn-ok:hover{border-color:var(--green);color:var(--green)}
-.kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:14px;margin-bottom:28px}
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:14px;margin-bottom:28px}
 .kpi{background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:18px 20px;position:relative;overflow:hidden;transition:border-color .2s;box-shadow:0 1px 3px rgba(20,20,20,.05)}
 .kpi:hover{border-color:var(--gold-dim)}
 .kpi-accent{position:absolute;top:0;left:0;right:0;height:2px}
 .kpi-label{font-size:10px;font-weight:600;letter-spacing:.16em;color:var(--muted);text-transform:uppercase;margin-bottom:8px}
-.kpi-value{font-family:'Syne',sans-serif;font-size:21px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.1}
+.kpi-value{font-family:'Syne',sans-serif;font-size:19px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.25;white-space:normal;overflow-wrap:break-word;word-break:break-word}
 .kpi-sub{font-size:11px;color:var(--dim);margin-top:5px}
 .sec-hdr{display:flex;align-items:center;gap:12px;margin-bottom:16px}
 .sec-hdr h2{font-family:'Syne',sans-serif;font-size:10px;font-weight:700;letter-spacing:.2em;color:var(--gold);text-transform:uppercase;white-space:nowrap}
@@ -412,11 +412,11 @@ function renderAlugueis(){
     <button class="btn-gold" onclick="addAluguel()">+ Registrar Recebimento</button>
   </div>
   <div class="tbl-wrap"><table>
-    <thead><tr><th>Imóvel</th><th>Bruto</th><th>Líquido</th><th>Data</th><th>Obs</th><th></th></tr></thead>
+    <thead><tr><th>Imóvel</th><th>Bruto</th><th>Líquido</th><th>Data</th><th>Obs</th><th>Comprovante</th><th></th></tr></thead>
     <tbody>
-      ${lst.length?lst.map(r=>`<tr><td>${imovelNome(r.imovelId)}</td><td>${fmt(r.bruto)}</td><td class="pos">${fmt(r.liquido)}</td><td>${r.data||'—'}</td><td class="dim">${r.obs||'—'}</td><td><button class="btn-sm btn-ok" onclick="abrirEdicaoAluguel('${r.id}')">editar</button> <button class="btn-sm" onclick="delItem('alugueis','${r.id}')">excluir</button></td></tr>`).join(''):`<tr><td colspan="6"><div class="empty">Nenhum recebimento neste mês.</div></td></tr>`}
+      ${lst.length?lst.map(r=>`<tr><td>${imovelNome(r.imovelId)}</td><td>${fmt(r.bruto)}</td><td class="pos">${fmt(r.liquido)}</td><td>${r.data||'—'}</td><td class="dim">${r.obs||'—'}</td><td>${comprovanteChip(r.comprovante)}</td><td><button class="btn-sm btn-ok" onclick="abrirEdicaoAluguel('${r.id}')">editar</button> <button class="btn-sm" onclick="delItem('alugueis','${r.id}')">excluir</button></td></tr>`).join(''):`<tr><td colspan="7"><div class="empty">Nenhum recebimento neste mês.</div></td></tr>`}
     </tbody>
-    <tfoot><tr class="tfoot"><td>Total Líquido do Mês</td><td></td><td class="pos">${fmt(total)}</td><td colspan="3"></td></tr></tfoot>
+    <tfoot><tr class="tfoot"><td>Total Líquido do Mês</td><td></td><td class="pos">${fmt(total)}</td><td colspan="4"></td></tr></tfoot>
   </table></div>`;
 }
 function addAluguel(){
@@ -485,12 +485,14 @@ function parseRelatorioAlude(text){
   const iptuCobrado=parseBRNum((cobradoSection.match(/IPTU\s+R\$\s?([\d.,]+)/)||[])[1]);
   const alugTransf=parseBRNum((transferSection.match(/Aluguel\s+R\$\s?([\d.,]+)/)||[])[1]);
   const iptuTransf=parseBRNum((transferSection.match(/IPTU\s+R\$\s?([\d.,]+)/)||[])[1]);
+  const aguaCobrado=parseBRNum((cobradoSection.match(/[ÁA]gua\s+R\$\s?([\d.,]+)/i)||[])[1]);
+  const aguaTransf=parseBRNum((transferSection.match(/[ÁA]gua\s+R\$\s?([\d.,]+)/i)||[])[1]);
   // Juros e multa por atraso — podem aparecer cobrados e/ou repassados ao proprietário
   const jurosCobrado=parseBRNum((cobradoSection.match(/(?:Juros|Multa)[^\n\d]*R\$\s?([\d.,]+)/)||[])[1]);
   const jurosTransf=parseBRNum((transferSection.match(/(?:Juros|Multa)[^\n\d]*R\$\s?([\d.,]+)/)||[])[1]);
   // Taxa de manutenção/administração cobrada do inquilino mas retida pela imobiliária (não repassada ao proprietário)
   const taxaManutCobrado=parseBRNum((cobradoSection.match(/Taxa de manuten[cç][aã]o[^\n\d]*R\$\s?([\d.,]+)/i)||[])[1]);
-  return {valorRepassado,dataRepasse,referente,imovelAddr,locatario,imobiliaria,alugCobrado,iptuCobrado,alugTransf,iptuTransf,jurosCobrado,jurosTransf,taxaManutCobrado};
+  return {valorRepassado,dataRepasse,referente,imovelAddr,locatario,imobiliaria,alugCobrado,iptuCobrado,alugTransf,iptuTransf,jurosCobrado,jurosTransf,taxaManutCobrado,aguaCobrado,aguaTransf};
 }
 function matchImovel(addr){
   if(!addr)return null;
@@ -581,9 +583,10 @@ function abrirPreviewImportPDF(p){
       ${p.jurosTransf?`<div class="sec-note" style="margin:0 0 12px;color:var(--amber)">⚠ Este relatório mostra <strong>${fmt(p.jurosTransf)}</strong> de juros/multa por atraso — já somei ao "Valor Líquido Aluguel" acima, porque esse valor é seu (é receita a mais, diferente do IPTU repassado). Confira se bateu certo antes de lançar.</div>`:''}
       ${p.taxaManutCobrado?`<div class="sec-note" style="margin:0 0 12px">Este relatório mostra <strong>${fmt(p.taxaManutCobrado)}</strong> de taxa de manutenção cobrada do inquilino — ela fica retida com a imobiliária (não é repassada pra você), por isso não entra no "Valor Líquido Aluguel". É só informativo.</div>`:''}
       ${p.iptuTransf?`<div class="sec-note" style="margin:0 0 12px">Este relatório mostra <strong>${fmt(p.iptuTransf)}</strong> de IPTU que a imobiliária repassou pra você (não descontou). Esse valor caiu na sua conta, mas não é seu — o IPTU ainda precisa ser pago. Por isso ele <strong>não</strong> entra no campo "Valor Líquido Aluguel" acima; vou registrar separado, como pendente, na aba IPTU/Água.</div>`:''}
+      ${p.aguaTransf?`<div class="sec-note" style="margin:0 0 12px">Este relatório mostra <strong>${fmt(p.aguaTransf)}</strong> de Água que a imobiliária repassou pra você (não descontou). Mesma lógica do IPTU: esse valor não entra no líquido, vou registrar como pendente na aba IPTU/Água.</div>`:''}
       <div class="fl" style="margin-bottom:20px"><label>Observação</label><input class="fi" id="pv-obs" value="Importado do relatório Aprisco/Alude${p.locatario?' — inquilino '+p.locatario:''}${p.jurosTransf?' (com juros de atraso '+fmt(p.jurosTransf)+')':''}"></div>
       <div style="display:flex;gap:10px">
-        <button class="btn-gold" style="flex:1" onclick="confirmarImportPDF(${p.iptuTransf||0})">Confirmar e Lançar</button>
+        <button class="btn-gold" style="flex:1" onclick="confirmarImportPDF(${p.iptuTransf||0},${p.aguaTransf||0})">Confirmar e Lançar</button>
         <button class="btn-ghost" onclick="fecharModal()">Cancelar</button>
       </div>
     </div>
@@ -604,18 +607,24 @@ function criarImovelInlineImport(p){
   abrirPreviewImportPDF(p);
   setTimeout(()=>{const sel=document.getElementById('pv-im');if(sel)sel.value=novo.id;},0);
 }
-function confirmarImportPDF(iptuTransf){
+function confirmarImportPDF(iptuTransf,aguaTransf){
   const imovelId=document.getElementById('pv-im').value;
   if(!imovelId){notify('Selecione um imóvel','err');return;}
   const comp=_pdfPendingFile?{...(_pdfPendingFile),nomeFinal:nomeAutomatico(imovelNome(imovelId),'RELATORIO')+'.pdf'}:null;
   const lst=load(pkPeriodo('alugueis'));
   lst.push({id:uuid(),imovelId,bruto:+document.getElementById('pv-bruto').value||0,liquido:+document.getElementById('pv-liquido').value||0,data:document.getElementById('pv-data').value,obs:document.getElementById('pv-obs').value.trim(),comprovante:comp});
   save(pkPeriodo('alugueis'),lst);
+  const rp=load(pkPeriodo('repasses'));
+  let mudouRp=false;
   if(iptuTransf>0){
-    const rp=load(pkPeriodo('repasses'));
     rp.push({id:uuid(),imovelId,tipo:'IPTU',valor:iptuTransf,envio:document.getElementById('pv-data').value,status:'recebido_a_pagar'});
-    save(pkPeriodo('repasses'),rp);
+    mudouRp=true;
   }
+  if(aguaTransf>0){
+    rp.push({id:uuid(),imovelId,tipo:'Água',valor:aguaTransf,envio:document.getElementById('pv-data').value,status:'recebido_a_pagar'});
+    mudouRp=true;
+  }
+  if(mudouRp)save(pkPeriodo('repasses'),rp);
   fecharModal();
   document.getElementById('pdf-import-input').value='';
   document.getElementById('pdf-import-status').textContent='';
