@@ -388,10 +388,60 @@ function salvarEdicaoImovel(id){
 function fecharModal(){document.getElementById('modal-root').innerHTML='';}
 
 // ── ALUGUÉIS (entrada líquida por imóvel/mês) ──
+// ── AGRUPAMENTO DE IMÓVEIS EM MÓDULOS (ordem fixa definida pelo usuário) ──
+const GRUPOS_ORDEM=[
+  {titulo:'Paul Harris',match:['paul harris']},
+  {titulo:'Av Getúlio Vargas 255 Loja 2',match:['getulio vargas','getúlio vargas']},
+  {titulo:'Rua Rudy Alberto',match:['rudy alberto']},
+  {titulo:'Rua Erineia',match:['erineia','erinéia']},
+  {titulo:'Travessa Gomes',match:['travessa gomes']},
+  {titulo:'Salas Comerciais Engracia',match:['engracia','engrácia']},
+  {titulo:'James Mendonça',match:['james mendonca','james mendonça','mendonca','mendonça']},
+  {titulo:'Recanto Família Guerra',match:['recanto']},
+  {titulo:'Rua Carioca',match:['rua carioca','carioca']},
+  {titulo:'Rua Ouro Preto',match:['ouro preto']},
+  {titulo:'Rua Liliane',match:['liliane']},
+];
+function getGrupoTitulo(imovelNome){
+  const n=normTxt(imovelNome||'');
+  const g=GRUPOS_ORDEM.find(g=>g.match.some(m=>n.includes(normTxt(m))));
+  return g?g.titulo:null;
+}
+function montarModulos(){
+  const ims=getImoveis();
+  const usados=new Set();
+  const modulos=GRUPOS_ORDEM.map(g=>{
+    const imsDoGrupo=ims.filter(im=>getGrupoTitulo(im.nome)===g.titulo);
+    imsDoGrupo.forEach(im=>usados.add(im.id));
+    return {titulo:g.titulo,imoveis:imsDoGrupo};
+  });
+  // imóveis que não caíram em nenhum grupo fixo — cada um vira seu próprio módulo, no final
+  const orfaos=ims.filter(im=>!usados.has(im.id));
+  orfaos.forEach(im=>modulos.push({titulo:im.nome,imoveis:[im]}));
+  return modulos;
+}
 function renderAlugueis(){
   const ims=getImoveis();
   const lst=load(pkPeriodo('alugueis'));
   const total=lst.reduce((s,r)=>s+(+r.liquido||0),0);
+  const modulos=montarModulos();
+  const tabelaModulo=(mod)=>{
+    const idsDoModulo=mod.imoveis.map(i=>i.id);
+    const linhas=lst.filter(r=>idsDoModulo.includes(r.imovelId));
+    const subtotal=linhas.reduce((s,r)=>s+(+r.liquido||0),0);
+    return `
+    <div class="form-card" style="margin-bottom:16px">
+      <div class="sec-hdr"><h2>🏠 ${mod.titulo}</h2><div class="sec-line"></div></div>
+      ${!mod.imoveis.length?`<div class="sec-note" style="margin:0">Nenhum imóvel cadastrado neste grupo ainda. Assim que cadastrar um imóvel com esse nome, ele entra aqui automaticamente.</div>`:`
+      <div class="tbl-wrap" style="margin-bottom:0"><table>
+        <thead><tr><th>Subunidade</th><th>Bruto</th><th>Líquido</th><th>Data</th><th>Obs</th><th>Comprovante</th><th></th></tr></thead>
+        <tbody>
+          ${linhas.length?linhas.map(r=>`<tr><td>${imovelNome(r.imovelId)}</td><td>${fmt(r.bruto)}</td><td class="pos">${fmt(r.liquido)}</td><td>${r.data||'—'}</td><td class="dim">${r.obs||'—'}</td><td>${comprovanteChip(r.comprovante)}</td><td><button class="btn-sm btn-ok" onclick="abrirEdicaoAluguel('${r.id}')">editar</button> <button class="btn-sm" onclick="delItem('alugueis','${r.id}')">excluir</button></td></tr>`).join(''):`<tr><td colspan="7"><div class="empty">Nenhum recebimento neste mês para este grupo.</div></td></tr>`}
+        </tbody>
+        <tfoot><tr class="tfoot"><td>Subtotal — ${mod.titulo}</td><td></td><td class="pos">${fmt(subtotal)}</td><td colspan="4"></td></tr></tfoot>
+      </table></div>`}
+    </div>`;
+  };
   return `
   <div class="sec-note">Lance aqui o valor <strong>líquido</strong> que a imobiliária de fato repassou — já descontado o que ela paga direto (IPTU/água, quando for o caso). O bruto é só referência.</div>
   <div class="form-card" style="border-color:var(--gold-dim)">
@@ -411,13 +461,13 @@ function renderAlugueis(){
     </div>
     <button class="btn-gold" onclick="addAluguel()">+ Registrar Recebimento</button>
   </div>
-  <div class="tbl-wrap"><table>
-    <thead><tr><th>Imóvel</th><th>Bruto</th><th>Líquido</th><th>Data</th><th>Obs</th><th>Comprovante</th><th></th></tr></thead>
-    <tbody>
-      ${lst.length?lst.map(r=>`<tr><td>${imovelNome(r.imovelId)}</td><td>${fmt(r.bruto)}</td><td class="pos">${fmt(r.liquido)}</td><td>${r.data||'—'}</td><td class="dim">${r.obs||'—'}</td><td>${comprovanteChip(r.comprovante)}</td><td><button class="btn-sm btn-ok" onclick="abrirEdicaoAluguel('${r.id}')">editar</button> <button class="btn-sm" onclick="delItem('alugueis','${r.id}')">excluir</button></td></tr>`).join(''):`<tr><td colspan="7"><div class="empty">Nenhum recebimento neste mês.</div></td></tr>`}
-    </tbody>
-    <tfoot><tr class="tfoot"><td>Total Líquido do Mês</td><td></td><td class="pos">${fmt(total)}</td><td colspan="4"></td></tr></tfoot>
-  </table></div>`;
+  ${modulos.map(tabelaModulo).join('')}
+  <div class="form-card" style="border-color:var(--gold-dim);background:var(--gold-bg)">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <span style="font-family:'Syne',sans-serif;font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.06em">Total Líquido do Mês — Todos os Módulos</span>
+      <span style="font-family:'Syne',sans-serif;font-size:20px;font-weight:800" class="${vc(total)}">${fmt(total)}</span>
+    </div>
+  </div>`;
 }
 function addAluguel(){
   const imovelId=document.getElementById('al-im').value;
