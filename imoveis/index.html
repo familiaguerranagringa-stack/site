@@ -433,10 +433,11 @@ function renderAlugueis(){
     <div class="form-card" style="margin-bottom:16px">
       <div class="sec-hdr"><h2>🏠 ${mod.titulo}</h2><div class="sec-line"></div></div>
       ${!mod.imoveis.length?`<div class="sec-note" style="margin:0">Nenhum imóvel cadastrado neste grupo ainda. Assim que cadastrar um imóvel com esse nome, ele entra aqui automaticamente.</div>`:`
-      <div class="tbl-wrap" style="margin-bottom:0"><table>
+      <div class="tbl-wrap" style="margin-bottom:0"><table style="table-layout:fixed;width:100%">
+        <colgroup><col style="width:22%"><col style="width:13%"><col style="width:13%"><col style="width:11%"><col style="width:17%"><col style="width:14%"><col style="width:10%"></colgroup>
         <thead><tr><th>Subunidade</th><th>Bruto</th><th>Líquido</th><th>Data</th><th>Obs</th><th>Comprovante</th><th></th></tr></thead>
         <tbody>
-          ${linhas.length?linhas.map(r=>`<tr><td>${imovelNome(r.imovelId)}</td><td>${fmt(r.bruto)}</td><td class="pos">${fmt(r.liquido)}</td><td>${r.data||'—'}</td><td class="dim">${r.obs||'—'}</td><td>${comprovanteChip(r.comprovante)}</td><td><button class="btn-sm btn-ok" onclick="abrirEdicaoAluguel('${r.id}')">editar</button> <button class="btn-sm" onclick="delItem('alugueis','${r.id}')">excluir</button></td></tr>`).join(''):`<tr><td colspan="7"><div class="empty">Nenhum recebimento neste mês para este grupo.</div></td></tr>`}
+          ${linhas.length?linhas.map(r=>`<tr><td>${imovelNome(r.imovelId)}</td><td>${fmt(r.bruto)}</td><td class="pos">${fmt(r.liquido)}</td><td>${r.data||'—'}</td><td class="dim" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.obs||'—'}</td><td>${comprovanteChip(r.comprovante)}</td><td><button class="btn-sm btn-ok" onclick="abrirEdicaoAluguel('${r.id}')">editar</button> <button class="btn-sm" onclick="delItem('alugueis','${r.id}')">excluir</button></td></tr>`).join(''):`<tr><td colspan="7"><div class="empty">Nenhum recebimento neste mês para este grupo.</div></td></tr>`}
         </tbody>
         <tfoot><tr class="tfoot"><td>Subtotal — ${mod.titulo}</td><td></td><td class="pos">${fmt(subtotal)}</td><td colspan="4"></td></tr></tfoot>
       </table></div>`}
