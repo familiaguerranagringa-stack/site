@@ -919,7 +919,7 @@ function saveVerif(v){
   flashSaved();
   pushToFB();
 }
-let showFF=false,showFC=false,filtroCusto='',showCrediario=false;
+let showFF=false,showFC=false,filtroCusto='',showCrediario=false,showFV=false,showFT=false,showFX=false;
 
 // ── UTILITÁRIOS DE ARQUIVO ──────────────────────────────────
 async function lerArquivo(file){
@@ -1000,15 +1000,13 @@ function renderVerif(){
   const funs=v.f||[];
   const todosC=v.c||[];
   const creds=v.cred||[];
-  const custos=filtroCusto?todosC.filter(cu=>cu.st===filtroCusto):todosC;
   const c=document.getElementById('content');
   const stO=['PENDENTE','PAGO','VENCIDO'].map(x=>`<option value="${x}">${x}</option>`).join('');
   const fmO=FORMAS.map(x=>`<option value="${x}">${x}</option>`).join('');
   const funOpts=funs.map(f=>`<option value="${f.id}">${f.nome}</option>`).join('');
-
-  // Vencimentos
   const hj=new Date();hj.setHours(0,0,0,0);
   const amanha=new Date(hj);amanha.setDate(amanha.getDate()+1);
+
   function vencBadge(cu){
     if(cu.st==='PAGO'||!cu.venc)return'';
     const vd=new Date(cu.venc+'T12:00:00');vd.setHours(0,0,0,0);
@@ -1018,34 +1016,96 @@ function renderVerif(){
     return'';
   }
 
-  // Parcelas de crediário por funcionário — filtra pelo mês atual dentro do range
+  // ─ Parcelas crediário por funcionário ─
   function parcelaCred(funId){
-    const ano=ST.ano, mes=ST.mes;
+    const ano=ST.ano,mes=ST.mes;
     return (creds||[]).filter(cr=>cr.funId===funId&&cr.st==='ativo').reduce((s,cr)=>{
-      if(!cr.dataInicio) return s+(+cr.valorParcela||0);
+      if(!cr.dataInicio)return s+(+cr.valorParcela||0);
       const ini=new Date(cr.dataInicio+'T12:00:00');
-      const iniAno=ini.getFullYear(), iniMes=ini.getMonth()+1;
-      const mesesDecorridos=(ano-iniAno)*12+(mes-iniMes);
-      // mês é válido se está dentro do range [0, parcelas-1]
-      if(mesesDecorridos>=0 && mesesDecorridos<(+cr.parcelas||1)){
-        return s+(+cr.valorParcela||0);
-      }
-      return s;
+      const iniAno=ini.getFullYear(),iniMes=ini.getMonth()+1;
+      const md=(ano-iniAno)*12+(mes-iniMes);
+      return (md>=0&&md<(+cr.parcelas||1))?s+(+cr.valorParcela||0):s;
     },0);
   }
 
-  // Rows de funcionários
+  // ─ Vales automáticos por funcionário ─
+  function valesFun(funId){
+    const vaiFun=(todosC||[]).filter(cu=>cu.cat==='VALES'&&cu.funId===funId);
+    const erros=vaiFun.filter(va=>va.tipo==='ERRO').reduce((s,va)=>s+(+va.val||0),0);
+    const adiPagos=vaiFun.filter(va=>va.tipo==='ADIANTAMENTO'&&va.st==='PAGO').reduce((s,va)=>s+(+va.val||0),0);
+    return{erros,adiPagos,total:erros+adiPagos};
+  }
+
+  // ─ Row custo (helper) ─
+  function cuRow(cu,semPagar){
+    const naoPagavel=cu.tipo==='ERRO';
+    const pagarBtn=(!naoPagavel&&cu.st!=='PAGO')?
+      `<button class="btn-sm btn-ok" onclick="pagarCusto('${cu.id}')" style="margin-right:4px">✓ Pago</button>`:
+      (cu.st==='PAGO'&&!naoPagavel?`<button class="btn-sm" onclick="desfazerPagto('${cu.id}')" style="margin-right:4px">↩</button>`:'');
+    const tipoTag=cu.tipo==='ERRO'?'<span class="badge b-late" style="font-size:9px;margin-right:4px">ERRO</span>':
+                  cu.tipo==='ADIANTAMENTO'?'<span class="badge b-pend" style="font-size:9px;margin-right:4px">ADIANT.</span>':'';
+    const funNome=cu.funId?((funs.find(f=>f.id===cu.funId)||{}).nome||'—'):'';
+    return`<tr>
+      <td style="text-align:left">${tipoTag}${funNome?'<strong>'+funNome+'</strong> · ':''}${cu.nome}${vencBadge(cu)}
+        <div style="margin-top:2px">${iconAnexo(cu.boleto,cu.id,'boleto')}${cu.comprovante?'<span style="margin-left:8px">'+iconAnexo(cu.comprovante,cu.id,'comprovante')+'</span>':iconAnexo(null,cu.id,'comprovante')}</div>
+      </td>
+      <td>${fmt(cu.val)}</td>
+      <td style="font-size:11px;color:var(--muted)">${cu.venc?new Date(cu.venc+'T12:00:00').toLocaleDateString('pt-BR'):'—'}</td>
+      <td style="font-size:11px;color:${cu.dataPagamento?'var(--green)':'var(--dim)'}">${cu.dataPagamento?new Date(cu.dataPagamento+'T12:00:00').toLocaleDateString('pt-BR'):'—'}</td>
+      <td>${cu.forma||'—'}</td>
+      <td><span class="badge ${naoPagavel?'b-late':cu.st==='PAGO'?'b-ok':cu.st==='VENCIDO'?'b-late':'b-pend'}">${naoPagavel?'AUTO':cu.st||'PENDENTE'}</span></td>
+      <td style="font-size:11px;color:var(--dim);text-align:left">${cu.obs||''}</td>
+      <td style="white-space:nowrap">
+        <button class="btn-sm btn-ok" onclick="editCusto('${cu.id}')" style="margin-right:4px" title="Editar">✏</button>
+        ${pagarBtn}
+        <button class="btn-sm" onclick="delVi('c','${cu.id}')">×</button>
+      </td>
+    </tr>`;
+  }
+
+  // ─ Template de módulo (header + tabela + footer) ─
+  function modulo(icon,titulo,itens,showKey,formHtml,totalExtra){
+    const showVar='show'+showKey;
+    const isOpen=window[showVar]||false;
+    const total=itens.reduce((s,cu)=>s+(+cu.val||0),0);
+    const pago=itens.filter(cu=>cu.st==='PAGO'||cu.tipo==='ERRO').reduce((s,cu)=>s+(+cu.val||0),0);
+    const tblRows=itens.map(cu=>cuRow(cu)).join('');
+    const hdCols='<tr><th style="text-align:left">Descrição</th><th>Valor</th><th>Vencimento</th><th>Pago em</th><th>Forma</th><th>Status</th><th style="text-align:left">Obs.</th><th>Ações</th></tr>';
+    return`<div class="form-card" style="margin-bottom:16px;padding:0;overflow:hidden">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;background:var(--bg-card);border-bottom:1px solid var(--border)">
+        <span style="font-family:'Syne',sans-serif;font-size:13px;font-weight:800;letter-spacing:.08em">${icon} ${titulo}</span>
+        <div style="display:flex;align-items:center;gap:12px">
+          <span style="font-size:11px;color:var(--muted)">Pago: <span style="color:var(--green);font-weight:700">${fmt(pago)}</span> · Total: <span style="color:var(--gold);font-weight:700">${fmt(total+(totalExtra||0))}</span></span>
+          <button class="btn-ghost" onclick="window['show${showKey}']=!window['show${showKey}'];renderVerif()" style="font-size:11px">${isOpen?'− Fechar':'+ Lançamento'}</button>
+        </div>
+      </div>
+      ${isOpen?`<div style="padding:12px 16px;border-bottom:1px solid var(--border);background:var(--bg)">${formHtml}</div>`:''}
+      <div style="padding:12px 16px">
+        ${itens.length?`<div class="tbl-wrap"><table>${hdCols}${tblRows}
+          <tr class="tfoot"><td>TOTAL</td><td class="neg">${fmt(total)}</td><td colspan="2">Pago: <span class="pos">${fmt(pago)}</span></td><td>Pendente: <span class="gold">${fmt(total-pago)}</span></td><td colspan="3"></td></tr>
+        </table></div>`:'<div class="empty" style="padding:10px 0;font-size:12px">Nenhuma despesa cadastrada nesta categoria.</div>'}
+      </div>
+    </div>`;
+  }
+
+  // ───────────────────────────────────────────
+  // Montar os 4 módulos
+  // ───────────────────────────────────────────
+
+  // ── MOD 1: QUADRO DE FUNCIONÁRIOS ──
   const fRows=funs.map(f=>{
     const bon=+f.bonificacao||0;
     const parcelas=parcelaCred(f.id);
-    const total=(+f.sal||0)-(+f.adi||0)-(+f.vale||0)+bon-parcelas;
+    const vf=valesFun(f.id);
+    const total=(+f.sal||0)-(+f.adi||0)-(+f.vale||0)+bon-parcelas-vf.erros-vf.adiPagos;
     return`<tr>
       <td style="text-align:left;font-weight:500">${f.nome}</td>
       <td>${fmt(f.sal)}</td>
-      <td>${fmt(f.adi)}</td>
-      <td>${fmt(f.vale)}</td>
+      <td>${fmt(+f.adi||0)}</td>
+      <td>${fmt(+f.vale||0)}</td>
       <td class="pos">${bon?fmt(bon):'—'}</td>
       <td class="neg" style="font-size:11px">${parcelas?'-'+fmt(parcelas):'—'}</td>
+      <td class="neg" style="font-size:11px">${(vf.erros+vf.adiPagos)?'-'+fmt(vf.erros+vf.adiPagos):'—'}</td>
       <td class="gold" style="font-family:'Syne',sans-serif;font-weight:700">${fmt(total)}</td>
       <td><span class="badge ${f.st==='PAGO'?'b-ok':'b-pend'}">${f.st||'PENDENTE'}</span></td>
       <td style="white-space:nowrap">
@@ -1057,133 +1117,138 @@ function renderVerif(){
   const totalF=funs.reduce((s,f)=>{
     const bon=+f.bonificacao||0;
     const parc=parcelaCred(f.id);
-    return s+(+f.sal||0)-(+f.adi||0)-(+f.vale||0)+bon-parc;
+    const vf=valesFun(f.id);
+    return s+(+f.sal||0)-(+f.adi||0)-(+f.vale||0)+bon-parc-vf.erros-vf.adiPagos;
   },0);
-
-  // Rows de custos
-  const cRows=custos.map(cu=>`<tr>
-    <td style="text-align:left">
-      ${cu.nome}${vencBadge(cu)}
-      <div style="margin-top:2px">${iconAnexo(cu.boleto,cu.id,'boleto')}${cu.comprovante?'<span style="margin-left:8px">'+iconAnexo(cu.comprovante,cu.id,'comprovante')+'</span>':iconAnexo(null,cu.id,'comprovante')}</div>
-    </td>
-    <td>${fmt(cu.val)}</td>
-    <td style="font-family:'Syne',sans-serif;font-size:11px;color:var(--muted)">${cu.venc?new Date(cu.venc+'T12:00:00').toLocaleDateString('pt-BR'):'—'}</td>
-    <td style="font-size:11px;color:${cu.dataPagamento?'var(--green)':'var(--dim)'}">${cu.dataPagamento?new Date(cu.dataPagamento+'T12:00:00').toLocaleDateString('pt-BR'):'—'}</td>
-    <td>${cu.forma||'—'}</td>
-    <td><span class="badge ${cu.st==='PAGO'?'b-ok':cu.st==='VENCIDO'?'b-late':'b-pend'}">${cu.st||'PENDENTE'}</span></td>
-    <td style="font-size:11px;color:var(--dim);text-align:left">${cu.obs||''}</td>
-    <td style="white-space:nowrap">
-      <button class="btn-sm btn-ok" onclick="editCusto('${cu.id}')" style="margin-right:4px" title="Editar">✏</button>
-      ${cu.st!=='PAGO'?`<button class="btn-sm btn-ok" onclick="pagarCusto('${cu.id}')" style="margin-right:4px">✓ Pago</button>`:`<button class="btn-sm" onclick="desfazerPagto('${cu.id}')" style="margin-right:4px">↩</button>`}
-      <button class="btn-sm" onclick="delVi('c','${cu.id}')">×</button>
-    </td>
-  </tr>`).join('');
-  const totalC=todosC.reduce((s,cu)=>s+(+cu.val||0),0);
-  const pagosC=todosC.filter(cu=>cu.st==='PAGO').reduce((s,cu)=>s+(+cu.val||0),0);
-  const pendentesC=totalC-pagosC;
-  const filtrosBtns=['','PENDENTE','PAGO','VENCIDO'].map(f=>`<button onclick="filtroCusto='${f}';renderVerif()" style="padding:5px 12px;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;border-radius:20px;cursor:pointer;border:1px solid ${filtroCusto===f?'var(--gold)':'var(--border)'};background:${filtroCusto===f?'var(--gold-bg)':'transparent'};color:${filtroCusto===f?'var(--gold)':'var(--muted)'};font-family:'DM Sans',sans-serif">${f||'Todos'}</button>`).join('');
-
-  // Rows de crediários
   const credRows=creds.map(cr=>{
     const fun=funs.find(f=>f.id===cr.funId);
-    // Calcular parcelas restantes no mês atual
     let restantes=+cr.parcelas||1;
     if(cr.dataInicio&&cr.st==='ativo'){
       const ini=new Date(cr.dataInicio+'T12:00:00');
-      const meses=(ST.ano-ini.getFullYear())*12+(ST.mes-(ini.getMonth()+1));
-      restantes=Math.max(0,(+cr.parcelas||1)-meses);
+      const md=(ST.ano-ini.getFullYear())*12+(ST.mes-(ini.getMonth()+1));
+      restantes=Math.max(0,(+cr.parcelas||1)-md);
     }
     const parcelaAtiva=cr.st==='ativo'&&restantes>0;
     return`<tr>
       <td style="text-align:left">${cr.desc||'—'}</td>
       <td>${fun?fun.nome:'—'}</td>
       <td>${fmt(cr.valorTotal)}</td>
-      <td style="font-size:11px">
-        <span style="color:var(--gold);font-weight:700">${restantes}x</span>
-        <span style="color:var(--dim)"> / ${cr.parcelas}x total</span>
-      </td>
+      <td style="font-size:11px"><span style="color:var(--gold);font-weight:700">${restantes}x</span> <span style="color:var(--dim)">/ ${cr.parcelas}x</span></td>
       <td class="neg">${fmt(cr.valorParcela)}/mês</td>
-      <td><span class="badge ${parcelaAtiva?'b-pend':cr.st==='ativo'?'b-ok':'b-ok'}">${parcelaAtiva?'ATIVO':restantes===0&&cr.st==='ativo'?'QUITADO':'QUITADO'}</span></td>
+      <td><span class="badge ${parcelaAtiva?'b-pend':'b-ok'}">${parcelaAtiva?'ATIVO':'QUITADO'}</span></td>
       <td style="white-space:nowrap">
         ${cr.st==='ativo'?`<button class="btn-sm btn-ok" onclick="quitarCred('${cr.id}')" style="margin-right:4px">✓ Quitar</button>`:''}
         <button class="btn-sm" onclick="delVi('cred','${cr.id}')">×</button>
       </td>
     </tr>`;
   }).join('');
+  const mod1Form=`<div class="fg">
+    <div class="fl"><label>Nome Completo</label><input class="fi" type="text" id="fn-n" placeholder="Nome completo"></div>
+    <div class="fl"><label>Salário R$</label><input class="fi" type="number" step="0.01" id="fn-s" placeholder="0,00"></div>
+    <div class="fl"><label>Adiantamento R$</label><input class="fi" type="number" step="0.01" id="fn-a" placeholder="0,00"></div>
+    <div class="fl"><label>Vales R$</label><input class="fi" type="number" step="0.01" id="fn-v" placeholder="0,00"></div>
+    <div class="fl"><label>Bonificação R$</label><input class="fi" type="number" step="0.01" id="fn-bon" placeholder="0,00"></div>
+    <div class="fl"><label>Status</label><select class="fi" id="fn-st">${stO}</select></div>
+  </div>
+  <button class="btn-gold" onclick="addFun()">Salvar Funcionário</button>
+  <hr style="border:none;border-top:1px solid var(--border);margin:12px 0">
+  <div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:8px;letter-spacing:.1em">CREDIÁRIO</div>
+  <div class="fg">
+    <div class="fl" style="grid-column:span 2"><label>Descrição</label><input class="fi" type="text" id="cr-desc" placeholder="Ex: Celular Samsung..."></div>
+    <div class="fl"><label>Funcionário</label><select class="fi" id="cr-fun">${funOpts||'<option>Cadastre um funcionário primeiro</option>'}</select></div>
+    <div class="fl"><label>Valor Total R$</label><input class="fi" type="number" step="0.01" id="cr-total" placeholder="0,00" oninput="calcParcelaCred()"></div>
+    <div class="fl"><label>Nº Parcelas</label><select class="fi" id="cr-parc" onchange="calcParcelaCred()">${[1,2,3,4,5,6,7,8,9,10,11,12].map(n=>`<option value="${n}">${n}x</option>`).join('')}</select></div>
+    <div class="fl"><label>Parcela <span style="color:var(--gold);font-size:9px">auto</span></label><input class="fi" type="text" id="cr-parcela" placeholder="R$ 0,00" readonly style="color:var(--gold);font-weight:700"></div>
+  </div>
+  <button class="btn-gold" onclick="addCred()">Registrar Crediário</button>`;
+
+  const isOpen1=window['showQUADRO']||false;
+  const mod1=`<div class="form-card" style="margin-bottom:16px;padding:0;overflow:hidden">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;background:var(--bg-card);border-bottom:1px solid var(--border)">
+      <span style="font-family:'Syne',sans-serif;font-size:13px;font-weight:800;letter-spacing:.08em">👥 QUADRO DE FUNCIONÁRIOS</span>
+      <div style="display:flex;align-items:center;gap:12px">
+        <span style="font-size:11px;color:var(--muted)">Total pessoal: <span style="color:var(--gold);font-weight:700">${fmt(totalF)}</span></span>
+        <button class="btn-ghost" onclick="window['showQUADRO']=!window['showQUADRO'];renderVerif()" style="font-size:11px">${isOpen1?'− Fechar':'+ Lançamento'}</button>
+      </div>
+    </div>
+    ${isOpen1?`<div style="padding:12px 16px;border-bottom:1px solid var(--border);background:var(--bg)">${mod1Form}</div>`:''}
+    <div style="padding:12px 16px">
+      ${funs.length?`<div class="tbl-wrap" style="margin-bottom:16px"><table>
+        <tr><th style="text-align:left">Nome</th><th>Salário</th><th>Adiant.</th><th>Vales</th><th>Bonific.</th><th>Crediário</th><th>Vales Mod.</th><th>Total</th><th>Status</th><th></th></tr>
+        ${fRows}
+        <tr class="tfoot"><td colspan="7">TOTAL PESSOAL</td><td class="gold">${fmt(totalF)}</td><td></td><td></td></tr>
+      </table></div>`:'<div class="empty" style="padding:10px 0;font-size:12px">Nenhum funcionário cadastrado.</div>'}
+      ${creds.length?`<div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:8px;letter-spacing:.1em">CREDIÁRIOS</div>
+        <div class="tbl-wrap"><table>
+          <tr><th style="text-align:left">Descrição</th><th style="text-align:left">Funcionário</th><th>Total</th><th>Parcelas</th><th>Parcela/Mês</th><th>Status</th><th></th></tr>
+          ${credRows}
+        </table></div>`:''}
+    </div>
+  </div>`;
+
+  // ── MOD 2: VALES FUNCIONÁRIOS ──
+  const valesCat=todosC.filter(cu=>cu.cat==='VALES');
+  const mod2Form=`<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:8px">
+    <div class="fl"><label>Tipo</label><select class="fi" id="va-tipo">
+      <option value="ADIANTAMENTO">💳 Adiantamento</option>
+      <option value="ERRO">⚠ Vale de Erro</option>
+    </select></div>
+    <div class="fl"><label>Funcionário</label><select class="fi" id="va-fun">${funOpts||'<option value="">Cadastre um funcionário</option>'}</select></div>
+    <div class="fl"><label>Descrição</label><input class="fi" type="text" id="va-n" placeholder="Ex: Adiantamento quinzenal"></div>
+    <div class="fl"><label>Valor R$</label><input class="fi" type="number" step="0.01" id="va-v" placeholder="0,00"></div>
+    <div class="fl"><label>Vencimento</label><input class="fi" type="date" id="va-vc"></div>
+    <div class="fl"><label>Forma</label><select class="fi" id="va-f">${fmO}</select></div>
+    <div class="fl"><label>Status</label><select class="fi" id="va-st">${stO}</select></div>
+    <div class="fl"><label>Observação</label><input class="fi" type="text" id="va-o" placeholder="Opcional"></div>
+  </div>
+  <div style="font-size:11px;color:var(--muted);margin-bottom:8px">⚠ <strong>Vale de Erro</strong>: não requer pagamento — desconto automático do funcionário. &nbsp;|&nbsp; <strong>Adiantamento</strong>: descontado após confirmação de pagamento.</div>
+  <button class="btn-gold" onclick="addVale()">Salvar Vale</button>`;
+
+  // ── MOD 3: TRIBUTOS ──
+  const trib=todosC.filter(cu=>cu.cat==='TRIBUTOS');
+  const mod3Form=`<div class="fg">
+    <div class="fl" style="grid-column:span 2"><label>Descrição</label><input class="fi" type="text" id="tri-n" placeholder="Ex: DAS MEI, ISS, COFINS..."></div>
+    <div class="fl"><label>Valor R$</label><input class="fi" type="number" step="0.01" id="tri-v" placeholder="0,00"></div>
+    <div class="fl"><label>Vencimento</label><input class="fi" type="date" id="tri-vc"></div>
+    <div class="fl"><label>Forma</label><select class="fi" id="tri-f">${fmO}</select></div>
+    <div class="fl"><label>Status</label><select class="fi" id="tri-st">${stO}</select></div>
+    <div class="fl" style="grid-column:span 2"><label>Observação</label><input class="fi" type="text" id="tri-o" placeholder="Referência, nº documento..."></div>
+    <div class="fl" style="grid-column:span 2"><label>📎 Boleto (opcional)</label><input class="fi" type="file" id="tri-boleto" accept="image/*,.pdf" style="padding:6px"></div>
+  </div>
+  <button class="btn-gold" onclick="addCusto('TRIBUTOS')">Salvar Tributo</button>`;
+
+  // ── MOD 4: CUSTOS FIXOS ──
+  const fixos=todosC.filter(cu=>!cu.cat||cu.cat==='FIXO');
+  const mod4Form=`<div class="fg">
+    <div class="fl" style="grid-column:span 2"><label>Descrição</label><input class="fi" type="text" id="cu-n" placeholder="Ex: Luz Enel, Aluguel, Internet..."></div>
+    <div class="fl"><label>Valor R$</label><input class="fi" type="number" step="0.01" id="cu-v" placeholder="0,00"></div>
+    <div class="fl"><label>Vencimento</label><input class="fi" type="date" id="cu-vc"></div>
+    <div class="fl"><label>Forma</label><select class="fi" id="cu-f">${fmO}</select></div>
+    <div class="fl"><label>Status</label><select class="fi" id="cu-st">${stO}</select></div>
+    <div class="fl" style="grid-column:span 2"><label>Observação</label><input class="fi" type="text" id="cu-o" placeholder="Nº boleto, CNPJ..."></div>
+    <div class="fl" style="grid-column:span 2"><label>📎 Boleto (opcional)</label><input class="fi" type="file" id="cu-boleto" accept="image/*,.pdf" style="padding:6px"></div>
+  </div>
+  <button class="btn-gold" onclick="addCusto('FIXO')">Salvar Custo Fixo</button>`;
+
+  // ── TOTALIZADOR GERAL ──
+  const totalGeral=totalF+todosC.reduce((s,cu)=>s+(+cu.val||0),0);
+  const pagoGeral=todosC.filter(cu=>cu.st==='PAGO'||cu.tipo==='ERRO').reduce((s,cu)=>s+(+cu.val||0),0)+
+    funs.filter(f=>f.st==='PAGO').reduce((s,f)=>{const vf=valesFun(f.id);return s+(+f.sal||0)-(+f.adi||0)-(+f.vale||0)+(+f.bonificacao||0)-parcelaCred(f.id)-vf.erros-vf.adiPagos;},0);
 
   c.innerHTML=`
-  <!-- FUNCIONÁRIOS -->
-  <div class="sec-hdr"><h2>Quadro de Funcionários</h2><div class="sec-line"></div>
-    <button class="btn-ghost" onclick="showFF=!showFF;renderVerif()">${showFF?'− Fechar':'+ Funcionário'}</button>
-  </div>
-  ${showFF?`<div class="form-card">
-    <div class="fg">
-      <div class="fl"><label>Nome Completo</label><input class="fi" type="text" id="fn-n" placeholder="Nome completo"></div>
-      <div class="fl"><label>Salário R$</label><input class="fi" type="number" step="0.01" id="fn-s" placeholder="0,00"></div>
-      <div class="fl"><label>Adiantamento R$</label><input class="fi" type="number" step="0.01" id="fn-a" placeholder="0,00"></div>
-      <div class="fl"><label>Vales R$</label><input class="fi" type="number" step="0.01" id="fn-v" placeholder="0,00"></div>
-      <div class="fl"><label>Bonificação R$</label><input class="fi" type="number" step="0.01" id="fn-bon" placeholder="0,00"></div>
-      <div class="fl"><label>Status</label><select class="fi" id="fn-st">${stO}</select></div>
-    </div>
-    <button class="btn-gold" onclick="addFun()">Salvar Funcionário</button>
-  </div>`:''}
-  ${funs.length?`<div class="tbl-wrap" style="margin-bottom:20px"><table>
-    <tr><th style="text-align:left">Nome</th><th>Salário</th><th>Adiant.</th><th>Vales</th><th>Bonific.</th><th>Crediário</th><th>Total</th><th>Status</th><th></th></tr>
-    ${fRows}
-    <tr class="tfoot"><td colspan="6">TOTAL PESSOAL</td><td class="gold">${fmt(totalF)}</td><td></td><td></td></tr>
-  </table></div>`:'<div class="empty" style="padding:20px">👤 Nenhum funcionário cadastrado.</div>'}
-
-  <!-- CUSTOS FIXOS -->
-  <div class="sec-hdr" style="margin-top:8px"><h2>Custos Fixos</h2><div class="sec-line"></div>
-    <button class="btn-ghost" onclick="showFC=!showFC;renderVerif()">${showFC?'− Fechar':'+ Custo Fixo'}</button>
-  </div>
-  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center">
-    ${filtrosBtns}
-    <span style="font-size:11px;color:var(--muted);margin-left:8px">Pago: <span style="color:var(--green)">${fmt(pagosC)}</span> | Pendente: <span style="color:var(--amber)">${fmt(pendentesC)}</span></span>
-  </div>
-  ${showFC?`<div class="form-card">
-    <div class="fg">
-      <div class="fl" style="grid-column:span 2"><label>Descrição</label><input class="fi" type="text" id="cu-n" placeholder="Ex: Luz Enel, Aluguel, Internet..."></div>
-      <div class="fl"><label>Valor R$</label><input class="fi" type="number" step="0.01" id="cu-v" placeholder="0,00"></div>
-      <div class="fl"><label>Vencimento</label><input class="fi" type="date" id="cu-vc"></div>
-      <div class="fl"><label>Forma Pagamento</label><select class="fi" id="cu-f">${fmO}</select></div>
-      <div class="fl"><label>Status</label><select class="fi" id="cu-st">${stO}</select></div>
-      <div class="fl" style="grid-column:span 2"><label>Observação</label><input class="fi" type="text" id="cu-o" placeholder="Nº boleto, CNPJ..."></div>
-      <div class="fl" style="grid-column:span 2">
-        <label>📎 Anexar Boleto <span style="color:var(--dim);font-size:9px">(opcional — PNG, JPG, PDF)</span></label>
-        <input class="fi" type="file" id="cu-boleto" accept="image/*,.pdf" style="padding:6px">
+    ${mod1}
+    ${modulo('💳','VALES FUNCIONÁRIOS',valesCat,'FV',mod2Form,0)}
+    ${modulo('🧾','TRIBUTOS',trib,'FT',mod3Form,0)}
+    ${modulo('🏢','CUSTOS FIXOS',fixos,'FX',mod4Form,0)}
+    <div class="form-card" style="padding:12px 16px;background:var(--gold-bg);border:1px solid var(--gold-dim)">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span style="font-family:'Syne',sans-serif;font-size:13px;font-weight:800">💰 TOTAL GERAL DA VERIFICAÇÃO MENSAL</span>
+        <div style="text-align:right">
+          <div style="font-size:11px;color:var(--muted)">Pago/Automático: <span style="color:var(--green);font-weight:700">${fmt(pagoGeral)}</span></div>
+          <div style="font-family:'Syne',sans-serif;font-size:18px;font-weight:800;color:var(--gold)">${fmt(totalGeral)}</div>
+        </div>
       </div>
     </div>
-    <button class="btn-gold" onclick="addCusto()">Salvar Custo Fixo</button>
-  </div>`:''}
-  ${custos.length?`<div class="tbl-wrap"><table>
-    <tr><th style="text-align:left">Descrição</th><th>Valor</th><th>Vencimento</th><th>Pago em</th><th>Forma</th><th>Status</th><th style="text-align:left">Obs.</th><th>Ações</th></tr>
-    ${cRows}
-    <tr class="tfoot"><td>TOTAL</td><td class="neg">${fmt(totalC)}</td><td colspan="2">Pago: <span class="pos">${fmt(pagosC)}</span></td><td>Pendente: <span class="gold">${fmt(pendentesC)}</span></td><td colspan="2"></td></tr>
-  </table></div>`:'<div class="empty" style="padding:20px">📋 Nenhum custo fixo.</div>'}
-
-  <!-- CREDIÁRIOS -->
-  <div class="sec-hdr" style="margin-top:24px"><h2>💳 Crediários de Funcionários</h2><div class="sec-line"></div>
-    <button class="btn-ghost" onclick="showCrediario=!showCrediario;renderVerif()">${showCrediario?'− Fechar':'+ Novo Crediário'}</button>
-  </div>
-  ${showCrediario?`<div class="form-card">
-    <div class="fg">
-      <div class="fl" style="grid-column:span 2"><label>Descrição do Crediário</label><input class="fi" type="text" id="cr-desc" placeholder="Ex: Celular Samsung, Notebook Dell..."></div>
-      <div class="fl"><label>Funcionário</label><select class="fi" id="cr-fun">${funOpts||'<option>Cadastre um funcionário primeiro</option>'}</select></div>
-      <div class="fl"><label>Valor Total R$</label><input class="fi" type="number" step="0.01" id="cr-total" placeholder="0,00" oninput="calcParcelaCred()"></div>
-      <div class="fl"><label>Nº de Parcelas</label><select class="fi" id="cr-parc" onchange="calcParcelaCred()">
-        ${[1,2,3,4,5,6,7,8,9,10,11,12].map(n=>`<option value="${n}">${n}x</option>`).join('')}
-      </select></div>
-      <div class="fl"><label>Valor da Parcela <span style="color:var(--gold);font-size:9px">auto</span></label>
-        <input class="fi" type="text" id="cr-parcela" placeholder="R$ 0,00" readonly style="color:var(--gold);font-weight:700">
-      </div>
-    </div>
-    <button class="btn-gold" onclick="addCred()">Registrar Crediário</button>
-  </div>`:''}
-  ${creds.length?`<div class="tbl-wrap"><table>
-    <tr><th style="text-align:left">Descrição</th><th style="text-align:left">Funcionário</th><th>Total</th><th>Parcelas</th><th>Parcela/Mês</th><th>Status</th><th></th></tr>
-    ${credRows}
-  </table></div>`:'<div style="color:var(--dim);font-size:12px;padding:12px 0">Nenhum crediário registrado.</div>'}
   `;
 }
 
@@ -1220,20 +1285,42 @@ function editFun(id){
 }
 
 // ── FUNÇÕES DE CUSTO FIXO ──────────────────────────────────
-async function addCusto(){
+async function addCusto(cat){
+  // Mapear IDs de campos por categoria
+  const pfx={'TRIBUTOS':'tri','FIXO':'cu','VALES':'va'}[cat]||'cu';
   const v=getVerif();if(!v.c)v.c=[];
-  const n=document.getElementById('cu-n').value;if(!n){notify('Informe a descrição','err');return}
-  const fileInput=document.getElementById('cu-boleto');
+  const n=(document.getElementById(pfx+'-n')||{}).value;
+  if(!n){notify('Informe a descrição','err');return}
+  const fileInput=document.getElementById(pfx+'-boleto');
   let boleto=null;
-  if(fileInput&&fileInput.files[0]){
+  if(fileInput&&fileInput.files&&fileInput.files[0]){
     try{boleto=await lerArquivo(fileInput.files[0]);}
     catch(e){notify(e.message,'err');return;}
   }
-  v.c.push({id:uuid(),nome:n,val:+document.getElementById('cu-v').value||0,
-    venc:document.getElementById('cu-vc').value,forma:document.getElementById('cu-f').value,
-    st:document.getElementById('cu-st').value,obs:document.getElementById('cu-o').value,
+  const get=id=>(document.getElementById(pfx+'-'+id)||{}).value||'';
+  v.c.push({id:uuid(),cat:cat||'FIXO',nome:n,val:+get('v')||0,
+    venc:get('vc'),forma:get('f')||FORMAS[0],
+    st:get('st')||'PENDENTE',obs:get('o'),
     boleto,comprovante:null});
-  saveVerif(v);showFC=false;renderVerif();notify('Custo adicionado!','ok');
+  saveVerif(v);window['showFX']=false;window['showFT']=false;
+  renderVerif();notify('Lançamento adicionado!','ok');
+}
+async function addVale(){
+  const v=getVerif();if(!v.c)v.c=[];
+  const tipo=(document.getElementById('va-tipo')||{}).value||'ADIANTAMENTO';
+  const funId=(document.getElementById('va-fun')||{}).value;
+  const n=(document.getElementById('va-n')||{}).value;
+  if(!n){notify('Informe a descrição','err');return}
+  if(!funId){notify('Selecione o funcionário','err');return}
+  const st=tipo==='ERRO'?'PENDENTE':(document.getElementById('va-st')||{}).value||'PENDENTE';
+  v.c.push({id:uuid(),cat:'VALES',tipo,funId,
+    nome:n,val:+((document.getElementById('va-v')||{}).value)||0,
+    venc:(document.getElementById('va-vc')||{}).value,
+    forma:(document.getElementById('va-f')||{}).value||FORMAS[0],
+    st,obs:(document.getElementById('va-o')||{}).value,
+    boleto:null,comprovante:null});
+  saveVerif(v);window['showFV']=false;renderVerif();
+  notify((tipo==='ERRO'?'Vale de Erro registrado — desconto automático!':'Adiantamento registrado!'),'ok');
 }
 
 function pagarCusto(id){
