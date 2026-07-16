@@ -707,6 +707,7 @@ function renderRepasses(){
       <div class="fl"><label>Valor</label><input class="fi" id="rp-val" type="number" step="0.01" placeholder="0,00"></div>
       <div class="fl"><label>Data Envio ao Corretor</label><input class="fi" id="rp-envio" type="date" value="${today()}"></div>
       <div class="fl"><label>Status</label><select class="fi" id="rp-status"><option value="enviado">Enviado ao corretor</option><option value="pago">Pago</option><option value="recebido_a_pagar">Recebido — a pagar por mim</option></select></div>
+      <div class="fl"><label>Observações</label><input class="fi" id="rp-obs" placeholder="opcional"></div>
     </div>
     <div class="fg">
       <div class="fl"><label>Boleto (a conta a ser paga)</label><input class="fi" id="rp-file-boleto" type="file" accept=".pdf,image/*"></div>
@@ -715,9 +716,9 @@ function renderRepasses(){
     <button class="btn-gold" style="margin-top:14px" onclick="addRepasse()">+ Registrar</button>
   </div>
   <div class="tbl-wrap"><table>
-    <thead><tr><th>Imóvel</th><th>Tipo</th><th>Valor</th><th>Envio</th><th>Status</th><th>Boleto</th><th>Comprovante Pgto</th><th></th></tr></thead>
+    <thead><tr><th>Imóvel</th><th>Tipo</th><th>Valor</th><th>Envio</th><th>Status</th><th>Obs</th><th>Boleto</th><th>Comprovante Pgto</th><th></th></tr></thead>
     <tbody>
-      ${lst.length?lst.map(r=>{const badges={pago:['b-ok','Pago'],enviado:['b-pend','Enviado'],recebido_a_pagar:['b-late','Recebido — a pagar']};const b=badges[r.status]||badges.enviado;const acao=r.status==='recebido_a_pagar'?`<button class="btn-sm btn-ok" onclick="marcarRepassePago('${r.id}')">✓ marcar pago</button> `:'';return `<tr><td>${imovelNome(r.imovelId)}</td><td>${r.tipo}</td><td>${fmt(r.valor)}</td><td>${r.envio||'—'}</td><td><span class="badge ${b[0]}">${b[1]}</span></td><td>${comprovanteChip(r.boleto)}</td><td>${comprovanteChip(r.comprovantePagamento)}</td><td>${acao}<button class="btn-sm" onclick="delItem('repasses','${r.id}')">excluir</button></td></tr>`}).join(''):`<tr><td colspan="8"><div class="empty">Nenhuma conta registrada neste mês.</div></td></tr>`}
+      ${lst.length?lst.map(r=>{const badges={pago:['b-ok','Pago'],enviado:['b-pend','Enviado'],recebido_a_pagar:['b-late','Recebido — a pagar']};const b=badges[r.status]||badges.enviado;const acao=r.status==='recebido_a_pagar'?`<button class="btn-sm btn-ok" onclick="marcarRepassePago('${r.id}')">✓ marcar pago</button> `:'';return `<tr><td>${imovelNome(r.imovelId)}</td><td>${r.tipo}</td><td>${fmt(r.valor)}</td><td>${r.envio||'—'}</td><td><span class="badge ${b[0]}">${b[1]}</span></td><td class="dim" style="text-align:left">${r.obs||'—'}</td><td>${comprovanteChip(r.boleto)}</td><td>${comprovanteChip(r.comprovantePagamento)}</td><td>${acao}<button class="btn-sm btn-ok" onclick="abrirEdicaoRepasse('${r.id}')">editar</button> <button class="btn-sm" onclick="delItem('repasses','${r.id}')">excluir</button></td></tr>`}).join(''):`<tr><td colspan="9"><div class="empty">Nenhuma conta registrada neste mês.</div></td></tr>`}
     </tbody>
   </table></div>`;
 }
@@ -725,7 +726,7 @@ function addRepasse(){
   const imovelId=document.getElementById('rp-im').value;
   if(!imovelId){notify('Cadastre e selecione um imóvel','err');return;}
   const tipo=document.getElementById('rp-tipo').value;
-  const base={id:uuid(),imovelId,tipo,valor:+document.getElementById('rp-val').value||0,envio:document.getElementById('rp-envio').value,status:document.getElementById('rp-status').value};
+  const base={id:uuid(),imovelId,tipo,valor:+document.getElementById('rp-val').value||0,envio:document.getElementById('rp-envio').value,status:document.getElementById('rp-status').value,obs:document.getElementById('rp-obs').value.trim()};
   const fBoleto=document.getElementById('rp-file-boleto');
   const fComp=document.getElementById('rp-file-comp');
   lerArquivo(fBoleto,()=>nomeAutomatico(imovelNome(imovelId),tipo+'-BOLETO'),(boleto)=>{
@@ -738,6 +739,50 @@ function addRepasse(){
       notify('Conta registrada','ok');render();
     });
   });
+}
+function abrirEdicaoRepasse(id){
+  const lst=load(pkPeriodo('repasses'));
+  const r=lst.find(x=>x.id===id);
+  if(!r)return;
+  document.getElementById('modal-root').innerHTML=`
+  <div class="modal-bg" onclick="if(event.target===this)fecharModal()">
+    <div class="modal">
+      <h2>Editar Lançamento</h2>
+      <p>Ajuste imóvel, tipo, valor, data, status ou observações sem precisar excluir e relançar.</p>
+      <div class="fl" style="margin-bottom:12px"><label>Imóvel</label><select class="fi" id="er-im">${selectImoveis(r.imovelId)}</select></div>
+      <div class="fg" style="grid-template-columns:1fr 1fr;margin-bottom:12px">
+        <div class="fl"><label>Tipo</label><select class="fi" id="er-tipo">${['IPTU','Água','Condomínio','Luz','Outro'].map(t=>`<option${r.tipo===t?' selected':''}>${t}</option>`).join('')}</select></div>
+        <div class="fl"><label>Valor</label><input class="fi" id="er-val" type="number" step="0.01" value="${r.valor||0}"></div>
+      </div>
+      <div class="fg" style="grid-template-columns:1fr 1fr;margin-bottom:12px">
+        <div class="fl"><label>Data</label><input class="fi" id="er-envio" type="date" value="${r.envio||today()}"></div>
+        <div class="fl"><label>Status</label><select class="fi" id="er-status">
+          <option value="enviado"${r.status==='enviado'?' selected':''}>Enviado ao corretor</option>
+          <option value="pago"${r.status==='pago'?' selected':''}>Pago</option>
+          <option value="recebido_a_pagar"${r.status==='recebido_a_pagar'?' selected':''}>Recebido — a pagar por mim</option>
+        </select></div>
+      </div>
+      <div class="fl" style="margin-bottom:20px"><label>Observações</label><input class="fi" id="er-obs" value="${(r.obs||'').replace(/"/g,'&quot;')}"></div>
+      <div style="display:flex;gap:10px">
+        <button class="btn-gold" style="flex:1" onclick="salvarEdicaoRepasse('${id}')">Salvar Alterações</button>
+        <button class="btn-ghost" onclick="fecharModal()">Cancelar</button>
+      </div>
+    </div>
+  </div>`;
+}
+function salvarEdicaoRepasse(id){
+  const lst=load(pkPeriodo('repasses'));
+  const r=lst.find(x=>x.id===id);
+  if(!r)return;
+  r.imovelId=document.getElementById('er-im').value;
+  r.tipo=document.getElementById('er-tipo').value;
+  r.valor=+document.getElementById('er-val').value||0;
+  r.envio=document.getElementById('er-envio').value;
+  r.status=document.getElementById('er-status').value;
+  r.obs=document.getElementById('er-obs').value.trim();
+  save(pkPeriodo('repasses'),lst);
+  fecharModal();
+  notify('Lançamento atualizado','ok');render();
 }
 
 function limparRelatoriosAntigos(){
