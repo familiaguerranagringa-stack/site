@@ -407,11 +407,14 @@ function getGrupoTitulo(imovelNome){
   const g=GRUPOS_ORDEM.find(g=>g.match.some(m=>n.includes(normTxt(m))));
   return g?g.titulo:null;
 }
+function ordemNatural(a,b){
+  return String(a).localeCompare(String(b),'pt-BR',{numeric:true,sensitivity:'base'});
+}
 function montarModulos(){
   const ims=getImoveis();
   const usados=new Set();
   const modulos=GRUPOS_ORDEM.map(g=>{
-    const imsDoGrupo=ims.filter(im=>getGrupoTitulo(im.nome)===g.titulo);
+    const imsDoGrupo=ims.filter(im=>getGrupoTitulo(im.nome)===g.titulo).sort((a,b)=>ordemNatural(a.nome,b.nome));
     imsDoGrupo.forEach(im=>usados.add(im.id));
     return {titulo:g.titulo,imoveis:imsDoGrupo};
   });
@@ -427,7 +430,7 @@ function renderAlugueis(){
   const modulos=montarModulos();
   const tabelaModulo=(mod)=>{
     const idsDoModulo=mod.imoveis.map(i=>i.id);
-    const linhas=lst.filter(r=>idsDoModulo.includes(r.imovelId));
+    const linhas=lst.filter(r=>idsDoModulo.includes(r.imovelId)).sort((a,b)=>ordemNatural(imovelNome(a.imovelId),imovelNome(b.imovelId)));
     const subtotal=linhas.reduce((s,r)=>s+(+r.liquido||0),0);
     return `
     <div class="form-card" style="margin-bottom:16px">
@@ -692,10 +695,40 @@ function confirmarImportPDF(iptuTransf,aguaTransf,condoTransf){
 }
 
 // ── REPASSES AO CORRETOR (IPTU/Água/Condomínio) — informativo, NÃO entra no saldo ──
+const STATUS_REPASSE=[
+  {v:'a_pagar',l:'A Pagar',badge:'b-pend'},
+  {v:'recebido_a_pagar',l:'Recebido — a pagar por mim',badge:'b-late'},
+  {v:'enviado',l:'Enviado ao corretor',badge:'b-pend'},
+  {v:'pago',l:'Pago',badge:'b-ok'},
+];
+function statusOptions(sel){
+  return STATUS_REPASSE.map(s=>`<option value="${s.v}"${sel===s.v?' selected':''}>${s.l}</option>`).join('');
+}
+function statusBadge(v){
+  const s=STATUS_REPASSE.find(x=>x.v===v)||STATUS_REPASSE[2];
+  return `<span class="badge ${s.badge}">${s.l}</span>`;
+}
 function renderRepasses(){
   const ims=getImoveis();
   const lst=load(pkPeriodo('repasses'));
   const temRelatorioAntigo=Object.keys(localStorage).some(k=>k.startsWith('imoveisfg_repasses_')&&load(k).some(r=>r.relatorioOrigem));
+  const modulos=montarModulos();
+  const tabelaModuloRepasse=(mod)=>{
+    const idsDoModulo=mod.imoveis.map(i=>i.id);
+    const linhas=lst.filter(r=>idsDoModulo.includes(r.imovelId)).sort((a,b)=>ordemNatural(imovelNome(a.imovelId),imovelNome(b.imovelId))||ordemNatural(a.tipo,b.tipo));
+    return `
+    <div class="form-card" style="margin-bottom:16px">
+      <div class="sec-hdr"><h2>🏠 ${mod.titulo}</h2><div class="sec-line"></div></div>
+      ${!mod.imoveis.length?`<div class="sec-note" style="margin:0">Nenhum imóvel cadastrado neste grupo ainda. Assim que cadastrar um imóvel com esse nome, ele entra aqui automaticamente.</div>`:`
+      <div class="tbl-wrap" style="margin-bottom:0"><table style="table-layout:fixed;width:100%">
+        <colgroup><col style="width:18%"><col style="width:10%"><col style="width:10%"><col style="width:11%"><col style="width:16%"><col style="width:15%"><col style="width:10%"><col style="width:10%"></colgroup>
+        <thead><tr><th>Imóvel</th><th>Tipo</th><th>Valor</th><th>Envio</th><th>Status</th><th>Obs</th><th>Boleto</th><th>Comprov.</th></tr></thead>
+        <tbody>
+          ${linhas.length?linhas.map(r=>`<tr><td>${imovelNome(r.imovelId)}</td><td>${r.tipo}</td><td>${fmt(r.valor)}</td><td>${r.envio||'—'}</td><td>${statusBadge(r.status)}</td><td class="dim" style="text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.obs||'—'}</td><td>${comprovanteChip(r.boleto)}</td><td>${comprovanteChip(r.comprovantePagamento)}</td></tr><tr><td colspan="8" style="padding:2px 14px 8px;border-bottom:1px solid var(--border-lite)">${r.status==='recebido_a_pagar'?`<button class="btn-sm btn-ok" onclick="marcarRepassePago('${r.id}')">✓ marcar pago</button> `:''}<button class="btn-sm btn-ok" onclick="abrirEdicaoRepasse('${r.id}')">editar</button> <button class="btn-sm" onclick="delItem('repasses','${r.id}')">excluir</button></td></tr>`).join(''):`<tr><td colspan="8"><div class="empty">Nenhum lançamento neste mês para este grupo.</div></td></tr>`}
+        </tbody>
+      </table></div>`}
+    </div>`;
+  };
   return `
   ${temRelatorioAntigo?`<div class="sec-note" style="background:var(--gold-bg);border:1px solid var(--gold-dim);border-radius:8px;padding:12px 14px;color:var(--text)">Existem relatórios antigos anexados automaticamente (de antes da correção). <button class="btn-sm btn-ok" onclick="limparRelatoriosAntigos()">🧹 Remover relatórios antigos</button></div>`:''}
   <div class="sec-note">Contas que você manda para o corretor pagar com o próprio aluguel (IPTU, água, condomínio). Ficam registradas com boleto e comprovante para conferência — <strong>não entram no cálculo do seu saldo</strong>, porque já saem do valor líquido repassado.</div>
@@ -706,7 +739,7 @@ function renderRepasses(){
       <div class="fl"><label>Tipo</label><select class="fi" id="rp-tipo"><option>IPTU</option><option>Água</option><option>Condomínio</option><option>Luz</option><option>Outro</option></select></div>
       <div class="fl"><label>Valor</label><input class="fi" id="rp-val" type="number" step="0.01" placeholder="0,00"></div>
       <div class="fl"><label>Data Envio ao Corretor</label><input class="fi" id="rp-envio" type="date" value="${today()}"></div>
-      <div class="fl"><label>Status</label><select class="fi" id="rp-status"><option value="enviado">Enviado ao corretor</option><option value="pago">Pago</option><option value="recebido_a_pagar">Recebido — a pagar por mim</option></select></div>
+      <div class="fl"><label>Status</label><select class="fi" id="rp-status">${statusOptions('a_pagar')}</select></div>
       <div class="fl"><label>Observações</label><input class="fi" id="rp-obs" placeholder="opcional"></div>
     </div>
     <div class="fg">
@@ -715,12 +748,7 @@ function renderRepasses(){
     </div>
     <button class="btn-gold" style="margin-top:14px" onclick="addRepasse()">+ Registrar</button>
   </div>
-  <div class="tbl-wrap"><table>
-    <thead><tr><th>Imóvel</th><th>Tipo</th><th>Valor</th><th>Envio</th><th>Status</th><th>Obs</th><th>Boleto</th><th>Comprovante Pgto</th><th></th></tr></thead>
-    <tbody>
-      ${lst.length?lst.map(r=>{const badges={pago:['b-ok','Pago'],enviado:['b-pend','Enviado'],recebido_a_pagar:['b-late','Recebido — a pagar']};const b=badges[r.status]||badges.enviado;const acao=r.status==='recebido_a_pagar'?`<button class="btn-sm btn-ok" onclick="marcarRepassePago('${r.id}')">✓ marcar pago</button> `:'';return `<tr><td>${imovelNome(r.imovelId)}</td><td>${r.tipo}</td><td>${fmt(r.valor)}</td><td>${r.envio||'—'}</td><td><span class="badge ${b[0]}">${b[1]}</span></td><td class="dim" style="text-align:left">${r.obs||'—'}</td><td>${comprovanteChip(r.boleto)}</td><td>${comprovanteChip(r.comprovantePagamento)}</td><td>${acao}<button class="btn-sm btn-ok" onclick="abrirEdicaoRepasse('${r.id}')">editar</button> <button class="btn-sm" onclick="delItem('repasses','${r.id}')">excluir</button></td></tr>`}).join(''):`<tr><td colspan="9"><div class="empty">Nenhuma conta registrada neste mês.</div></td></tr>`}
-    </tbody>
-  </table></div>`;
+  ${modulos.map(tabelaModuloRepasse).join('')}`;
 }
 function addRepasse(){
   const imovelId=document.getElementById('rp-im').value;
@@ -756,11 +784,7 @@ function abrirEdicaoRepasse(id){
       </div>
       <div class="fg" style="grid-template-columns:1fr 1fr;margin-bottom:12px">
         <div class="fl"><label>Data</label><input class="fi" id="er-envio" type="date" value="${r.envio||today()}"></div>
-        <div class="fl"><label>Status</label><select class="fi" id="er-status">
-          <option value="enviado"${r.status==='enviado'?' selected':''}>Enviado ao corretor</option>
-          <option value="pago"${r.status==='pago'?' selected':''}>Pago</option>
-          <option value="recebido_a_pagar"${r.status==='recebido_a_pagar'?' selected':''}>Recebido — a pagar por mim</option>
-        </select></div>
+        <div class="fl"><label>Status</label><select class="fi" id="er-status">${statusOptions(r.status)}</select></div>
       </div>
       <div class="fl" style="margin-bottom:20px"><label>Observações</label><input class="fi" id="er-obs" value="${(r.obs||'').replace(/"/g,'&quot;')}"></div>
       <div style="display:flex;gap:10px">
