@@ -435,7 +435,7 @@ function calcTotais(){
   const getnet=en.reduce((s,r)=>s+(+r.getnet||0),0);
   const rend=en.reduce((s,r)=>s+(+r.rend||0),0);
   const cred=en.reduce((s,r)=>s+(+r.cred||0),0);
-  const taxas=en.reduce((s,r)=>s+(+r.tpix||0)+(+r.tcart||0),0);
+  const taxas=en.reduce((s,r)=>s+(+r.tpix||0)+(+r.tcart||0)+(+r.tgetnet||0),0);
 
   // ── CMV nas entradas (campo cmv do dia)
   const cmvEntradas=en.reduce((s,r)=>s+(+r.cmv||0),0);
@@ -561,6 +561,9 @@ function renderEntradas(){
         </td>
       </tr>`;
     }).join('');
+  // Corrigir tTaxaTotal: adicionar finTaxas de dias sem entrada
+  const finTaxaInEntries=data.reduce((s,r)=>s+(taxFinDia[r.data]||0),0);
+  tTaxaTotal+=(allFinTaxas-finTaxaInEntries);
     h+=`<div class="sec-hdr"><h2>Lançamentos — ${MESES[ST.mes-1]} ${ST.ano}</h2><div class="sec-line"></div></div>
     <div class="tbl-wrap"><table>
       <tr><th>Data</th><th>Dinheiro</th><th>PIX</th><th>PagBank</th><th>GetNet</th><th>Total Taxas</th><th>CMV Dia</th><th style="text-align:left">Obs.</th><th>Total Bruto</th><th></th></tr>
@@ -1664,7 +1667,7 @@ function renderMarkup(){
     // Markup atual
     const fiMk=loadO('fin');
     let cAcc=0,vAcc=0;
-    en.forEach(r=>{cAcc+=(+r.cmv||0);vAcc+=(+r.din||0)+(+r.pix||0)+(+r.cart||0)+(+r.getnet||0)+(+r.rend||0);});
+    en.forEach(r=>{cAcc+=(+r.cmv||0);vAcc+=(+r.din||0)+(+r.pix||0)+(+r.cart||0)+(+r.getnet||0)+(+r.rend||0)+(+r.cred||0+(+r.cred||0));});
     PARCEIROS.forEach(p=>{const k=p.toLowerCase().replace(/\s+/g,'_');vAcc+=(fiMk[k]||[]).reduce((s,r)=>s+(+r.vv||0),0);});
     const pctAtual=cAcc>0&&vAcc>0?vAcc/(2*cAcc):1.0;
     const metaMes=metaDigitada>0&&pctAtual>0?metaDigitada/(pctAtual/(1+pctAtual)):metaDigitada;
@@ -1696,7 +1699,7 @@ function renderMarkup(){
       const temFin=finDia[dt]>0;
       if(!isSun&&(enDia||temFin)){
         cmvAcc2+=enDia?(+enDia.cmv||0):0;
-        vendaAcc+=(enDia?((+enDia.din||0)+(+enDia.pix||0)+(+enDia.cart||0)+(+enDia.getnet||0)+(+enDia.rend||0)):0)+(finDia[dt]||0);
+        vendaAcc+=(enDia?((+enDia.din||0)+(+enDia.pix||0)+(+enDia.cart||0)+(+enDia.getnet||0)+(+enDia.rend||0)+(+enDia.cred||0)):0)+(finDia[dt]||0);
         taxasAcc+=(enDia?((+enDia.tpix||0)+(+enDia.tcart||0)+(+enDia.tgetnet||0)):0)+(taxDia[dt]||0);
         gastosAcc+=gastosDia[dt]||0;
         diasAbertos.push(dt);
