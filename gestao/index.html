@@ -502,6 +502,13 @@ function renderDash(){
 function renderEntradas(){
   const data=load('entradas');
   const c=document.getElementById('content');
+  // Taxas de financeiras por dia de venda
+  const fiEn=loadO('fin');
+  const taxFinDia={};
+  PARCEIROS.forEach(p=>{
+    const k=p.toLowerCase().replace(/\s+/g,'_');
+    (fiEn[k]||[]).forEach(r=>{if(r.dv&&r.tx)taxFinDia[r.dv]=(taxFinDia[r.dv]||0)+(+r.tx||0);});
+  });
   let h=`<div class="form-card">
     <div class="sec-hdr" style="margin-bottom:14px"><h2>Novo Lançamento Diário</h2><div class="sec-line"></div></div>
     <div class="fg">
@@ -534,7 +541,7 @@ function renderEntradas(){
       const sub=(+r.din||0)+(+r.pix||0)+(+r.cart||0)+(+r.getnet||0)+(+r.rend||0)+(+r.cred||0);
       const finDia=finPorData[r.data]||0;
       const totalBruto=sub+finDia;
-      const taxa=(+r.tpix||0)+(+r.tcart||0)+(+r.tgetnet||0);
+      const taxa=(+r.tpix||0)+(+r.tcart||0)+(+r.tgetnet||0)+(taxFinDia[r.data]||0);
       const cmvDia=+r.cmv||0;
       tDin+=(+r.din||0);tPix+=(+r.pix||0);tCart+=(+r.cart||0);tTp+=(+r.tpix||0);tTc+=(+r.tcart||0);tGetnet+=(+r.getnet||0);tTgetnet+=(+r.tgetnet||0);tG+=totalBruto;tTaxaTotal+=taxa;tCmvTotal+=cmvDia;
       const d=new Date(r.data+'T12:00:00');
@@ -1666,7 +1673,7 @@ function renderMarkup(){
     const diasMes=new Date(ST.ano,ST.mes,0).getDate();
     const hoje=new Date();
     const gastosDia={};
-    sa.filter(r=>r.cat!=='Verificação Escritório').forEach(r=>{if(r.data&&r.val)gastosDia[r.data]=(gastosDia[r.data]||0)+(+r.val||0)});
+    sa.filter(r=>r.cat!=='Verificação Escritório'&&r.cat!=='Compra Mercadoria').forEach(r=>{if(r.data&&r.val)gastosDia[r.data]=(gastosDia[r.data]||0)+(+r.val||0)});
     // financeiras por dia de venda (valor e taxa)
     const finDia={}, taxDia={};
     PARCEIROS.forEach(p=>{
