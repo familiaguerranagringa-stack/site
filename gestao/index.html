@@ -228,7 +228,7 @@ const CREDS_EXTRA=[
 ];
 const MESES=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 const PARCEIROS=['UME','Payjoy','Moeda Social','Brasilcard','Parcelex','Crefaz'];
-const CAT_SAIDA=['Despesa Operacional','Compra Mercadoria','Marketing','Tributo','Pessoal','Erro de Caixa','Perda','Estorno','Outro'];
+const CAT_SAIDA=['Despesa Operacional','Verificação Escritório','Compra Mercadoria','Marketing','Tributo','Pessoal','Erro de Caixa','Perda','Estorno','Outro'];
 const FORMAS=['PIX','Dinheiro','Cartão','Boleto','Débito Automático'];
 const NOW=new Date();
 const ST={tab:'dashboard',empresa:'bacaxa',mes:NOW.getMonth()+1,ano:NOW.getFullYear()};
@@ -1429,9 +1429,33 @@ function renderDRE(){
   const v=getVerif();
   const sa=t.sa;
 
-  // ── Verificação Mensal: soma somente PAGOS (funcionários pagos + todos custos pagos)
-  const pessoalPago=(v.f||[]).filter(f=>f.st==='PAGO').reduce((s,f)=>s+(+f.sal||0)+(+f.vale||0)+(+f.bonificacao||0),0);
-  const custosVerifPagos=(v.c||[]).filter(c=>c.st==='PAGO'||c.tipo==='ERRO').reduce((s,c)=>s+(+c.val||0),0);
+  // ── Verificação Mensal: replica o cálculo de pagoGeral da aba Verificação
+  const creds_dre=v.cred||[];
+  const parcelaCred_dre=(funId)=>{
+    const ano=ST.ano,mes=ST.mes;
+    return creds_dre.filter(cr=>cr.funId===funId&&cr.st==='ativo').reduce((s,cr)=>{
+      if(!cr.dataInicio)return s+(+cr.valorParcela||0);
+      const ini=new Date(cr.dataInicio+'T12:00:00');
+      const md=(ano-ini.getFullYear())*12+(mes-(ini.getMonth()+1));
+      return (md>=0&&md<(+cr.parcelas||1))?s+(+cr.valorParcela||0):s;
+    },0);
+  };
+  const valesFun_dre=(funId)=>{
+    const vaiFun=(v.c||[]).filter(cu=>cu.cat==='VALES'&&cu.funId===funId);
+    return{
+      erros:vaiFun.filter(va=>va.tipo==='ERRO').reduce((s,va)=>s+(+va.val||0),0),
+      adiPagos:vaiFun.filter(va=>va.tipo==='ADIANTAMENTO'&&va.st==='PAGO').reduce((s,va)=>s+(+va.val||0),0)
+    };
+  };
+  // Funcionários PAGOS: valor líquido (sal - adi - vale + bon - parcelas - valesErro - adiPagos)
+  const pessoalPago=(v.f||[]).filter(f=>f.st==='PAGO').reduce((s,f)=>{
+    const bon=+f.bonificacao||0;
+    const parc=parcelaCred_dre(f.id);
+    const vf=valesFun_dre(f.id);
+    return s+(+f.sal||0)-(+f.adi||0)-(+f.vale||0)+bon-parc-vf.erros-vf.adiPagos;
+  },0);
+  // Custos pagos (TRIBUTOS + FIXO PAGOS; excluir VALES - já descontados dos funcionários)
+  const custosVerifPagos=(v.c||[]).filter(c=>c.st==='PAGO'&&c.cat!=='VALES').reduce((s,c)=>s+(+c.val||0),0);
   const verifMensal=pessoalPago+custosVerifPagos;
 
   // ── Saídas: banco = tudo exceto compras (excl. verificação mensal q é separada)
@@ -1642,7 +1666,7 @@ function renderMarkup(){
     const diasMes=new Date(ST.ano,ST.mes,0).getDate();
     const hoje=new Date();
     const gastosDia={};
-    sa.forEach(r=>{if(r.data&&r.val)gastosDia[r.data]=(gastosDia[r.data]||0)+(+r.val||0)});
+    sa.filter(r=>r.cat!=='Verificação Escritório').forEach(r=>{if(r.data&&r.val)gastosDia[r.data]=(gastosDia[r.data]||0)+(+r.val||0)});
     // financeiras por dia de venda (valor e taxa)
     const finDia={}, taxDia={};
     PARCEIROS.forEach(p=>{
@@ -1670,7 +1694,8 @@ function renderMarkup(){
         gastosAcc+=gastosDia[dt]||0;
         diasAbertos.push(dt);
       }
-      tblRows.push({d,dt,isSun,isFuture,enDia,cmvAcc:cmvAcc2,vendaAcc,taxasAcc,gastosAcc,imposto:vendaAcc*0.09,pct:cmvAcc2>0&&vendaAcc>0?vendaAcc/(2*cmvAcc2):0});
+      const impostoAcc=vendaAcc*0.09;
+tblRows.push({d,dt,isSun,isFuture,enDia,cmvAcc:cmvAcc2,vendaAcc,taxasAcc,gastosAcc,imposto:impostoAcc,pct:cmvAcc2>0?(vendaAcc-taxasAcc-gastosAcc-impostoAcc)/cmvAcc2-1:0});
     }
 
     const totalVendido=vendaAcc;
