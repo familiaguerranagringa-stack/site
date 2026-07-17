@@ -45,12 +45,12 @@ html,body{min-height:100vh;background:var(--bg);color:var(--text);font-family:'D
 .btn-sm:hover{border-color:var(--red);color:var(--red)}
 .btn-ok{border-color:transparent;color:var(--muted)}
 .btn-ok:hover{border-color:var(--green);color:var(--green)}
-.kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:14px;margin-bottom:28px}
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(235px,1fr));gap:14px;margin-bottom:28px}
 .kpi{background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:18px 20px;position:relative;overflow:hidden;transition:border-color .2s;box-shadow:0 1px 3px rgba(20,20,20,.05)}
 .kpi:hover{border-color:var(--gold-dim)}
 .kpi-accent{position:absolute;top:0;left:0;right:0;height:2px}
 .kpi-label{font-size:10px;font-weight:600;letter-spacing:.16em;color:var(--muted);text-transform:uppercase;margin-bottom:8px}
-.kpi-value{font-family:'Syne',sans-serif;font-size:19px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.25;white-space:normal;overflow-wrap:break-word;word-break:break-word}
+.kpi-value{font-family:'Syne',sans-serif;font-size:17px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.2;white-space:nowrap}
 .kpi-sub{font-size:11px;color:var(--dim);margin-top:5px}
 .sec-hdr{display:flex;align-items:center;gap:12px;margin-bottom:16px}
 .sec-hdr h2{font-family:'Syne',sans-serif;font-size:10px;font-weight:700;letter-spacing:.2em;color:var(--gold);text-transform:uppercase;white-space:nowrap}
@@ -106,7 +106,7 @@ tr:hover td{background:var(--bg-hover)}
 .modal{background:var(--bg-card);border:1px solid var(--border);border-top:3px solid var(--gold);border-radius:12px;padding:32px;width:440px;max-width:92vw;max-height:86vh;overflow-y:auto;box-shadow:0 8px 30px rgba(20,20,20,.18)}
 .modal h2{font-family:'Syne',sans-serif;font-size:17px;font-weight:800;margin-bottom:6px}
 .modal p{font-size:12px;color:var(--muted);margin-bottom:18px;line-height:1.6}
-@media(max-width:768px){.sidebar{display:none}.content{padding:14px 12px 80px}.kpi-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:768px){.sidebar{display:none}.content{padding:14px 12px 80px}.kpi-grid{grid-template-columns:1fr 1fr}.kpi-value{font-size:14px}}
 @media print{.sidebar,.topbar{display:none!important}.content{padding:0}body{background:#fff;color:#000}}
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
@@ -391,11 +391,11 @@ function fecharModal(){document.getElementById('modal-root').innerHTML='';}
 // ── AGRUPAMENTO DE IMÓVEIS EM MÓDULOS (ordem fixa definida pelo usuário) ──
 const GRUPOS_ORDEM=[
   {titulo:'Paul Harris',match:['paul harris']},
-  {titulo:'Av Getúlio Vargas 255 Loja 2',match:['getulio vargas','getúlio vargas']},
+  {titulo:'CHAVEIRO',match:['getulio vargas','getúlio vargas']},
   {titulo:'Rua Rudy Alberto',match:['rudy alberto']},
   {titulo:'Rua Erineia',match:['erineia','erinéia']},
   {titulo:'Travessa Gomes',match:['travessa gomes']},
-  {titulo:'Salas Comerciais Engracia',match:['engracia','engrácia']},
+  {titulo:'SALAS COMERCIAIS ENGRACIA',match:['engracia','engrácia']},
   {titulo:'James Mendonça',match:['james mendonca','james mendonça','mendonca','mendonça']},
   {titulo:'Recanto Família Guerra',match:['recanto']},
   {titulo:'Rua Carioca',match:['rua carioca','carioca']},
@@ -404,6 +404,9 @@ const GRUPOS_ORDEM=[
 ];
 function getGrupoTitulo(imovelNome){
   const n=normTxt(imovelNome||'');
+  // Regra especial: Sala 603 e Sala 609 sempre vão para Salas Comerciais Engracia,
+  // mesmo que o endereço cite outro logradouro (ex: Av Getúlio Vargas, 221, Sala 609)
+  if(n.includes('SALA 603')||n.includes('SALA 609')) return 'SALAS COMERCIAIS ENGRACIA';
   const g=GRUPOS_ORDEM.find(g=>g.match.some(m=>n.includes(normTxt(m))));
   return g?g.titulo:null;
 }
