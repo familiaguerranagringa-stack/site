@@ -378,6 +378,7 @@ function initApp(){
   const y=ST.ano;
   ys.innerHTML=[y-1,y,y+1].map(v=>`<option value="${v}"${v===y?' selected':''}>${v}</option>`).join('');
   syncFromFB().then(function(){ render(); }).catch(function(){ render(); });
+  migrarVendedores();
   startRealtimeSync(); // polling 5s + SSE bônus
 }
 function changeEmpresa(v){
@@ -1099,7 +1100,7 @@ function renderVerif(){
     const vf=valesFun(f.id);
     const total=(+f.sal||0)-(+f.adi||0)-(+f.vale||0)+bon-parcelas-vf.erros-vf.adiPagos;
     return`<tr>
-      <td style="text-align:left;font-weight:500">${f.nome}</td>
+      <td style="text-align:left;font-weight:500">${f.nome}${f.vendedor?'<span style="font-size:9px;color:var(--gold);margin-left:4px">🏆</span>':''}</td>
       <td>${fmt(f.sal)}</td>
       <td>${fmt(+f.adi||0)}</td>
       <td>${fmt(+f.vale||0)}</td>
@@ -1149,6 +1150,10 @@ function renderVerif(){
     <div class="fl"><label>Vales R$</label><input class="fi" type="number" step="0.01" id="fn-v" placeholder="0,00"></div>
     <div class="fl"><label>Bonificação R$</label><input class="fi" type="number" step="0.01" id="fn-bon" placeholder="0,00"></div>
     <div class="fl"><label>Status</label><select class="fi" id="fn-st">${stO}</select></div>
+  <div class="fl"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin-top:4px">
+    <input type="checkbox" id="fn-vend" style="width:15px;height:15px;accent-color:var(--gold)">
+    <span>🏆 É Vendedor (aparece na Meta por Vendedor)</span>
+  </label></div>
   </div>
   <button class="btn-gold" onclick="addFun()">Salvar Funcionário</button>
   <hr style="border:none;border-top:1px solid var(--border);margin:12px 0">
@@ -1244,8 +1249,8 @@ function renderVerif(){
       <div style="display:flex;justify-content:space-between;align-items:center">
         <span style="font-family:'Syne',sans-serif;font-size:13px;font-weight:800">💰 TOTAL GERAL DA VERIFICAÇÃO MENSAL</span>
         <div style="text-align:right">
-          <div style="font-size:11px;color:var(--muted)">Pago/Automático: <span style="color:var(--green);font-weight:700">${fmt(pagoGeral)}</span></div>
-          <div style="font-family:'Syne',sans-serif;font-size:18px;font-weight:800;color:var(--gold)">${fmt(totalGeral)}</div>
+          <div style="font-family:'Syne',sans-serif;font-size:18px;font-weight:800;color:var(--green)">✓ PAGO: ${fmt(pagoGeral)}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:3px">Total lançado (pago + pendente): <span style="color:var(--gold);font-weight:700">${fmt(totalGeral)}</span></div>
         </div>
       </div>
     </div>
@@ -1254,12 +1259,20 @@ function renderVerif(){
 
 // ── FUNÇÕES DE FUNCIONÁRIO ──────────────────────────────────
 function addFun(){
-  const v=getVerif();if(!v.f)v.f=[];
   const n=document.getElementById('fn-n').value;if(!n){notify('Informe o nome','err');return}
-  v.f.push({id:uuid(),nome:n,sal:+document.getElementById('fn-s').value||0,
+  const isVend=document.getElementById('fn-vend')?.checked||false;
+  const newId=uuid();
+  // Global: nome + vendedor
+  const funsG=JSON.parse(localStorage.getItem('srcapas_funcionarios_'+ST.empresa)||'[]');
+  funsG.push({id:newId,nome:n,vendedor:isVend});
+  localStorage.setItem('srcapas_funcionarios_'+ST.empresa,JSON.stringify(funsG));
+  // Mensal: dados financeiros
+  const funMes=getFunsMes();
+  funMes[newId]={sal:+document.getElementById('fn-s').value||0,
     adi:+document.getElementById('fn-a').value||0,vale:+document.getElementById('fn-v').value||0,
-    bonificacao:+document.getElementById('fn-bon').value||0,st:document.getElementById('fn-st').value});
-  saveVerif(v);showFF=false;renderVerif();notify('Funcionário adicionado!','ok');
+    bonificacao:+document.getElementById('fn-bon').value||0,st:document.getElementById('fn-st').value||'PENDENTE'};
+  saveFunMes(funMes);
+  pushToFB();showFF=false;renderVerif();notify('Funcionário adicionado!','ok');
 }
 function editFun(id){
   const v=getVerif();const f=v.f.find(x=>x.id===id);if(!f)return;
@@ -1270,11 +1283,12 @@ function editFun(id){
     {id:'vale',label:'Vales R$ (este mês)',type:'number',value:f.vale||''},
     {id:'bonificacao',label:'Bonificação R$ (este mês)',type:'number',value:f.bonificacao||''},
     {id:'st',label:'Status',type:'select',value:f.st,options:['PENDENTE','PAGO','VENCIDO'].map(x=>({v:x,l:x}))},
+    {id:'vendedor',label:'🏆 É Vendedor (Meta Markup)',type:'select',value:f.vendedor?'sim':'nao',options:[{v:'sim',l:'✓ Sim — aparece no Markup'},{v:'nao',l:'× Não — apenas funcionário'}]},
   ],vals=>{
-    // Nome → global
+    // Nome + vendedor → global
     const funsGlobal=JSON.parse(localStorage.getItem('srcapas_funcionarios_'+ST.empresa)||'[]');
     const fg=funsGlobal.find(x=>x.id===id);
-    if(fg)fg.nome=vals.nome;
+    if(fg){fg.nome=vals.nome;fg.vendedor=(vals.vendedor==='sim');}
     localStorage.setItem('srcapas_funcionarios_'+ST.empresa,JSON.stringify(funsGlobal));
     // Sal/adi/vale/bon/st → mensal
     const funMes=getFunsMes();
@@ -1415,10 +1429,10 @@ function renderDRE(){
   const v=getVerif();
   const sa=t.sa;
 
-  // ── Verificação Mensal (pessoal + custos fixos PAGOS)
-  const pessoal=(v.f||[]).reduce((s,f)=>s+(+f.sal||0)+(+f.vale||0)+(+f.bonificacao||0),0);
-  const custoFixoPago=(v.c||[]).filter(c=>c.st==='PAGO').reduce((s,c)=>s+(+c.val||0),0);
-  const verifMensal=pessoal+custoFixoPago;
+  // ── Verificação Mensal: soma somente PAGOS (funcionários pagos + todos custos pagos)
+  const pessoalPago=(v.f||[]).filter(f=>f.st==='PAGO').reduce((s,f)=>s+(+f.sal||0)+(+f.vale||0)+(+f.bonificacao||0),0);
+  const custosVerifPagos=(v.c||[]).filter(c=>c.st==='PAGO'||c.tipo==='ERRO').reduce((s,c)=>s+(+c.val||0),0);
+  const verifMensal=pessoalPago+custosVerifPagos;
 
   // ── Saídas: banco = tudo exceto compras (excl. verificação mensal q é separada)
   const bancoSaidas=sa.filter(r=>r.cat!=='Compra Mercadoria').reduce((s,r)=>s+(+r.val||0),0);
@@ -1612,7 +1626,7 @@ function renderMarkup(){
     const en=[...load('entradas')].sort((a,b)=>a.data.localeCompare(b.data));
     const sa=load('saidas');
     const funcionarios=(getVerif().f||[]);
-    const nomes=funcionarios.map(f=>f.nome).filter(Boolean);
+    const nomes=funcionarios.filter(f=>f.vendedor===true).map(f=>f.nome).filter(Boolean);
     const metaDigitada=cfg.metaMes||0;
     const diasAbrir=cfg.diasAbrir||26;
 
@@ -2400,6 +2414,26 @@ function diagFB(){
   },500);
 }
 
+
+// Migrar: marcar vendedores existentes (Kauã Davi e Ramon Mesquita)
+function migrarVendedores(){
+  try{
+    const funsG=JSON.parse(localStorage.getItem('srcapas_funcionarios_'+ST.empresa)||'[]');
+    let changed=false;
+    funsG.forEach(f=>{
+      if(!f.hasOwnProperty('vendedor')){
+        const nm=(f.nome||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+        f.vendedor=nm.includes('kaua')||nm.includes('ramon');
+        changed=true;
+      }
+    });
+    if(changed){
+      localStorage.setItem('srcapas_funcionarios_'+ST.empresa,JSON.stringify(funsG));
+      pushToFB();
+      console.log('[migrarVendedores] concluído');
+    }
+  }catch(e){console.warn('migrarVendedores:',e);}
+}
 // ── NOTIFICAÇÕES ──────────────────────────────────────────────
 function notify(msg, tipo) {
   const c = document.getElementById('notif');
