@@ -289,9 +289,15 @@ function lerArquivo(inputEl,cbNomeBase,onDone){
   if(f.size>4*1024*1024){notify('Arquivo maior que 4MB — reduza o tamanho do PDF/foto.','err');onDone(null);return;}
   const reader=new FileReader();
   reader.onload=()=>{
-    const ext=(f.name.split('.').pop()||'pdf').toLowerCase();
-    const nomeFinal=`${cbNomeBase()}.${ext}`;
-    onDone({nomeOriginal:f.name,nomeFinal,mime:f.type,data:reader.result,tamanho:f.size});
+    try{
+      const ext=(f.name.split('.').pop()||'pdf').toLowerCase();
+      const nomeFinal=`${cbNomeBase()}.${ext}`;
+      onDone({nomeOriginal:f.name,nomeFinal,mime:f.type,data:reader.result,tamanho:f.size});
+    }catch(e){
+      console.error('Erro ao processar arquivo:',e);
+      notify('Erro ao processar o arquivo "'+f.name+'": '+e.message,'err');
+      onDone(null);
+    }
   };
   reader.onerror=()=>{
     notify('Não consegui ler o arquivo "'+f.name+'" — tente outro arquivo ou uma foto mais leve.','err');
@@ -766,7 +772,9 @@ function addRepasse(btn){
   const fComp=document.getElementById('rp-file-comp');
   const textoOriginal=btn?btn.textContent:null;
   if(btn){btn.disabled=true;btn.textContent='Enviando...';btn.style.opacity='0.6';}
-  const restaurarBotao=()=>{if(btn){btn.disabled=false;btn.textContent=textoOriginal;btn.style.opacity='1';}};
+  let concluido=false;
+  const restaurarBotao=()=>{concluido=true;if(btn){btn.disabled=false;btn.textContent=textoOriginal;btn.style.opacity='1';}};
+  setTimeout(()=>{if(!concluido){restaurarBotao();notify('Demorou demais pra processar o arquivo. Tente novamente com um arquivo menor.','err');}},15000);
   lerArquivo(fBoleto,()=>nomeAutomatico(imovelNome(imovelId),tipo+'-BOLETO'),(boleto)=>{
     base.boleto=boleto;
     lerArquivo(fComp,()=>nomeAutomatico(imovelNome(imovelId),tipo+'-COMPROVANTE'),(comp)=>{
