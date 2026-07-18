@@ -293,6 +293,10 @@ function lerArquivo(inputEl,cbNomeBase,onDone){
     const nomeFinal=`${cbNomeBase()}.${ext}`;
     onDone({nomeOriginal:f.name,nomeFinal,mime:f.type,data:reader.result,tamanho:f.size});
   };
+  reader.onerror=()=>{
+    notify('Não consegui ler o arquivo "'+f.name+'" — tente outro arquivo ou uma foto mais leve.','err');
+    onDone(null);
+  };
   reader.readAsDataURL(f);
 }
 function comprovanteChip(comp){
@@ -749,17 +753,20 @@ function renderRepasses(){
       <div class="fl"><label>Boleto (a conta a ser paga)</label><input class="fi" id="rp-file-boleto" type="file" accept=".pdf,image/*"></div>
       <div class="fl"><label>Comprovante de Pagamento</label><input class="fi" id="rp-file-comp" type="file" accept=".pdf,image/*"></div>
     </div>
-    <button class="btn-gold" style="margin-top:14px" onclick="addRepasse()">+ Registrar</button>
+    <button class="btn-gold" style="margin-top:14px" onclick="addRepasse(this)">+ Registrar</button>
   </div>
   ${modulos.map(tabelaModuloRepasse).join('')}`;
 }
-function addRepasse(){
+function addRepasse(btn){
   const imovelId=document.getElementById('rp-im').value;
   if(!imovelId){notify('Cadastre e selecione um imóvel','err');return;}
   const tipo=document.getElementById('rp-tipo').value;
   const base={id:uuid(),imovelId,tipo,valor:+document.getElementById('rp-val').value||0,envio:document.getElementById('rp-envio').value,status:document.getElementById('rp-status').value,obs:document.getElementById('rp-obs').value.trim()};
   const fBoleto=document.getElementById('rp-file-boleto');
   const fComp=document.getElementById('rp-file-comp');
+  const textoOriginal=btn?btn.textContent:null;
+  if(btn){btn.disabled=true;btn.textContent='Enviando...';btn.style.opacity='0.6';}
+  const restaurarBotao=()=>{if(btn){btn.disabled=false;btn.textContent=textoOriginal;btn.style.opacity='1';}};
   lerArquivo(fBoleto,()=>nomeAutomatico(imovelNome(imovelId),tipo+'-BOLETO'),(boleto)=>{
     base.boleto=boleto;
     lerArquivo(fComp,()=>nomeAutomatico(imovelNome(imovelId),tipo+'-COMPROVANTE'),(comp)=>{
@@ -767,6 +774,7 @@ function addRepasse(){
       const lst=load(pkPeriodo('repasses'));
       lst.push(base);
       save(pkPeriodo('repasses'),lst);
+      restaurarBotao();
       notify('Conta registrada','ok');render();
     });
   });
