@@ -198,7 +198,17 @@ function notify(msg,type){
 function pk(t){return `imoveisfg_${t}`}
 function pkPeriodo(t){return `imoveisfg_${t}_${ST.ano}_${pad2(ST.mes)}`}
 function load(k){try{return JSON.parse(localStorage.getItem(k)||'[]')}catch(e){return []}}
-function save(k,d){localStorage.setItem(k,JSON.stringify(d));pushToFB();}
+function save(k,d){
+  let localOk=true;
+  try{
+    localStorage.setItem(k,JSON.stringify(d));
+  }catch(e){
+    localOk=false;
+    console.error('localStorage cheio, salvando só na nuvem:',e);
+    notify('Aviso: cache local cheio, mas os dados vão para a nuvem normalmente.','info');
+  }
+  pushToFB(localOk?null:{[k]:d});
+}
 
 // ── FIREBASE — mesmo projeto, caminho separado do Mr. Capas ──
 firebase.initializeApp({
@@ -208,13 +218,14 @@ firebase.initializeApp({
 });
 const _db=firebase.database();
 const _dbRef=_db.ref('imoveisfg');
+const _filesRef=_db.ref('imoveisfg_files');
 let _syncTimer=null,_pushInProgress=false;
 
 function setSyncStatus(msg,cor){
   const el=document.getElementById('sync-status');
   if(el){el.textContent=msg;el.style.color=cor||'var(--muted)';}
 }
-function _coletaDados(){
+function _coletaDados(override){
   const d={_ts:Date.now()};
   for(let i=0;i<localStorage.length;i++){
     const k=localStorage.key(i);
@@ -222,13 +233,14 @@ function _coletaDados(){
       try{d[k]=JSON.parse(localStorage.getItem(k));}catch(e){d[k]=localStorage.getItem(k);}
     }
   }
+  if(override)Object.assign(d,override);
   return d;
 }
-function pushToFB(){
+function pushToFB(override){
   clearTimeout(_syncTimer);
   _syncTimer=setTimeout(()=>{
     setSyncStatus('⟳ Salvando...','var(--amber)');
-    _dbRef.set(_coletaDados()).then(()=>{
+    _dbRef.set(_coletaDados(override)).then(()=>{
       setSyncStatus('✓ Salvo','var(--green)');
       setTimeout(()=>setSyncStatus('• Online','var(--green)'),2000);
     }).catch(e=>{
@@ -292,7 +304,14 @@ function lerArquivo(inputEl,cbNomeBase,onDone){
     try{
       const ext=(f.name.split('.').pop()||'pdf').toLowerCase();
       const nomeFinal=`${cbNomeBase()}.${ext}`;
-      onDone({nomeOriginal:f.name,nomeFinal,mime:f.type,data:reader.result,tamanho:f.size});
+      const fileId=uuid()+uuid();
+      // Envia o conteúdo do arquivo direto pro Firebase (sem limite de 5-10MB do localStorage).
+      // Não esperamos a confirmação pra não travar o formulário — o SDK do Firebase enfileira o envio.
+      _filesRef.child(fileId).set(reader.result).catch(e=>{
+        console.error('Erro ao enviar arquivo para a nuvem:',e);
+        notify('Aviso: o arquivo "'+f.name+'" pode não ter sido salvo na nuvem ('+e.message+').','err');
+      });
+      onDone({nomeOriginal:f.name,nomeFinal,mime:f.type,tamanho:f.size,fileId});
     }catch(e){
       console.error('Erro ao processar arquivo:',e);
       notify('Erro ao processar o arquivo "'+f.name+'": '+e.message,'err');
@@ -307,16 +326,48 @@ function lerArquivo(inputEl,cbNomeBase,onDone){
 }
 function comprovanteChip(comp){
   if(!comp) return `<span class="dim" style="font-size:11px">sem comprovante</span>`;
-  return `<span class="file-chip">📎 <a href="#" onclick="event.preventDefault();abrirComprovante('${comp.id||''}',this)" data-file='${JSON.stringify(comp).replace(/'/g,'&apos;')}'>${comp.nomeFinal}</a> <a href="${comp.data}" download="${comp.nomeFinal}" title="baixar" style="color:var(--dim);text-decoration:none">⬇</a></span>`;
+  const dataAttr=JSON.stringify(comp).replace(/'/g,'&apos;');
+  return `<span class="file-chip">📎 <a href="#" onclick="event.preventDefault();abrirComprovante(this)" data-file='${dataAttr}'>${comp.nomeFinal}</a> <a href="#" onclick="event.preventDefault();baixarComprovante(this)" data-file='${dataAttr}' title="baixar" style="color:var(--dim);text-decoration:none">⬇</a></span>`;
 }
-function abrirComprovante(_id,el){
+async function obterDadosArquivo(comp){
+  if(comp.data) return comp.data; // arquivos salvos antes desta correção, ainda embutidos
+  if(comp.fileId){
+    const snap=await _filesRef.child(comp.fileId).once('value');
+    const v=snap.val();
+    if(!v) throw new Error('arquivo não encontrado na nuvem');
+    return v;
+  }
+  throw new Error('sem referência de arquivo');
+}
+function abrirComprovante(el){
   const comp=JSON.parse(el.getAttribute('data-file').replace(/&apos;/g,"'"));
   const w=window.open('');
-  if(comp.mime && comp.mime.startsWith('image/')){
-    w.document.write(`<title>${comp.nomeFinal}</title><body style="margin:0;background:#F0F0EE;display:flex;align-items:center;justify-content:center;min-height:100vh"><img src="${comp.data}" style="max-width:100%;max-height:100vh"></body>`);
-  } else {
-    w.document.write(`<title>${comp.nomeFinal}</title><style>html,body,iframe{margin:0;padding:0;width:100%;height:100%;border:none}</style><iframe src="${comp.data}"></iframe>`);
-  }
+  w.document.write('<title>Carregando...</title><body style="font-family:sans-serif;padding:40px;text-align:center;color:#666">Carregando arquivo...</body>');
+  obterDadosArquivo(comp).then(data=>{
+    w.document.open();
+    if(comp.mime && comp.mime.startsWith('image/')){
+      w.document.write(`<title>${comp.nomeFinal}</title><body style="margin:0;background:#F0F0EE;display:flex;align-items:center;justify-content:center;min-height:100vh"><img src="${data}" style="max-width:100%;max-height:100vh"></body>`);
+    } else {
+      w.document.write(`<title>${comp.nomeFinal}</title><style>html,body,iframe{margin:0;padding:0;width:100%;height:100%;border:none}</style><iframe src="${data}"></iframe>`);
+    }
+    w.document.close();
+  }).catch(e=>{
+    w.document.open();
+    w.document.write('<body style="font-family:sans-serif;padding:40px;color:#c00">Erro ao carregar o arquivo: '+e.message+'</body>');
+    w.document.close();
+  });
+}
+function baixarComprovante(el){
+  const comp=JSON.parse(el.getAttribute('data-file').replace(/&apos;/g,"'"));
+  notify('Preparando download...','info');
+  obterDadosArquivo(comp).then(data=>{
+    const a=document.createElement('a');
+    a.href=data;
+    a.download=comp.nomeFinal;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }).catch(e=>notify('Erro ao baixar o arquivo: '+e.message,'err'));
 }
 
 // ── CADASTRO DE IMÓVEIS ──
