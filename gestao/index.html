@@ -509,6 +509,7 @@ function renderEntradas(){
     const k=p.toLowerCase().replace(/\s+/g,'_');
     (fiEn[k]||[]).forEach(r=>{if(r.dv&&r.tx)taxFinDia[r.dv]=(taxFinDia[r.dv]||0)+(+r.tx||0);});
   });
+  const allFinTaxas=Object.values(taxFinDia).reduce((s,v)=>s+v,0);
   let h=`<div class="form-card">
     <div class="sec-hdr" style="margin-bottom:14px"><h2>Novo Lançamento Diário</h2><div class="sec-line"></div></div>
     <div class="fg">
