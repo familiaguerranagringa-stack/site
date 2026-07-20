@@ -804,6 +804,7 @@ function renderFin(){
     const dr=r.dr?new Date(r.dr+'T12:00:00').toLocaleDateString('pt-BR'):'—';
     const recebido=!!r.dr;
     return `<tr>
+      <td style="width:30px;text-align:center">${!recebido?`<input type="checkbox" class="fin-check" data-key="${key}" data-id="${r.id}" onchange="atualizarBtnLote()" style="width:14px;height:14px;accent-color:var(--gold)">`:'<span style="color:var(--green);font-size:11px">✓</span>'}</td>
       <td style="font-family:'Syne',sans-serif;font-size:11px;color:var(--muted)">${dv}</td>
       <td>${fmt(r.vv)}</td>
       <td class="dim">${dp}</td>
@@ -833,9 +834,9 @@ function renderFin(){
     </div>
     <button class="btn-gold" onclick="addFi('${key}')">+ Adicionar</button>
   </div>
-  ${rows.length?`<div class="sec-hdr"><h2>${p} — ${MESES[ST.mes-1]} ${ST.ano}</h2><div class="sec-line"></div></div>
+  ${rows.length?`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><div class="sec-hdr" style="margin:0"><h2>${p} — ${MESES[ST.mes-1]} ${ST.ano}</h2><div class="sec-line"></div></div><button id="btn-lote" class="btn-gold" onclick="receberLote()" style="display:none;font-size:12px;padding:6px 14px">✓ Receber Selecionados</button></div>
   <div class="tbl-wrap"><table>
-    <tr><th>Data Venda</th><th>Valor Venda</th><th>Data Prev.</th><th>Taxa</th><th>Recebido</th><th>Dia Receb.</th><th style="text-align:right">Ação</th></tr>
+    <tr><th><input type="checkbox" onchange="toggleAllFin(this)" title="Selecionar todos" style="width:14px;height:14px;accent-color:var(--gold)"></th><th>Data Venda</th><th>Valor Venda</th><th>Data Prev.</th><th>Taxa</th><th>Recebido</th><th>Dia Receb.</th><th style="text-align:right">Ação</th></tr>
     ${tRows}
     <tr class="tfoot"><td>TOTAL</td><td>${fmt(tVv)}</td><td>—</td><td class="neg">${fmt(tTx)}</td><td class="pos">${fmt(tVr)}</td><td colspan="2"></td></tr>
   </table></div>
@@ -847,6 +848,52 @@ function renderFin(){
   c.innerHTML=h;
 }
 
+
+// ── RECEBIMENTO EM LOTE ───────────────────────────────────
+function toggleAllFin(cb){
+  document.querySelectorAll('.fin-check').forEach(c=>{c.checked=cb.checked;});
+  atualizarBtnLote();
+}
+function atualizarBtnLote(){
+  const n=document.querySelectorAll('.fin-check:checked').length;
+  const btn=document.getElementById('btn-lote');
+  if(btn){btn.textContent='✓ Receber Selecionados ('+n+')';btn.style.display=n>0?'inline-flex':'none';}
+}
+function receberLote(){
+  const checks=document.querySelectorAll('.fin-check:checked');
+  if(!checks.length){notify('Selecione pelo menos uma financeira','err');return;}
+  const items=Array.from(checks).map(c=>({key:c.dataset.key,id:c.dataset.id}));
+  const m=document.createElement('div');m.className='modal-bg';
+  const div=document.createElement('div');div.className='modal';
+  const h2=document.createElement('h2');h2.textContent='Receber em Lote ('+items.length+' financeiras)';div.appendChild(h2);
+  const fl=document.createElement('div');fl.className='fl';fl.style.marginBottom='16px';
+  const lbl=document.createElement('label');lbl.textContent='Data de Recebimento';fl.appendChild(lbl);
+  const inp=document.createElement('input');inp.className='fi';inp.type='date';inp.id='lote-dr';inp.value=today();inp.style.maxWidth='200px';fl.appendChild(inp);
+  div.appendChild(fl);
+  const btns=document.createElement('div');btns.style.cssText='display:flex;gap:8px';
+  const ok=document.createElement('button');ok.className='btn-gold';ok.style.flex='1';
+  ok.textContent='Confirmar ('+items.length+')';
+  ok.onclick=function(){confirmarLote(items,ok);};
+  const cancel=document.createElement('button');cancel.className='btn-ghost';cancel.textContent='Cancelar';
+  cancel.onclick=function(){m.remove();};
+  btns.appendChild(ok);btns.appendChild(cancel);div.appendChild(btns);
+  m.appendChild(div);document.body.appendChild(m);
+}
+function confirmarLote(items,btn){
+  const dr=document.getElementById('lote-dr').value;
+  if(!dr){notify('Informe a data','err');return;}
+  btn.textContent='Aguarde...';btn.disabled=true;
+  const fi=loadO('fin');
+  let ok=0;
+  items.forEach(({key,id})=>{
+    const r=(fi[key]||[]).find(x=>x.id===id);
+    if(r&&!r.dr){r.vr=(+r.vv||0)-(+r.tx||0);r.dr=dr;ok++;}
+  });
+  saveO('fin',fi);
+  document.querySelector('.modal-bg').remove();
+  renderFin();
+  notify('✓ '+ok+' financeiras recebidas em '+new Date(dr+'T12:00:00').toLocaleDateString('pt-BR')+'!','ok');
+}
 function calcVrAuto(){
   const vv=parseFloat(document.getElementById('f-vv')?.value)||0;
   const tx=parseFloat(document.getElementById('f-tx')?.value)||0;
@@ -1490,10 +1537,14 @@ function renderDRE(){
   const totalSaidas=verifMensal+bancoSaidas+t.compras;
 
   // ── Bancos
-  // PagBank: recebe (cartão+pix+rendimentos+fin.recebidas) - paga (despesas+verificação+compras)
-  const pagbank=t.cart+t.pix+t.rend+t.finRecebido-bancoSaidas-verifMensal-t.compras;
+  // Taxas individuais por banco (PagBank e GetNet separados)
+  const tcartSum=t.en.reduce((s,r)=>s+(+r.tcart||0),0);  // taxa cartão PagBank
+  const tpixSum =t.en.reduce((s,r)=>s+(+r.tpix||0),0);   // taxa PIX
+  const tgetnetSum=t.en.reduce((s,r)=>s+(+r.tgetnet||0),0); // taxa GetNet
+  // PagBank: (cart líq) + (pix líq) + rendimentos + fin.recebidas - saídas - verif - compras
+  const pagbank=(t.cart-tcartSum)+(t.pix-tpixSum)+t.rend+t.finRecebido-bancoSaidas-verifMensal-t.compras;
   const malote=t.din;
-  const santander=t.getnet||0;
+  const santander=(t.getnet||0)-tgetnetSum; // GetNet líquido
   const totalBancos=pagbank+malote+santander;
 
   // ── Faturamento
