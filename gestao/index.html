@@ -561,9 +561,9 @@ function renderEntradas(){
         </td>
       </tr>`;
     }).join('');
-  // Corrigir tTaxaTotal: adicionar finTaxas de dias sem entrada
-  const finTaxaInEntries=data.reduce((s,r)=>s+(taxFinDia[r.data]||0),0);
-  tTaxaTotal+=(allFinTaxas-finTaxaInEntries);
+    // Corrigir tTaxaTotal: adicionar finTaxas de dias sem entrada
+    const finTaxaInEntries=data.reduce((s,r)=>s+(taxFinDia[r.data]||0),0);
+    tTaxaTotal+=(allFinTaxas-finTaxaInEntries);
     h+=`<div class="sec-hdr"><h2>Lançamentos — ${MESES[ST.mes-1]} ${ST.ano}</h2><div class="sec-line"></div></div>
     <div class="tbl-wrap"><table>
       <tr><th>Data</th><th>Dinheiro</th><th>PIX</th><th>PagBank</th><th>GetNet</th><th>Total Taxas</th><th>CMV Dia</th><th style="text-align:left">Obs.</th><th>Total Bruto</th><th></th></tr>
@@ -1121,6 +1121,9 @@ function renderVerif(){
       <td><span class="badge ${f.st==='PAGO'?'b-ok':'b-pend'}">${f.st||'PENDENTE'}</span></td>
       <td style="white-space:nowrap">
         <button class="btn-sm btn-ok" onclick="editFun('${f.id}')" style="margin-right:4px">✏</button>
+        ${f.st==='PAGO'
+          ?'<button class="btn-sm" onclick="desfazerPagFun(\''+f.id+'\')" style="margin-right:4px" title="Desfazer">↩</button>'
+          :'<button class="btn-sm" style="background:var(--green-bg);border-color:var(--green);color:var(--green);margin-right:4px" onclick="pagarFun(\''+f.id+'\')">✓ Pagar</button>'}
         <button class="btn-sm" onclick="delVi('f','${f.id}')">×</button>
       </td>
     </tr>`;
@@ -1347,6 +1350,19 @@ async function addVale(){
   notify((tipo==='ERRO'?'Vale de Erro registrado — desconto automático!':'Adiantamento registrado!'),'ok');
 }
 
+
+function pagarFun(id){
+  const funMes=getFunsMes();
+  if(!funMes[id])funMes[id]={};
+  funMes[id].st='PAGO';
+  saveFunMes(funMes);pushToFB();renderVerif();notify('Salário pago!','ok');
+}
+function desfazerPagFun(id){
+  const funMes=getFunsMes();
+  if(!funMes[id])funMes[id]={};
+  funMes[id].st='PENDENTE';
+  saveFunMes(funMes);pushToFB();renderVerif();notify('Pagamento revertido','info');
+}
 function pagarCusto(id){
   // Exige comprovante de pagamento
   const m=document.createElement('div');
@@ -1473,7 +1489,8 @@ function renderDRE(){
   const totalSaidas=verifMensal+bancoSaidas+t.compras;
 
   // ── Bancos
-  const pagbank=t.cart+t.rend+t.finRecebido-bancoSaidas;
+  // PagBank: recebe (cartão+pix+rendimentos+fin.recebidas) - paga (despesas+verificação+compras)
+  const pagbank=t.cart+t.pix+t.rend+t.finRecebido-bancoSaidas-verifMensal-t.compras;
   const malote=t.din;
   const santander=t.getnet||0;
   const totalBancos=pagbank+malote+santander;
