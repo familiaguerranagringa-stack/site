@@ -506,12 +506,12 @@ function renderAlugueis(){
       <div class="sec-hdr"><h2>🏠 ${mod.titulo}</h2><div class="sec-line"></div></div>
       ${!mod.imoveis.length?`<div class="sec-note" style="margin:0">Nenhum imóvel cadastrado neste grupo ainda. Assim que cadastrar um imóvel com esse nome, ele entra aqui automaticamente.</div>`:`
       <div class="tbl-wrap" style="margin-bottom:0"><table style="table-layout:fixed;width:100%">
-        <colgroup><col style="width:22%"><col style="width:13%"><col style="width:13%"><col style="width:11%"><col style="width:17%"><col style="width:14%"><col style="width:10%"></colgroup>
-        <thead><tr><th>Subunidade</th><th>Bruto</th><th>Líquido</th><th>Data</th><th>Obs</th><th>Comprovante</th><th></th></tr></thead>
+        <colgroup><col style="width:16%"><col style="width:10%"><col style="width:10%"><col style="width:11%"><col style="width:11%"><col style="width:14%"><col style="width:12%"><col style="width:10%"></colgroup>
+        <thead><tr><th>Subunidade</th><th>Bruto</th><th>Líquido</th><th>Data de Repasse</th><th>Vencimento</th><th>Obs</th><th>Comprovante</th><th></th></tr></thead>
         <tbody>
-          ${linhas.length?linhas.map(r=>`<tr><td>${imovelNome(r.imovelId)}</td><td>${fmt(r.bruto)}</td><td class="pos">${fmt(r.liquido)}</td><td>${r.data||'—'}</td><td class="dim" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.obs||'—'}</td><td>${comprovanteChip(r.comprovante)}</td><td><button class="btn-sm btn-ok" onclick="abrirEdicaoAluguel('${r.id}')">editar</button> <button class="btn-sm" onclick="delItem('alugueis','${r.id}')">excluir</button></td></tr>`).join(''):`<tr><td colspan="7"><div class="empty">Nenhum recebimento neste mês para este grupo.</div></td></tr>`}
+          ${linhas.length?linhas.map(r=>`<tr><td>${imovelNome(r.imovelId)}</td><td>${fmt(r.bruto)}</td><td class="pos">${fmt(r.liquido)}</td><td>${r.data||'—'}</td><td>${r.vencimento||'—'}</td><td class="dim" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.obs||'—'}</td><td>${comprovanteChip(r.comprovante)}</td><td><button class="btn-sm btn-ok" onclick="abrirEdicaoAluguel('${r.id}')">editar</button> <button class="btn-sm" onclick="delItem('alugueis','${r.id}')">excluir</button></td></tr>`).join(''):`<tr><td colspan="8"><div class="empty">Nenhum recebimento neste mês para este grupo.</div></td></tr>`}
         </tbody>
-        <tfoot><tr class="tfoot"><td>Subtotal — ${mod.titulo}</td><td></td><td class="pos">${fmt(subtotal)}</td><td colspan="4"></td></tr></tfoot>
+        <tfoot><tr class="tfoot"><td>Subtotal — ${mod.titulo}</td><td></td><td class="pos">${fmt(subtotal)}</td><td colspan="5"></td></tr></tfoot>
       </table></div>`}
     </div>`;
   };
@@ -530,6 +530,7 @@ function renderAlugueis(){
       <div class="fl"><label>Valor Boleto (bruto)</label><input class="fi" id="al-bruto" type="number" step="0.01" placeholder="0,00"></div>
       <div class="fl"><label>Valor Líquido Recebido</label><input class="fi" id="al-liquido" type="number" step="0.01" placeholder="0,00"></div>
       <div class="fl"><label>Data do Repasse</label><input class="fi" id="al-data" type="date" value="${today()}"></div>
+      <div class="fl"><label>Data de Vencimento</label><input class="fi" id="al-vencimento" type="date"></div>
       <div class="fl"><label>Observação</label><input class="fi" id="al-obs" placeholder="opcional"></div>
     </div>
     <button class="btn-gold" onclick="addAluguel()">+ Registrar Recebimento</button>
@@ -546,7 +547,7 @@ function addAluguel(){
   const imovelId=document.getElementById('al-im').value;
   if(!imovelId){notify('Cadastre e selecione um imóvel','err');return;}
   const lst=load(pkPeriodo('alugueis'));
-  lst.push({id:uuid(),imovelId,bruto:+document.getElementById('al-bruto').value||0,liquido:+document.getElementById('al-liquido').value||0,data:document.getElementById('al-data').value,obs:document.getElementById('al-obs').value.trim()});
+  lst.push({id:uuid(),imovelId,bruto:+document.getElementById('al-bruto').value||0,liquido:+document.getElementById('al-liquido').value||0,data:document.getElementById('al-data').value,vencimento:document.getElementById('al-vencimento').value,obs:document.getElementById('al-obs').value.trim()});
   save(pkPeriodo('alugueis'),lst);
   notify('Recebimento registrado','ok');render();
 }
@@ -564,7 +565,10 @@ function abrirEdicaoAluguel(id){
         <div class="fl"><label>Valor Boleto (bruto)</label><input class="fi" id="ea-bruto" type="number" step="0.01" value="${r.bruto||0}"></div>
         <div class="fl"><label>Valor Líquido Recebido</label><input class="fi" id="ea-liquido" type="number" step="0.01" value="${r.liquido||0}"></div>
       </div>
-      <div class="fl" style="margin-bottom:12px"><label>Data do Repasse</label><input class="fi" id="ea-data" type="date" value="${r.data||today()}"></div>
+      <div class="fg" style="grid-template-columns:1fr 1fr;margin-bottom:12px">
+        <div class="fl"><label>Data do Repasse</label><input class="fi" id="ea-data" type="date" value="${r.data||today()}"></div>
+        <div class="fl"><label>Data de Vencimento</label><input class="fi" id="ea-vencimento" type="date" value="${r.vencimento||''}"></div>
+      </div>
       <div class="fl" style="margin-bottom:20px"><label>Observação</label><input class="fi" id="ea-obs" value="${(r.obs||'').replace(/"/g,'&quot;')}"></div>
       <div style="display:flex;gap:10px">
         <button class="btn-gold" style="flex:1" onclick="salvarEdicaoAluguel('${id}')">Salvar Alterações</button>
@@ -581,6 +585,7 @@ function salvarEdicaoAluguel(id){
   r.bruto=+document.getElementById('ea-bruto').value||0;
   r.liquido=+document.getElementById('ea-liquido').value||0;
   r.data=document.getElementById('ea-data').value;
+  r.vencimento=document.getElementById('ea-vencimento').value;
   r.obs=document.getElementById('ea-obs').value.trim();
   save(pkPeriodo('alugueis'),lst);
   fecharModal();
@@ -598,6 +603,7 @@ function parseRelatorioAlude(text){
   const g=(re)=>{const m=text.match(re);return m?m[1].trim():null};
   const valorRepassado=parseBRNum(g(/Valor repassado[\s\S]{0,40}?R\$\s?([\d.,]+)/));
   const dataRepasse=g(/(\d{2}\/\d{2}\/\d{4})\s*(?:às|as)/);
+  const dataVencimento=g(/Data de vencimento da cobran[cç]a\s+(\d{2}\/\d{2}\/\d{4})/i);
   const referente=g(/Referente a\s+([A-Za-zçÇéÉ]+\/\d{4})/);
   const imovelAddr=g(/Im[oó]vel\s+([\s\S]+?)\s+Locat[aá]rio/);
   const locatario=g(/Locat[aá]rio\s+([^\n(]+?)\s*\(/);
@@ -621,7 +627,7 @@ function parseRelatorioAlude(text){
   // Bruto = TOTAL de tudo que foi cobrado do inquilino (aluguel + IPTU + água + condomínio + juros + taxas)
   const totalCobradoMatch=cobradoSection.match(/Total\s+R\$\s?([\d.,]+)/);
   const totalCobrado=parseBRNum(totalCobradoMatch?totalCobradoMatch[1]:null);
-  return {valorRepassado,dataRepasse,referente,imovelAddr,locatario,imobiliaria,alugCobrado,iptuCobrado,alugTransf,iptuTransf,jurosCobrado,jurosTransf,taxaManutCobrado,aguaCobrado,aguaTransf,condoTransf,totalCobrado};
+  return {valorRepassado,dataRepasse,dataVencimento,referente,imovelAddr,locatario,imobiliaria,alugCobrado,iptuCobrado,alugTransf,iptuTransf,jurosCobrado,jurosTransf,taxaManutCobrado,aguaCobrado,aguaTransf,condoTransf,totalCobrado};
 }
 function matchImovel(addr){
   if(!addr)return null;
@@ -708,7 +714,10 @@ function abrirPreviewImportPDF(p){
         <div class="fl"><label>Valor Bruto (total cobrado do inquilino)</label><input class="fi" id="pv-bruto" type="number" step="0.01" value="${p.totalCobrado||p.alugCobrado||''}"></div>
         <div class="fl"><label>Valor Líquido (repassado a você)</label><input class="fi" id="pv-liquido" type="number" step="0.01" value="${p.valorRepassado||p.alugTransf||''}"></div>
       </div>
-      <div class="fl" style="margin-bottom:12px"><label>Data do Repasse</label><input class="fi" id="pv-data" type="date" value="${ddmmyyyy2iso(p.dataRepasse)}"></div>
+      <div class="fg" style="grid-template-columns:1fr 1fr;margin-bottom:12px">
+        <div class="fl"><label>Data do Repasse</label><input class="fi" id="pv-data" type="date" value="${ddmmyyyy2iso(p.dataRepasse)}"></div>
+        <div class="fl"><label>Data de Vencimento</label><input class="fi" id="pv-vencimento" type="date" value="${p.dataVencimento?ddmmyyyy2iso(p.dataVencimento):''}"></div>
+      </div>
       <div class="sec-note" style="margin:0 0 12px">
         <strong>Bruto</strong> = tudo que foi cobrado do inquilino somado (aluguel${p.iptuCobrado?' + IPTU':''}${p.aguaCobrado?' + água':''}${p.condoTransf?' + condomínio':''}${p.jurosCobrado?' + juros/multa':''}${p.taxaManutCobrado?' + taxa de manutenção':''}) — um lançamento único.
         <strong>Líquido</strong> = o valor que efetivamente caiu na sua conta (repasse total do relatório).
@@ -741,7 +750,7 @@ function confirmarImportPDF(){
   if(!imovelId){notify('Selecione um imóvel','err');return;}
   const comp=_pdfPendingFile?{...(_pdfPendingFile),nomeFinal:nomeAutomatico(imovelNome(imovelId),'RELATORIO')+'.pdf'}:null;
   const lst=load(pkPeriodo('alugueis'));
-  lst.push({id:uuid(),imovelId,bruto:+document.getElementById('pv-bruto').value||0,liquido:+document.getElementById('pv-liquido').value||0,data:document.getElementById('pv-data').value,obs:document.getElementById('pv-obs').value.trim(),comprovante:comp});
+  lst.push({id:uuid(),imovelId,bruto:+document.getElementById('pv-bruto').value||0,liquido:+document.getElementById('pv-liquido').value||0,data:document.getElementById('pv-data').value,vencimento:document.getElementById('pv-vencimento').value,obs:document.getElementById('pv-obs').value.trim(),comprovante:comp});
   save(pkPeriodo('alugueis'),lst);
   fecharModal();
   document.getElementById('pdf-import-input').value='';
@@ -777,10 +786,10 @@ function renderRepasses(){
       <div class="sec-hdr"><h2>🏠 ${mod.titulo}</h2><div class="sec-line"></div></div>
       ${!mod.imoveis.length?`<div class="sec-note" style="margin:0">Nenhum imóvel cadastrado neste grupo ainda. Assim que cadastrar um imóvel com esse nome, ele entra aqui automaticamente.</div>`:`
       <div class="tbl-wrap" style="margin-bottom:0"><table style="table-layout:fixed;width:100%">
-        <colgroup><col style="width:16%"><col style="width:9%"><col style="width:9%"><col style="width:9%"><col style="width:14%"><col style="width:13%"><col style="width:9%"><col style="width:9%"><col style="width:12%"></colgroup>
-        <thead><tr><th>Imóvel</th><th>Tipo</th><th>Valor</th><th>Envio</th><th>Status</th><th>Obs</th><th>Boleto</th><th>Comprov.</th><th>Ações</th></tr></thead>
+        <colgroup><col style="width:14%"><col style="width:8%"><col style="width:8%"><col style="width:10%"><col style="width:10%"><col style="width:9%"><col style="width:10%"><col style="width:9%"><col style="width:9%"><col style="width:13%"></colgroup>
+        <thead><tr><th>Imóvel</th><th>Tipo</th><th>Valor</th><th>Vencimento</th><th>Data Pagto</th><th>Forma Pgto</th><th>Status</th><th>Boleto</th><th>Comprov.</th><th>Ações</th></tr></thead>
         <tbody>
-          ${linhas.length?linhas.map(r=>`<tr><td>${imovelNome(r.imovelId)}</td><td>${r.tipo}</td><td>${fmt(r.valor)}</td><td>${r.envio||'—'}</td><td>${statusBadge(r.status)}</td><td class="dim" style="text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.obs||'—'}</td><td>${comprovanteChip(r.boleto)}</td><td>${comprovanteChip(r.comprovantePagamento)}</td><td style="white-space:nowrap">${r.status!=='pago'?`<button class="btn-sm btn-ok" onclick="marcarRepassePago('${r.id}')" title="marcar pago">✓</button> `:''}<button class="btn-sm btn-ok" onclick="abrirEdicaoRepasse('${r.id}')">editar</button> <button class="btn-sm" onclick="delItem('repasses','${r.id}')">excluir</button></td></tr>`).join(''):`<tr><td colspan="9"><div class="empty">Nenhum lançamento neste mês para este grupo.</div></td></tr>`}
+          ${linhas.length?linhas.map(r=>`<tr><td>${imovelNome(r.imovelId)}</td><td>${r.tipo}</td><td>${fmt(r.valor)}</td><td>${r.envio||'—'}</td><td>${r.dataPagamento||'—'}</td><td>${r.formaPagamento||'—'}</td><td>${statusBadge(r.status)}</td><td>${comprovanteChip(r.boleto)}</td><td>${comprovanteChip(r.comprovantePagamento)}</td><td style="white-space:nowrap">${r.status!=='pago'?`<button class="btn-sm btn-ok" onclick="marcarRepassePago('${r.id}')" title="marcar pago">✓</button> `:''}<button class="btn-sm btn-ok" onclick="abrirEdicaoRepasse('${r.id}')">editar</button> <button class="btn-sm" onclick="delItem('repasses','${r.id}')">excluir</button></td></tr>`).join(''):`<tr><td colspan="10"><div class="empty">Nenhum lançamento neste mês para este grupo.</div></td></tr>`}
         </tbody>
       </table></div>`}
     </div>`;
@@ -794,7 +803,8 @@ function renderRepasses(){
       <div class="fl"><label>Imóvel</label><select class="fi" id="rp-im">${selectImoveis()}</select></div>
       <div class="fl"><label>Tipo</label><select class="fi" id="rp-tipo"><option>IPTU</option><option>Água</option><option>Condomínio</option><option>Luz</option><option>Internet</option><option>Manutenção</option><option>Outro</option></select></div>
       <div class="fl"><label>Valor</label><input class="fi" id="rp-val" type="number" step="0.01" placeholder="0,00"></div>
-      <div class="fl"><label>Data Envio ao Corretor</label><input class="fi" id="rp-envio" type="date" value="${today()}"></div>
+      <div class="fl"><label>Data de Vencimento</label><input class="fi" id="rp-envio" type="date" value="${today()}"></div>
+      <div class="fl"><label>Forma de Pagamento</label><select class="fi" id="rp-forma"><option>Boleto</option><option>Pix</option></select></div>
       <div class="fl"><label>Status</label><select class="fi" id="rp-status">${statusOptions('a_pagar')}</select></div>
       <div class="fl"><label>Observações</label><input class="fi" id="rp-obs" placeholder="opcional"></div>
     </div>
@@ -810,7 +820,7 @@ function addRepasse(btn){
   const imovelId=document.getElementById('rp-im').value;
   if(!imovelId){notify('Cadastre e selecione um imóvel','err');return;}
   const tipo=document.getElementById('rp-tipo').value;
-  const base={id:uuid(),imovelId,tipo,valor:+document.getElementById('rp-val').value||0,envio:document.getElementById('rp-envio').value,status:document.getElementById('rp-status').value,obs:document.getElementById('rp-obs').value.trim()};
+  const base={id:uuid(),imovelId,tipo,valor:+document.getElementById('rp-val').value||0,envio:document.getElementById('rp-envio').value,formaPagamento:document.getElementById('rp-forma').value,status:document.getElementById('rp-status').value,obs:document.getElementById('rp-obs').value.trim()};
   const fBoleto=document.getElementById('rp-file-boleto');
   const fComp=document.getElementById('rp-file-comp');
   const textoOriginal=btn?btn.textContent:null;
@@ -845,9 +855,11 @@ function abrirEdicaoRepasse(id){
         <div class="fl"><label>Valor</label><input class="fi" id="er-val" type="number" step="0.01" value="${r.valor||0}"></div>
       </div>
       <div class="fg" style="grid-template-columns:1fr 1fr;margin-bottom:12px">
-        <div class="fl"><label>Data</label><input class="fi" id="er-envio" type="date" value="${r.envio||today()}"></div>
-        <div class="fl"><label>Status</label><select class="fi" id="er-status" onchange="toggleComprovanteEdicao('${(r.comprovantePagamento?'1':'')}')">${statusOptions(r.status)}</select></div>
+        <div class="fl"><label>Data de Vencimento</label><input class="fi" id="er-envio" type="date" value="${r.envio||today()}"></div>
+        <div class="fl"><label>Forma de Pagamento</label><select class="fi" id="er-forma"><option${r.formaPagamento==='Boleto'||!r.formaPagamento?' selected':''}>Boleto</option><option${r.formaPagamento==='Pix'?' selected':''}>Pix</option></select></div>
       </div>
+      <div class="fl" style="margin-bottom:12px"><label>Status</label><select class="fi" id="er-status" onchange="toggleComprovanteEdicao('${(r.comprovantePagamento?'1':'')}')">${statusOptions(r.status)}</select></div>
+      ${r.dataPagamento?`<div class="sec-note" style="margin:0 0 12px">Pago em: <strong>${r.dataPagamento}</strong></div>`:''}
       <div id="er-comprovante-wrap" style="display:${r.status==='pago'?'block':'none'}">
         ${r.comprovantePagamento?`<div class="sec-note" style="margin:0 0 10px">Comprovante já anexado: ${comprovanteChip(r.comprovantePagamento)}. Pode anexar outro abaixo pra substituir, se quiser.</div>`:''}
         <div class="fl" style="margin-bottom:12px"><label>Comprovante de Pagamento ${r.comprovantePagamento?'(opcional — já existe um)':'<span style="color:var(--red)">*obrigatório para status Pago</span>'}</label><input class="fi" id="er-comprovante" type="file" accept=".pdf,image/*"></div>
@@ -881,7 +893,12 @@ function salvarEdicaoRepasse(id){
     r.tipo=document.getElementById('er-tipo').value;
     r.valor=+document.getElementById('er-val').value||0;
     r.envio=document.getElementById('er-envio').value;
+    r.formaPagamento=document.getElementById('er-forma').value;
+    const statusAnterior=r.status;
     r.status=novoStatus;
+    if(novoStatus==='pago' && statusAnterior!=='pago'){
+      r.dataPagamento=new Date().toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+    }
     r.obs=document.getElementById('er-obs').value.trim();
     save(pkPeriodo('repasses'),lst);
     fecharModal();
@@ -946,6 +963,7 @@ function confirmarRepassePago(id){
         return;
       }
       it.status='pago';
+      it.dataPagamento=new Date().toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
       save(pkPeriodo('repasses'),lst);
       fecharModal();
       notify('Marcado como pago','ok');render();
@@ -1153,7 +1171,7 @@ function renderRateio(){
   <div class="tbl-wrap"><table>
     <thead><tr><th>Data</th><th>Valor Total</th><th>Divisão</th><th>Comprovantes</th><th></th></tr></thead>
     <tbody>
-      ${lanc.length?lanc.map(r=>{const cotas=calcularCotasAjustadas(r.valor,r.partes).map(c=>`${imovelNome(c.imovelId)}: ${fmt(c.cota)} (${c.pct}%)`).join(' · ');return `<tr><td>${r.data||'—'}</td><td>${fmt(r.valor)}</td><td style="font-size:11px;text-align:left">${cotas}</td><td>${comprovantesLista(r)}</td><td><button class="btn-sm btn-ok" onclick="abrirAnexarComprovanteRateio('${r.id}')">+ anexar</button> <button class="btn-sm" onclick="delRateioLanc('${r.id}')">excluir</button></td></tr>`}).join(''):`<tr><td colspan="5"><div class="empty">Nenhum rateio lançado neste mês.</div></td></tr>`}
+      ${lanc.length?lanc.map(r=>{const cotas=(r.partes&&r.partes.length)?calcularCotasAjustadas(r.valor,r.partes).map(c=>`${imovelNome(c.imovelId)}: ${fmt(c.cota)} (${c.pct}%)`).join(' · '):'<span class="dim">registro antigo, sem detalhamento — pode excluir e relançar</span>';return `<tr><td>${r.data||'—'}</td><td>${fmt(r.valor)}</td><td style="font-size:11px;text-align:left">${cotas}</td><td>${comprovantesLista(r)}</td><td><button class="btn-sm btn-ok" onclick="abrirAnexarComprovanteRateio('${r.id}')">+ anexar</button> <button class="btn-sm" onclick="delRateioLanc('${r.id}')">excluir</button></td></tr>`}).join(''):`<tr><td colspan="5"><div class="empty">Nenhum rateio lançado neste mês.</div></td></tr>`}
     </tbody>
   </table></div>`;
 }
@@ -1380,8 +1398,17 @@ function setTab(tab,btn){
 function render(){
   document.getElementById('tb-title').textContent=TITLES[ST.tab]||'';
   const fns={dashboard:renderDash,alugueis:renderAlugueis,repasses:renderRepasses,despesas:renderDespesas,condominio:renderCondominio,rateio:renderRateio,imoveis:renderImoveis,pessoal:renderPessoal,dre:renderDRE};
-  document.getElementById('content').innerHTML=(fns[ST.tab]||(()=>''))();
-  if(ST.tab==='rateio') renderRateioLinhas(ST.rateioQtd||3);
+  try{
+    document.getElementById('content').innerHTML=(fns[ST.tab]||(()=>''))();
+    if(ST.tab==='rateio') renderRateioLinhas(ST.rateioQtd||3);
+  }catch(e){
+    console.error('Erro ao renderizar a aba',ST.tab,e);
+    document.getElementById('content').innerHTML=`<div class="form-card" style="border-color:var(--red)">
+      <div class="sec-hdr"><h2 style="color:var(--red)">Ops, algo deu errado nesta tela</h2><div class="sec-line"></div></div>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:10px">Detalhe técnico: ${(e.message||'').replace(/</g,'&lt;')}</p>
+      <button class="btn-ghost" onclick="setTab('dashboard',null)">Voltar ao Dashboard</button>
+    </div>`;
+  }
 }
 function changePeriod(){
   ST.mes=Number(document.getElementById('sel-mes').value);
