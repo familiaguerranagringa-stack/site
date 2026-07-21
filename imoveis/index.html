@@ -454,7 +454,7 @@ const GRUPOS_ORDEM=[
   {titulo:'Paul Harris',match:['paul harris']},
   {titulo:'CHAVEIRO',match:['getulio vargas','getúlio vargas']},
   {titulo:'Rua Rudy Alberto',match:['rudy alberto']},
-  {titulo:'Rua Erineia',match:['erineia','erinéia']},
+  {titulo:'Rua Erineia',match:['erineia','erinéia','residencial familia guerra','residencial família guerra']},
   {titulo:'Travessa Gomes',match:['travessa gomes']},
   {titulo:'SALAS COMERCIAIS ENGRACIA',match:['engracia','engrácia']},
   {titulo:'James Mendonça',match:['james mendonca','james mendonça','mendonca','mendonça']},
@@ -613,7 +613,10 @@ function parseRelatorioAlude(text){
   // Taxa de manutenção/administração cobrada do inquilino mas retida pela imobiliária (não repassada ao proprietário)
   const taxaManutCobrado=parseBRNum((cobradoSection.match(/Taxa de manuten[cç][aã]o[^\n\d]*R\$\s?([\d.,]+)/i)||[])[1]);
   const condoTransf=parseBRNum((transferSection.match(/Condom[ií]nio\s+R\$\s?([\d.,]+)/i)||[])[1]);
-  return {valorRepassado,dataRepasse,referente,imovelAddr,locatario,imobiliaria,alugCobrado,iptuCobrado,alugTransf,iptuTransf,jurosCobrado,jurosTransf,taxaManutCobrado,aguaCobrado,aguaTransf,condoTransf};
+  // Bruto = TOTAL de tudo que foi cobrado do inquilino (aluguel + IPTU + água + condomínio + juros + taxas)
+  const totalCobradoMatch=cobradoSection.match(/Total\s+R\$\s?([\d.,]+)/);
+  const totalCobrado=parseBRNum(totalCobradoMatch?totalCobradoMatch[1]:null);
+  return {valorRepassado,dataRepasse,referente,imovelAddr,locatario,imobiliaria,alugCobrado,iptuCobrado,alugTransf,iptuTransf,jurosCobrado,jurosTransf,taxaManutCobrado,aguaCobrado,aguaTransf,condoTransf,totalCobrado};
 }
 function matchImovel(addr){
   if(!addr)return null;
@@ -697,18 +700,17 @@ function abrirPreviewImportPDF(p){
         <button type="button" class="btn-gold" style="width:100%" onclick="criarImovelInlineImport(${JSON.stringify(p).replace(/"/g,'&quot;')})">Cadastrar e Selecionar</button>
       </div>
       <div class="fg" style="grid-template-columns:1fr 1fr">
-        <div class="fl"><label>Valor Boleto (bruto)</label><input class="fi" id="pv-bruto" type="number" step="0.01" value="${p.alugCobrado||''}"></div>
-        <div class="fl"><label>Valor Líquido Aluguel${p.jurosTransf?' (com juros)':''}</label><input class="fi" id="pv-liquido" type="number" step="0.01" value="${((p.alugTransf||0)+(p.jurosTransf||0))||''}"></div>
+        <div class="fl"><label>Valor Bruto (total cobrado do inquilino)</label><input class="fi" id="pv-bruto" type="number" step="0.01" value="${p.totalCobrado||p.alugCobrado||''}"></div>
+        <div class="fl"><label>Valor Líquido (repassado a você)</label><input class="fi" id="pv-liquido" type="number" step="0.01" value="${p.valorRepassado||p.alugTransf||''}"></div>
       </div>
       <div class="fl" style="margin-bottom:12px"><label>Data do Repasse</label><input class="fi" id="pv-data" type="date" value="${ddmmyyyy2iso(p.dataRepasse)}"></div>
-      ${p.jurosTransf?`<div class="sec-note" style="margin:0 0 12px;color:var(--amber)">⚠ Este relatório mostra <strong>${fmt(p.jurosTransf)}</strong> de juros/multa por atraso — já somei ao "Valor Líquido Aluguel" acima, porque esse valor é seu (é receita a mais, diferente do IPTU repassado). Confira se bateu certo antes de lançar.</div>`:''}
-      ${p.taxaManutCobrado?`<div class="sec-note" style="margin:0 0 12px">Este relatório mostra <strong>${fmt(p.taxaManutCobrado)}</strong> de taxa de manutenção cobrada do inquilino — ela fica retida com a imobiliária (não é repassada pra você), por isso não entra no "Valor Líquido Aluguel". É só informativo.</div>`:''}
-      ${p.iptuTransf?`<div class="sec-note" style="margin:0 0 12px">Este relatório mostra <strong>${fmt(p.iptuTransf)}</strong> de IPTU que a imobiliária repassou pra você (não descontou). Esse valor caiu na sua conta, mas não é seu — o IPTU ainda precisa ser pago. Por isso ele <strong>não</strong> entra no campo "Valor Líquido Aluguel" acima; vou registrar separado, como pendente, na aba IPTU/Água.</div>`:''}
-      ${p.aguaTransf?`<div class="sec-note" style="margin:0 0 12px">Este relatório mostra <strong>${fmt(p.aguaTransf)}</strong> de Água que a imobiliária repassou pra você (não descontou). Mesma lógica do IPTU: esse valor não entra no líquido, vou registrar como pendente na aba IPTU/Água.</div>`:''}
-      ${p.condoTransf?`<div class="sec-note" style="margin:0 0 12px">Este relatório mostra <strong>${fmt(p.condoTransf)}</strong> de Condomínio que a imobiliária repassou pra você (não descontou) — é pra você fazer o pagamento. Mesma lógica do IPTU: esse valor não entra no líquido, vou registrar como pendente na aba IPTU/Água.</div>`:''}
+      <div class="sec-note" style="margin:0 0 12px">
+        <strong>Bruto</strong> = tudo que foi cobrado do inquilino somado (aluguel${p.iptuCobrado?' + IPTU':''}${p.aguaCobrado?' + água':''}${p.condoTransf?' + condomínio':''}${p.jurosCobrado?' + juros/multa':''}${p.taxaManutCobrado?' + taxa de manutenção':''}) — um lançamento único.
+        <strong>Líquido</strong> = o valor que efetivamente caiu na sua conta (repasse total do relatório).
+      </div>
       <div class="fl" style="margin-bottom:20px"><label>Observação</label><input class="fi" id="pv-obs" value="Importado do relatório Aprisco/Alude${p.locatario?' — inquilino '+p.locatario:''}${p.jurosTransf?' (com juros de atraso '+fmt(p.jurosTransf)+')':''}"></div>
       <div style="display:flex;gap:10px">
-        <button class="btn-gold" style="flex:1" onclick="confirmarImportPDF(${p.iptuTransf||0},${p.aguaTransf||0},${p.condoTransf||0})">Confirmar e Lançar</button>
+        <button class="btn-gold" style="flex:1" onclick="confirmarImportPDF()">Confirmar e Lançar</button>
         <button class="btn-ghost" onclick="fecharModal()">Cancelar</button>
       </div>
     </div>
@@ -729,28 +731,13 @@ function criarImovelInlineImport(p){
   abrirPreviewImportPDF(p);
   setTimeout(()=>{const sel=document.getElementById('pv-im');if(sel)sel.value=novo.id;},0);
 }
-function confirmarImportPDF(iptuTransf,aguaTransf,condoTransf){
+function confirmarImportPDF(){
   const imovelId=document.getElementById('pv-im').value;
   if(!imovelId){notify('Selecione um imóvel','err');return;}
   const comp=_pdfPendingFile?{...(_pdfPendingFile),nomeFinal:nomeAutomatico(imovelNome(imovelId),'RELATORIO')+'.pdf'}:null;
   const lst=load(pkPeriodo('alugueis'));
   lst.push({id:uuid(),imovelId,bruto:+document.getElementById('pv-bruto').value||0,liquido:+document.getElementById('pv-liquido').value||0,data:document.getElementById('pv-data').value,obs:document.getElementById('pv-obs').value.trim(),comprovante:comp});
   save(pkPeriodo('alugueis'),lst);
-  const rp=load(pkPeriodo('repasses'));
-  let mudouRp=false;
-  if(iptuTransf>0){
-    rp.push({id:uuid(),imovelId,tipo:'IPTU',valor:iptuTransf,envio:document.getElementById('pv-data').value,status:'recebido_a_pagar'});
-    mudouRp=true;
-  }
-  if(aguaTransf>0){
-    rp.push({id:uuid(),imovelId,tipo:'Água',valor:aguaTransf,envio:document.getElementById('pv-data').value,status:'recebido_a_pagar'});
-    mudouRp=true;
-  }
-  if(condoTransf>0){
-    rp.push({id:uuid(),imovelId,tipo:'Condomínio',valor:condoTransf,envio:document.getElementById('pv-data').value,status:'recebido_a_pagar'});
-    mudouRp=true;
-  }
-  if(mudouRp)save(pkPeriodo('repasses'),rp);
   fecharModal();
   document.getElementById('pdf-import-input').value='';
   document.getElementById('pdf-import-status').textContent='';
@@ -854,8 +841,13 @@ function abrirEdicaoRepasse(id){
       </div>
       <div class="fg" style="grid-template-columns:1fr 1fr;margin-bottom:12px">
         <div class="fl"><label>Data</label><input class="fi" id="er-envio" type="date" value="${r.envio||today()}"></div>
-        <div class="fl"><label>Status</label><select class="fi" id="er-status">${statusOptions(r.status)}</select></div>
+        <div class="fl"><label>Status</label><select class="fi" id="er-status" onchange="toggleComprovanteEdicao('${(r.comprovantePagamento?'1':'')}')">${statusOptions(r.status)}</select></div>
       </div>
+      <div id="er-comprovante-wrap" style="display:${r.status==='pago'?'block':'none'}">
+        ${r.comprovantePagamento?`<div class="sec-note" style="margin:0 0 10px">Comprovante já anexado: ${comprovanteChip(r.comprovantePagamento)}. Pode anexar outro abaixo pra substituir, se quiser.</div>`:''}
+        <div class="fl" style="margin-bottom:12px"><label>Comprovante de Pagamento ${r.comprovantePagamento?'(opcional — já existe um)':'<span style="color:var(--red)">*obrigatório para status Pago</span>'}</label><input class="fi" id="er-comprovante" type="file" accept=".pdf,image/*"></div>
+      </div>
+      <div id="er-erro" style="font-size:12px;color:var(--red);margin-bottom:12px;display:none">Anexe o comprovante de pagamento para salvar como Pago.</div>
       <div class="fl" style="margin-bottom:20px"><label>Observações</label><input class="fi" id="er-obs" value="${(r.obs||'').replace(/"/g,'&quot;')}"></div>
       <div style="display:flex;gap:10px">
         <button class="btn-gold" style="flex:1" onclick="salvarEdicaoRepasse('${id}')">Salvar Alterações</button>
@@ -864,19 +856,40 @@ function abrirEdicaoRepasse(id){
     </div>
   </div>`;
 }
+function toggleComprovanteEdicao(){
+  const status=document.getElementById('er-status').value;
+  document.getElementById('er-comprovante-wrap').style.display=status==='pago'?'block':'none';
+}
 function salvarEdicaoRepasse(id){
   const lst=load(pkPeriodo('repasses'));
   const r=lst.find(x=>x.id===id);
   if(!r)return;
-  r.imovelId=document.getElementById('er-im').value;
-  r.tipo=document.getElementById('er-tipo').value;
-  r.valor=+document.getElementById('er-val').value||0;
-  r.envio=document.getElementById('er-envio').value;
-  r.status=document.getElementById('er-status').value;
-  r.obs=document.getElementById('er-obs').value.trim();
-  save(pkPeriodo('repasses'),lst);
-  fecharModal();
-  notify('Lançamento atualizado','ok');render();
+  const novoStatus=document.getElementById('er-status').value;
+  const fComp=document.getElementById('er-comprovante');
+  if(novoStatus==='pago' && !r.comprovantePagamento && !fComp.files[0]){
+    document.getElementById('er-erro').style.display='block';
+    notify('Anexe o comprovante de pagamento para salvar como Pago','err');
+    return;
+  }
+  const salvarResto=()=>{
+    r.imovelId=document.getElementById('er-im').value;
+    r.tipo=document.getElementById('er-tipo').value;
+    r.valor=+document.getElementById('er-val').value||0;
+    r.envio=document.getElementById('er-envio').value;
+    r.status=novoStatus;
+    r.obs=document.getElementById('er-obs').value.trim();
+    save(pkPeriodo('repasses'),lst);
+    fecharModal();
+    notify('Lançamento atualizado','ok');render();
+  };
+  if(fComp.files[0]){
+    lerArquivo(fComp,()=>nomeAutomatico(imovelNome(r.imovelId),r.tipo+'-COMPROVANTE'),(comp)=>{
+      if(comp)r.comprovantePagamento=comp;
+      salvarResto();
+    });
+  } else {
+    salvarResto();
+  }
 }
 
 function limparRelatoriosAntigos(){
@@ -897,9 +910,10 @@ function marcarRepassePago(id){
   <div class="modal-bg" onclick="if(event.target===this)fecharModal()">
     <div class="modal" style="width:420px">
       <h2>Marcar como Pago</h2>
-      <p>Anexe o comprovante de pagamento agora (opcional, mas recomendado para conferência futura).</p>
+      <p>Para marcar como pago é <strong>obrigatório</strong> anexar o comprovante de pagamento — garante que fique registrado o pagamento de fato.</p>
       <div class="fl" style="margin-bottom:12px"><label>Boleto (opcional)</label><input class="fi" id="mp-boleto" type="file" accept=".pdf,image/*"></div>
-      <div class="fl" style="margin-bottom:20px"><label>Comprovante de Pagamento (opcional)</label><input class="fi" id="mp-comp" type="file" accept=".pdf,image/*"></div>
+      <div class="fl" style="margin-bottom:8px"><label>Comprovante de Pagamento <span style="color:var(--red)">*obrigatório</span></label><input class="fi" id="mp-comp" type="file" accept=".pdf,image/*"></div>
+      <div id="mp-erro" style="font-size:12px;color:var(--red);margin-bottom:12px;display:none">Anexe o comprovante de pagamento para poder marcar como pago.</div>
       <div style="display:flex;gap:10px">
         <button class="btn-gold" style="flex:1" onclick="confirmarRepassePago('${id}')">Confirmar Pagamento</button>
         <button class="btn-ghost" onclick="fecharModal()">Cancelar</button>
@@ -913,10 +927,19 @@ function confirmarRepassePago(id){
   if(!it)return;
   const fBoleto=document.getElementById('mp-boleto');
   const fComp=document.getElementById('mp-comp');
+  if(!fComp.files[0] && !it.comprovantePagamento){
+    document.getElementById('mp-erro').style.display='block';
+    notify('Anexe o comprovante de pagamento para marcar como pago','err');
+    return;
+  }
   lerArquivo(fBoleto,()=>nomeAutomatico(imovelNome(it.imovelId),it.tipo+'-BOLETO'),(boleto)=>{
     if(boleto)it.boleto=boleto;
     lerArquivo(fComp,()=>nomeAutomatico(imovelNome(it.imovelId),it.tipo+'-COMPROVANTE'),(comp)=>{
       if(comp)it.comprovantePagamento=comp;
+      if(!it.comprovantePagamento){
+        notify('Não foi possível confirmar o pagamento sem o comprovante.','err');
+        return;
+      }
       it.status='pago';
       save(pkPeriodo('repasses'),lst);
       fecharModal();
