@@ -460,7 +460,7 @@ const GRUPOS_ORDEM=[
   {titulo:'Paul Harris',match:['paul harris']},
   {titulo:'CHAVEIRO',match:['getulio vargas','getúlio vargas']},
   {titulo:'Rua Rudy Alberto',match:['rudy alberto']},
-  {titulo:'Rua Erineia',match:['erineia','erinéia','residencial familia guerra','residencial família guerra']},
+  {titulo:'RESIDENCIAL FAMILIA GUERRA',match:['erineia','erinéia','residencial familia guerra','residencial família guerra']},
   {titulo:'Travessa Gomes',match:['travessa gomes']},
   {titulo:'SALAS COMERCIAIS ENGRACIA',match:['engracia','engrácia']},
   {titulo:'James Mendonça',match:['james mendonca','james mendonça','mendonca','mendonça']},
@@ -763,8 +763,6 @@ function confirmarImportPDF(){
 // ── REPASSES AO CORRETOR (IPTU/Água/Condomínio) — informativo, NÃO entra no saldo ──
 const STATUS_REPASSE=[
   {v:'a_pagar',l:'A Pagar',badge:'b-pend'},
-  {v:'recebido_a_pagar',l:'A Pagar',badge:'b-pend'},
-  {v:'enviado',l:'A Pagar',badge:'b-pend'},
   {v:'vencida',l:'Vencida',badge:'b-late'},
   {v:'pago',l:'Pago',badge:'b-blue'},
 ];
@@ -1361,7 +1359,7 @@ function delItem(tipo,id){
 
 // ── CÁLCULO CONSOLIDADO DO MÊS ──
 function calcMes(imovelIdFiltro){
-  let ims=getImoveis();
+  let ims=imoveisOrdenados();
   if(imovelIdFiltro) ims=ims.filter(i=>i.id===imovelIdFiltro);
   const alug=load(pkPeriodo('alugueis'));
   const desp=load(pkPeriodo('despesas'));
