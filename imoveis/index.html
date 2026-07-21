@@ -113,6 +113,7 @@ tr:hover td{background:var(--bg-hover)}
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.0.4/tesseract.min.js"></script>
 </head>
 <body>
 <div id="notif"></div>
@@ -723,7 +724,7 @@ function abrirPreviewImportPDF(p){
         <strong>Bruto</strong> = tudo que foi cobrado do inquilino somado (aluguel${p.iptuCobrado?' + IPTU':''}${p.aguaCobrado?' + água':''}${p.condoTransf?' + condomínio':''}${p.jurosCobrado?' + juros/multa':''}${p.taxaManutCobrado?' + taxa de manutenção':''}) — um lançamento único.
         <strong>Líquido</strong> = o valor que efetivamente caiu na sua conta (repasse total do relatório).
       </div>
-      <div class="fl" style="margin-bottom:20px"><label>Observação</label><input class="fi" id="pv-obs" value="Importado do relatório Aprisco/Alude${p.locatario?' — inquilino '+p.locatario:''}${p.jurosTransf?' (com juros de atraso '+fmt(p.jurosTransf)+')':''}"></div>
+      <div class="fl" style="margin-bottom:20px"><label>Observação</label><input class="fi" id="pv-obs" value="" placeholder="opcional"></div>
       <div style="display:flex;gap:10px">
         <button class="btn-gold" style="flex:1" onclick="confirmarImportPDF()">Confirmar e Lançar</button>
         <button class="btn-ghost" onclick="fecharModal()">Cancelar</button>
@@ -1136,19 +1137,29 @@ function calcularCotasAjustadas(valor,partes){
   return cotas;
 }
 function parseValorTotalGenerico(text){
-  let m=text.match(/TOTAL\s*A\s*PAGAR\s*(?:\(R\$\))?\s*[:\-]?\s*R?\$?\s?([\d.,]+)/i);
+  const m=text.match(/(?:total\s*a\s*pagar(?:\s*\(r\$\))?|valor\s*a\s*pagar|total\s*\(r\$\))\D{0,15}(\d{1,3}(?:\.\d{3})*[.,]\d{2})/i);
   if(m) return parseBRNum(m[1]);
-  m=text.match(/VALOR\s*A\s*PAGAR\s*[:\-]?\s*R?\$?\s?([\d.,]+)/i);
-  if(m) return parseBRNum(m[1]);
-  m=text.match(/Total(?:\s*(?:geral|da\s*fatura|do\s*boleto|a\s*recolher))?\s*[:\-]?\s*R\$\s?([\d.,]+)/i);
-  if(m) return parseBRNum(m[1]);
-  const todos=[...text.matchAll(/R\$\s?([\d.,]+)/g)].map(x=>parseBRNum(x[1]));
+  const todos=[...text.matchAll(/R\$\s?([\d.,]+)/gi)].map(x=>parseBRNum(x[1]));
   if(!todos.length) return 0;
   return Math.max(...todos);
 }
 function parseVencimentoGenerico(text){
-  const m=text.match(/VENCIMENTO\s*[:\-]?\s*(\d{2}\/\d{2}\/\d{4})/i);
+  const m=text.match(/vencimento\D{0,10}(\d{2}\/\d{2}\/\d{4})/i);
   return m?m[1]:null;
+}
+async function ocrExtrairTexto(imageSourceCanvasOrDataUrl){
+  if(!window.Tesseract) throw new Error('OCR indisponível (biblioteca não carregou)');
+  const {data}=await Tesseract.recognize(imageSourceCanvasOrDataUrl,'por');
+  return data.text||'';
+}
+async function pdfPrimeiraPaginaParaCanvas(typedarray){
+  const pdf=await pdfjsLib.getDocument({data:typedarray}).promise;
+  const page=await pdf.getPage(1);
+  const viewport=page.getViewport({scale:2.5});
+  const canvas=document.createElement('canvas');
+  canvas.width=viewport.width;canvas.height=viewport.height;
+  await page.render({canvasContext:canvas.getContext('2d'),viewport}).promise;
+  return canvas;
 }
 let _rateioPendingFile=null;
 function handleRateioFile(input){
@@ -1158,6 +1169,30 @@ function handleRateioFile(input){
   statusEl.textContent='⟳ Lendo arquivo...';
   const finalizarAnexo=()=>{
     lerArquivoCore(f,()=>nomeAutomatico('RATEIO','CONTA'),(comp)=>{ _rateioPendingFile=comp; });
+  };
+  const aplicarResultado=(valor,venc,origem)=>{
+    if(valor>0){
+      document.getElementById('rt-valor-total').value=valor.toFixed(2);
+      atualizarRateioPreview();
+      statusEl.textContent='✓ Valor lido'+(origem?' ('+origem+')':'')+': '+fmt(valor)+(venc?' — vencimento '+venc:'')+' — confira antes de confirmar.';
+    }else{
+      statusEl.textContent='⚠ Não consegui identificar o valor total automaticamente. Preencha manualmente abaixo.';
+    }
+    if(venc){
+      const [dd,mm,yyyy]=venc.split('/');
+      const dataEl=document.getElementById('rt-data');
+      if(dataEl)dataEl.value=`${yyyy}-${mm}-${dd}`;
+    }
+  };
+  const tentarOcrImagem=async(src)=>{
+    try{
+      statusEl.textContent='⟳ Não achei texto direto — tentando reconhecer por OCR (pode levar alguns segundos)...';
+      const texto=await ocrExtrairTexto(src);
+      aplicarResultado(parseValorTotalGenerico(texto),parseVencimentoGenerico(texto),'via OCR');
+    }catch(e){
+      console.error(e);
+      statusEl.textContent='⚠ Não consegui ler automaticamente (nem por texto, nem por OCR). Preencha manualmente abaixo.';
+    }
   };
   if(f.type==='application/pdf'){
     const readerBin=new FileReader();
@@ -1172,18 +1207,12 @@ function handleRateioFile(input){
           fullText+=tc.items.map(it=>it.str).join(' ')+' ';
         }
         const valor=parseValorTotalGenerico(fullText);
-        const venc=parseVencimentoGenerico(fullText);
         if(valor>0){
-          document.getElementById('rt-valor-total').value=valor.toFixed(2);
-          atualizarRateioPreview();
-          statusEl.textContent='✓ Valor lido automaticamente: '+fmt(valor)+(venc?' — vencimento '+venc:'')+' — confira antes de confirmar.';
-        }else{
-          statusEl.textContent='⚠ Não consegui identificar o valor total automaticamente. Preencha manualmente abaixo.';
-        }
-        if(venc){
-          const [dd,mm,yyyy]=venc.split('/');
-          const dataEl=document.getElementById('rt-data');
-          if(dataEl)dataEl.value=`${yyyy}-${mm}-${dd}`;
+          aplicarResultado(valor,parseVencimentoGenerico(fullText),null);
+        } else {
+          // PDF provavelmente escaneado (imagem) — sem texto útil. Tenta OCR na primeira página.
+          const canvas=await pdfPrimeiraPaginaParaCanvas(new Uint8Array(readerBin.result));
+          await tentarOcrImagem(canvas);
         }
       }catch(e){
         console.error(e);
@@ -1192,8 +1221,19 @@ function handleRateioFile(input){
       finalizarAnexo();
     };
     readerBin.readAsArrayBuffer(f);
+  } else if(f.type.startsWith('image/')){
+    const readerImg=new FileReader();
+    readerImg.onload=async()=>{
+      await tentarOcrImagem(readerImg.result);
+      finalizarAnexo();
+    };
+    readerImg.onerror=()=>{
+      statusEl.textContent='⚠ Não consegui ler esta imagem. Preencha manualmente abaixo.';
+      finalizarAnexo();
+    };
+    readerImg.readAsDataURL(f);
   } else {
-    statusEl.textContent='📎 Imagem anexada — não dá pra ler o valor automaticamente de fotos. Preencha manualmente abaixo.';
+    statusEl.textContent='📎 Arquivo anexado — não dá pra ler o valor automaticamente deste tipo de arquivo. Preencha manualmente abaixo.';
     finalizarAnexo();
   }
 }
@@ -1201,7 +1241,7 @@ function renderRateio(){
   const lanc=load(pkPeriodo('rateio_lanc'));
   const qtd=ST.rateioQtd||3;
   return `
-  <div class="sec-note">Anexe a conta (PDF ou foto), escolha entre quantos imóveis ela será dividida e defina o percentual de cada um. O valor de cada parte é calculado automaticamente. Isso gera um lançamento único, com uma despesa direta correspondente criada para cada imóvel selecionado.</div>
+  <div class="sec-note">Anexe a conta (PDF ou foto), escolha entre quantos imóveis ela será dividida e defina o percentual de cada um. O valor de cada parte é calculado automaticamente. Isso gera uma despesa direta e também um lançamento em "Contas" (com o mesmo boleto anexado) para cada imóvel selecionado.</div>
   <div class="form-card" style="border-color:var(--gold-dim)">
     <div class="sec-hdr"><h2>Anexar Conta para Rateio</h2><div class="sec-line"></div></div>
     <input class="fi" type="file" id="rt-file-input" accept=".pdf,image/*" onchange="handleRateioFile(this)">
@@ -1281,16 +1321,27 @@ function confirmarRateio(){
     }
   });
   save(pkPeriodo('despesas'),desp);
+  // gera também um lançamento em "Contas" (repasses) por imóvel, vinculado ao rateio
+  const hojeStr=today();
+  const statusInicial=data && data<hojeStr?'vencida':'a_pagar';
+  const rep=load(pkPeriodo('repasses'));
+  calcularCotasAjustadas(total,partes).forEach(c=>{
+    if(c.cota>0){
+      rep.push({id:uuid(),imovelId:c.imovelId,tipo:'Outro',valor:c.cota,envio:data,status:statusInicial,obs:'',boleto:_rateioPendingFile||null,rateioLancId:base.id});
+    }
+  });
+  save(pkPeriodo('repasses'),rep);
   document.getElementById('rt-file-input').value='';
   document.getElementById('rt-file-status').textContent='';
   _rateioPendingFile=null;
-  notify('Rateio confirmado e lançado como despesa de cada imóvel','ok');render();
+  notify('Rateio confirmado — lançado como despesa e em Contas para cada imóvel','ok');render();
 }
 function delRateioLanc(id){
-  if(!confirm('Excluir este rateio? As despesas que foram criadas automaticamente para cada imóvel também serão removidas.'))return;
+  if(!confirm('Excluir este rateio? As despesas e os lançamentos em Contas criados automaticamente para cada imóvel também serão removidos.'))return;
   save(pkPeriodo('rateio_lanc'),load(pkPeriodo('rateio_lanc')).filter(r=>r.id!==id));
   save(pkPeriodo('despesas'),load(pkPeriodo('despesas')).filter(d=>d.rateioLancId!==id));
-  notify('Rateio e despesas vinculadas excluídos','ok');render();
+  save(pkPeriodo('repasses'),load(pkPeriodo('repasses')).filter(r=>r.rateioLancId!==id));
+  notify('Rateio, despesas e lançamentos em Contas excluídos','ok');render();
 }
 function abrirAnexarComprovanteRateio(id){
   document.getElementById('modal-root').innerHTML=`
