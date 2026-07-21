@@ -1739,7 +1739,7 @@ function renderMarkup(){
     en.forEach(r=>{cAcc+=(+r.cmv||0);vAcc+=(+r.din||0)+(+r.pix||0)+(+r.cart||0)+(+r.getnet||0)+(+r.rend||0)+(+r.cred||0+(+r.cred||0));});
     PARCEIROS.forEach(p=>{const k=p.toLowerCase().replace(/\s+/g,'_');vAcc+=(fiMk[k]||[]).reduce((s,r)=>s+(+r.vv||0),0);});
     const pctAtual=cAcc>0&&vAcc>0?vAcc/(2*cAcc):1.0;
-    const metaMes=metaDigitada>0&&pctAtual>0?metaDigitada/(pctAtual/(1+pctAtual)):metaDigitada;
+    let metaMes=metaDigitada; // será recomputado após o loop acumulativo
 
     // Tabela acumulativa
     const diasMes=new Date(ST.ano,ST.mes,0).getDate();
@@ -1776,6 +1776,11 @@ function renderMarkup(){
       const impostoAcc=vendaAcc*0.09;
 tblRows.push({d,dt,isSun,isFuture,enDia,cmvAcc:cmvAcc2,vendaAcc,taxasAcc,gastosAcc,imposto:impostoAcc,pct:cmvAcc2>0?(vendaAcc-taxasAcc-gastosAcc-impostoAcc)/cmvAcc2-1:0});
     }
+
+    // META DO MÊS = MB / (P / (1+P)) usando P do ÚLTIMO DIA do acumulativo
+    const ultimoDiaAcc=tblRows.filter(r=>!r.isFuture&&r.cmvAcc>0);
+    const pUltimoDia=ultimoDiaAcc.length>0?ultimoDiaAcc[ultimoDiaAcc.length-1].pct:(pctAtual||0);
+    metaMes=metaDigitada>0&&pUltimoDia>0?metaDigitada/(pUltimoDia/(1+pUltimoDia)):metaDigitada;
 
     const totalVendido=vendaAcc;
     const nDias=diasAbertos.length;
@@ -1983,14 +1988,24 @@ tblRows.push({d,dt,isSun,isFuture,enDia,cmvAcc:cmvAcc2,vendaAcc,taxasAcc,gastosA
     h+='<div class="form-card" style="padding:10px 12px">';
     h+='<div class="sec-hdr" style="margin-bottom:8px"><h2>Informativos</h2><div class="sec-line"></div></div>';
     [
-      ['💰 Olhando de Cima','R$5k/dia → R$50 no próximo. R$7k → R$100.'],
-      ['⭐ Mais Avaliado','Mais avaliações Google → R$200 (mín. 20).'],
-      ['💳 Bônus UME','R$10/contrato. Pago no 8º do mês seguinte.'],
-      ['💳 Bônus Payjoy','R$10/contrato + película Hidrogel.'],
-    ].forEach(([ti,di])=>{
-      h+='<div style="border-bottom:1px solid var(--border-lite);padding:6px 0">'
-        +'<div style="font-size:10px;font-weight:700;color:var(--gold)">'+ti+'</div>'
-        +'<div style="font-size:10px;color:var(--dim)">'+di+'</div></div>';
+      ['⭐ SOU O MAIS AVALIADO',
+       'O vendedor que tiver seu nome destacado na avaliação do Google positivamente levará R$ 200,00 mínimo de 20 avaliações.',
+       'Obs: Os clientes que avaliarem devem ter comprado algo na loja e cadastrados no sistema.'],
+      ['💰 VENDEDOR OLHANDO DE CIMA',
+       'O vendedor que vender R$ 5.000,00 no dia seguinte R$ 50,00. Se vender R$ 7.000,00 leva R$ 100,00.',
+       'Obs: Linha prime não entra nesse cálculo.'],
+      ['💳 BÔNUS UME',
+       'Cada contrato finalizado pela financeira UME terá uma bonificação de R$ 10,00 por contrato. Contratos finalizados durante o mês serão depositados pela UME até o oitavo dia do mês seguinte na conta do vendedor.',
+       'Obs: Proibido vender UME em preço promocional.'],
+      ['💳 BÔNUS PAYJOY',
+       'Cada contrato finalizado pela financeira PAYJOY terá uma bonificação de R$ 10,00 por contrato. Contratos finalizados durante o mês serão depositados até o oitavo dia do mês seguinte na conta do vendedor.',
+       'Obs: Deverá incluir uma película de Hidrogel. Proibido vender PAYJOY em preço promocional.'],
+    ].forEach(([ti,di,obs])=>{
+      h+='<div style="border-bottom:1px solid var(--border-lite);padding:7px 0">'
+        +'<div style="font-size:10px;font-weight:800;color:var(--gold);letter-spacing:.06em">'+ti+'</div>'
+        +'<div style="font-size:10px;color:var(--text);margin-top:3px">'+di+'</div>'
+        +(obs?'<div style="font-size:9px;color:var(--amber);margin-top:2px;font-style:italic">'+obs+'</div>':'')
+        +'</div>';
     });
     h+='</div>';
 
