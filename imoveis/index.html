@@ -78,6 +78,7 @@ tr:hover td{background:var(--bg-hover)}
 .b-ok{background:#E7F5EC;color:var(--green);border:1px solid #BFE3CC}
 .b-pend{background:#FCF1DD;color:var(--amber);border:1px solid #F0D9A6}
 .b-late{background:#FBD5D0;color:#A6291A;border:1px solid #E8A599;font-weight:800}
+.b-soon{background:#FCE3B8;color:#8A5A00;border:1px solid #EFC372;font-weight:700}
 .b-blue{background:#E8F1F5;color:var(--blue);border:1px solid #C3DCE6}
 .b-info{background:var(--gold-bg);color:var(--gold);border:1px solid var(--gold-dim)}
 .tabs{display:flex;border-bottom:1px solid var(--border);margin-bottom:20px;overflow-x:auto;gap:0}
@@ -770,27 +771,33 @@ function confirmarImportPDF(){
 // ── REPASSES AO CORRETOR (IPTU/Água/Condomínio) — informativo, NÃO entra no saldo ──
 const STATUS_REPASSE=[
   {v:'a_pagar',l:'A Pagar',badge:'b-pend'},
+  {v:'a_vencer',l:'A Vencer',badge:'b-soon'},
   {v:'vencida',l:'Vencida',badge:'b-late'},
   {v:'pago',l:'Pago',badge:'b-blue'},
 ];
 function statusOptions(sel){
   return STATUS_REPASSE.map(s=>`<option value="${s.v}"${sel===s.v?' selected':''}>${s.l}</option>`).join('');
 }
+function diasParaVencimento(vencStr){
+  if(!vencStr)return null;
+  const hoje=new Date(today()+'T00:00:00');
+  const venc=new Date(vencStr+'T00:00:00');
+  return Math.round((venc-hoje)/86400000);
+}
 function statusBadge(r){
   // r pode ser o registro inteiro (uso novo, com verificação de vencimento) ou só a string do status (compat)
   const status=typeof r==='string'?r:r.status;
-  if(status==='pago'){
-    const s=STATUS_REPASSE.find(x=>x.v==='pago');
-    return `<span class="badge ${s.badge}">${s.l}</span>`;
-  }
+  const badgeDe=(v,labelFallback)=>{const s=STATUS_REPASSE.find(x=>x.v===v);return `<span class="badge ${s?s.badge:'b-pend'}">${s?s.l:labelFallback}</span>`;};
+  if(status==='pago') return badgeDe('pago','Pago');
+  if(status==='vencida') return badgeDe('vencida','Vencida'); // override manual
+  if(status==='a_vencer') return badgeDe('a_vencer','A Vencer'); // override manual
   const vencStr=typeof r==='object'?r.envio:null;
-  const hojeStr=today();
-  if(status==='vencida' || (vencStr && vencStr<hojeStr)){
-    const s=STATUS_REPASSE.find(x=>x.v==='vencida');
-    return `<span class="badge ${s.badge}">${s.l}</span>`;
+  const dias=diasParaVencimento(vencStr);
+  if(dias!==null){
+    if(dias<0) return badgeDe('vencida','Vencida');
+    if(dias<=5) return badgeDe('a_vencer','A Vencer');
   }
-  const s=STATUS_REPASSE.find(x=>x.v===status)||STATUS_REPASSE[0];
-  return `<span class="badge ${s.badge}">A Pagar</span>`;
+  return badgeDe('a_pagar','A Pagar');
 }
 function renderRepasses(){
   const ims=getImoveis();
@@ -1310,6 +1317,7 @@ function renderRateio(){
       <div class="fl"><label>Tipo</label><select class="fi" id="rt-tipo"><option>IPTU</option><option>Água</option><option>Condomínio</option><option>Luz</option><option>Internet</option><option>Manutenção</option><option>Outro</option></select></div>
       <div class="fl"><label>Forma de Pagamento</label><select class="fi" id="rt-forma"><option>Boleto</option><option>Pix</option></select></div>
       <div class="fl"><label>Status</label><select class="fi" id="rt-status">${statusOptions('a_pagar')}</select></div>
+      <div class="fl"><label>Observações</label><input class="fi" id="rt-obs" placeholder="opcional"></div>
     </div>
     <div id="rt-linhas-container" style="margin:14px 0"></div>
     <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px">
@@ -1381,13 +1389,12 @@ function confirmarRateio(){
   // gera também um lançamento em "Contas" (repasses) por imóvel, vinculado ao rateio
   const tipoSel=document.getElementById('rt-tipo').value;
   const formaSel=document.getElementById('rt-forma').value;
-  const hojeStr=today();
   const statusSel=document.getElementById('rt-status').value;
-  const statusInicial=statusSel==='a_pagar'&&data&&data<hojeStr?'vencida':statusSel;
+  const obsSel=document.getElementById('rt-obs').value.trim();
   const rep=load(pkPeriodo('repasses'));
   calcularCotasAjustadas(total,partes).forEach(c=>{
     if(c.cota>0){
-      rep.push({id:uuid(),imovelId:c.imovelId,tipo:tipoSel,valor:c.cota,envio:data,formaPagamento:formaSel,status:statusInicial,obs:'',boleto:_rateioPendingFile||null,rateioLancId:base.id});
+      rep.push({id:uuid(),imovelId:c.imovelId,tipo:tipoSel,valor:c.cota,envio:data,formaPagamento:formaSel,status:statusSel,obs:obsSel,boleto:_rateioPendingFile||null,rateioLancId:base.id});
     }
   });
   save(pkPeriodo('repasses'),rep);
@@ -1510,12 +1517,13 @@ function renderDash(){
     <div class="form-card" style="margin-bottom:16px">
       <div class="sec-hdr"><h2>🏠 ${mod.titulo}</h2><div class="sec-line"></div></div>
       ${!mod.imoveis.length?`<div class="sec-note" style="margin:0">Nenhum imóvel cadastrado neste grupo ainda. Assim que cadastrar um imóvel com esse nome, ele entra aqui automaticamente.</div>`:`
-      <div class="tbl-wrap" style="margin-bottom:0"><table>
-        <thead><tr><th>Imóvel</th><th>Líquido</th><th>Despesas</th><th>Condomínio Pendente</th><th>IPTU a Pagar</th><th>Saldo</th></tr></thead>
+      <div class="tbl-wrap" style="margin-bottom:0"><table style="table-layout:fixed;width:100%">
+        <colgroup><col style="width:30%"><col style="width:14%"><col style="width:14%"><col style="width:14%"><col style="width:14%"><col style="width:14%"></colgroup>
+        <thead><tr><th style="text-align:left">Imóvel</th><th style="text-align:right">Líquido</th><th style="text-align:right">Despesas</th><th style="text-align:right">Condomínio Pendente</th><th style="text-align:right">IPTU a Pagar</th><th style="text-align:right">Saldo</th></tr></thead>
         <tbody>
-          ${linhas.length?linhas.map(p=>`<tr><td>${p.imovel.nome}</td><td class="pos">${fmt(p.liquido)}</td><td class="neg">${fmt(p.despesas)}</td><td style="color:var(--amber)">${fmt(p.condPend)}</td><td style="color:var(--red)">${fmt(p.iptuAPagar)}</td><td class="${vc(p.saldo)}"><strong>${fmt(p.saldo)}</strong></td></tr>`).join(''):`<tr><td colspan="6"><div class="empty">Nenhum lançamento neste mês para este grupo.</div></td></tr>`}
+          ${linhas.length?linhas.map(p=>`<tr><td style="text-align:left">${p.imovel.nome}</td><td class="pos" style="text-align:right">${fmt(p.liquido)}</td><td class="neg" style="text-align:right">${fmt(p.despesas)}</td><td style="color:var(--amber);text-align:right">${fmt(p.condPend)}</td><td style="color:var(--red);text-align:right">${fmt(p.iptuAPagar)}</td><td class="${vc(p.saldo)}" style="text-align:right"><strong>${fmt(p.saldo)}</strong></td></tr>`).join(''):`<tr><td colspan="6"><div class="empty">Nenhum lançamento neste mês para este grupo.</div></td></tr>`}
         </tbody>
-        <tfoot><tr class="tfoot"><td>Subtotal — ${mod.titulo}</td><td class="pos">${fmt(sub.liquido)}</td><td class="neg">${fmt(sub.despesas)}</td><td style="color:var(--amber)">${fmt(sub.condPend)}</td><td style="color:var(--red)">${fmt(sub.iptuAPagar)}</td><td class="${vc(sub.saldo)}">${fmt(sub.saldo)}</td></tr></tfoot>
+        <tfoot><tr class="tfoot"><td style="text-align:left">Subtotal — ${mod.titulo}</td><td class="pos" style="text-align:right">${fmt(sub.liquido)}</td><td class="neg" style="text-align:right">${fmt(sub.despesas)}</td><td style="color:var(--amber);text-align:right">${fmt(sub.condPend)}</td><td style="color:var(--red);text-align:right">${fmt(sub.iptuAPagar)}</td><td class="${vc(sub.saldo)}" style="text-align:right">${fmt(sub.saldo)}</td></tr></tfoot>
       </table></div>`}
     </div>`;
   };
