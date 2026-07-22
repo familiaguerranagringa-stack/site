@@ -77,7 +77,7 @@ tr:hover td{background:var(--bg-hover)}
 .badge{display:inline-flex;align-items:center;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;padding:3px 8px;border-radius:4px;white-space:nowrap}
 .b-ok{background:#E7F5EC;color:var(--green);border:1px solid #BFE3CC}
 .b-pend{background:#FCF1DD;color:var(--amber);border:1px solid #F0D9A6}
-.b-late{background:#FAE7E4;color:var(--red);border:1px solid #EFC3BC}
+.b-late{background:#FBD5D0;color:#A6291A;border:1px solid #E8A599;font-weight:800}
 .b-blue{background:#E8F1F5;color:var(--blue);border:1px solid #C3DCE6}
 .b-info{background:var(--gold-bg);color:var(--gold);border:1px solid var(--gold-dim)}
 .tabs{display:flex;border-bottom:1px solid var(--border);margin-bottom:20px;overflow-x:auto;gap:0}
@@ -663,6 +663,12 @@ function ddmmyyyy2iso(d){
   const [dd,mm,yy]=d.split('/');
   return `${yy}-${mm}-${dd}`;
 }
+function isoParaBR(iso){
+  if(!iso)return '';
+  const [yy,mm,dd]=iso.split('-');
+  if(!yy||!mm||!dd)return iso;
+  return `${dd}/${mm}/${yy}`;
+}
 function handlePDFFile(input){
   const f=input.files[0];
   if(!f)return;
@@ -799,10 +805,10 @@ function renderRepasses(){
       <div class="sec-hdr"><h2>🏠 ${mod.titulo}</h2><div class="sec-line"></div></div>
       ${!mod.imoveis.length?`<div class="sec-note" style="margin:0">Nenhum imóvel cadastrado neste grupo ainda. Assim que cadastrar um imóvel com esse nome, ele entra aqui automaticamente.</div>`:`
       <div class="tbl-wrap" style="margin-bottom:0"><table style="table-layout:fixed;width:100%">
-        <colgroup><col style="width:13%"><col style="width:7%"><col style="width:7%"><col style="width:9%"><col style="width:9%"><col style="width:8%"><col style="width:9%"><col style="width:11%"><col style="width:8%"><col style="width:8%"><col style="width:11%"></colgroup>
-        <thead><tr><th>Imóvel</th><th>Tipo</th><th>Valor</th><th>Vencimento</th><th>Data Pagto</th><th>Forma Pgto</th><th>Status</th><th>Obs</th><th>Boleto</th><th>Comprov.</th><th>Ações</th></tr></thead>
+        <colgroup><col style="width:12%"><col style="width:6%"><col style="width:7%"><col style="width:8%"><col style="width:8%"><col style="width:7%"><col style="width:8%"><col style="width:9%"><col style="width:8%"><col style="width:8%"><col style="width:8%"><col style="width:11%"></colgroup>
+        <thead><tr><th>Imóvel</th><th>Tipo</th><th>Valor</th><th>Vencimento</th><th>Data Pagto</th><th>Forma Pgto</th><th>Status</th><th>Obs</th><th>Boleto</th><th>Comprov. 1</th><th>Comprov. 2</th><th>Ações</th></tr></thead>
         <tbody>
-          ${linhas.length?linhas.map(r=>`<tr><td>${imovelNome(r.imovelId)}</td><td>${r.tipo}</td><td>${fmt(r.valor)}</td><td>${r.envio||'—'}</td><td>${r.dataPagamento||'—'}</td><td>${r.formaPagamento||'—'}</td><td>${statusBadge(r)}</td><td class="dim" style="text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.obs||'—'}</td><td>${comprovanteChip(r.boleto)}</td><td>${comprovanteChip(r.comprovantePagamento)}</td><td style="white-space:nowrap">${r.status!=='pago'?`<button class="btn-sm btn-ok" onclick="marcarRepassePago('${r.id}')" title="marcar pago">✓</button> `:''}<button class="btn-sm btn-ok" onclick="abrirEdicaoRepasse('${r.id}')">editar</button> <button class="btn-sm" onclick="delItem('repasses','${r.id}')">excluir</button></td></tr>`).join(''):`<tr><td colspan="11"><div class="empty">Nenhum lançamento neste mês para este grupo.</div></td></tr>`}
+          ${linhas.length?linhas.map(r=>`<tr><td>${imovelNome(r.imovelId)}</td><td>${r.tipo}</td><td>${fmt(r.valor)}</td><td>${r.envio||'—'}</td><td>${r.dataPagamento?isoParaBR(r.dataPagamento):'—'}</td><td>${r.formaPagamento||'—'}</td><td>${statusBadge(r)}</td><td class="dim" style="text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.obs||'—'}</td><td>${comprovanteChip(r.boleto)}</td><td>${comprovanteChip(r.comprovantePagamento)}</td><td>${comprovanteChip(r.comprovantePagamento2)}</td><td style="white-space:nowrap">${r.status!=='pago'?`<button class="btn-sm btn-ok" onclick="marcarRepassePago('${r.id}')" title="marcar pago">✓</button> `:''}<button class="btn-sm btn-ok" onclick="abrirEdicaoRepasse('${r.id}')">editar</button> <button class="btn-sm" onclick="delItem('repasses','${r.id}')">excluir</button></td></tr>`).join(''):`<tr><td colspan="12"><div class="empty">Nenhum lançamento neste mês para este grupo.</div></td></tr>`}
         </tbody>
       </table></div>`}
     </div>`;
@@ -823,7 +829,8 @@ function renderRepasses(){
     </div>
     <div class="fg">
       <div class="fl"><label>Boleto (a conta a ser paga)</label><input class="fi" id="rp-file-boleto" type="file" accept=".pdf,image/*"></div>
-      <div class="fl"><label>Comprovante de Pagamento</label><input class="fi" id="rp-file-comp" type="file" accept=".pdf,image/*"></div>
+      <div class="fl"><label>Comprovante de Pagamento 1</label><input class="fi" id="rp-file-comp" type="file" accept=".pdf,image/*"></div>
+      <div class="fl"><label>Comprovante de Pagamento 2 (opcional)</label><input class="fi" id="rp-file-comp2" type="file" accept=".pdf,image/*"></div>
     </div>
     <button class="btn-gold" style="margin-top:14px" onclick="addRepasse(this)">+ Registrar</button>
   </div>
@@ -836,6 +843,7 @@ function addRepasse(btn){
   const base={id:uuid(),imovelId,tipo,valor:+document.getElementById('rp-val').value||0,envio:document.getElementById('rp-envio').value,formaPagamento:document.getElementById('rp-forma').value,status:document.getElementById('rp-status').value,obs:document.getElementById('rp-obs').value.trim()};
   const fBoleto=document.getElementById('rp-file-boleto');
   const fComp=document.getElementById('rp-file-comp');
+  const fComp2=document.getElementById('rp-file-comp2');
   const textoOriginal=btn?btn.textContent:null;
   if(btn){btn.disabled=true;btn.textContent='Enviando...';btn.style.opacity='0.6';}
   let concluido=false;
@@ -843,13 +851,16 @@ function addRepasse(btn){
   setTimeout(()=>{if(!concluido){restaurarBotao();notify('Demorou demais pra processar o arquivo. Tente novamente com um arquivo menor.','err');}},15000);
   lerArquivo(fBoleto,()=>nomeAutomatico(imovelNome(imovelId),tipo+'-BOLETO'),(boleto)=>{
     base.boleto=boleto;
-    lerArquivo(fComp,()=>nomeAutomatico(imovelNome(imovelId),tipo+'-COMPROVANTE'),(comp)=>{
+    lerArquivo(fComp,()=>nomeAutomatico(imovelNome(imovelId),tipo+'-COMPROVANTE1'),(comp)=>{
       base.comprovantePagamento=comp;
-      const lst=load(pkPeriodo('repasses'));
-      lst.push(base);
-      save(pkPeriodo('repasses'),lst);
-      restaurarBotao();
-      notify('Conta registrada','ok');render();
+      lerArquivo(fComp2,()=>nomeAutomatico(imovelNome(imovelId),tipo+'-COMPROVANTE2'),(comp2)=>{
+        base.comprovantePagamento2=comp2;
+        const lst=load(pkPeriodo('repasses'));
+        lst.push(base);
+        save(pkPeriodo('repasses'),lst);
+        restaurarBotao();
+        notify('Conta registrada','ok');render();
+      });
     });
   });
 }
@@ -872,10 +883,12 @@ function abrirEdicaoRepasse(id){
         <div class="fl"><label>Forma de Pagamento</label><select class="fi" id="er-forma"><option${r.formaPagamento==='Boleto'||!r.formaPagamento?' selected':''}>Boleto</option><option${r.formaPagamento==='Pix'?' selected':''}>Pix</option></select></div>
       </div>
       <div class="fl" style="margin-bottom:12px"><label>Status</label><select class="fi" id="er-status" onchange="toggleComprovanteEdicao('${(r.comprovantePagamento?'1':'')}')">${statusOptions(r.status)}</select></div>
-      ${r.dataPagamento?`<div class="sec-note" style="margin:0 0 12px">Pago em: <strong>${r.dataPagamento}</strong></div>`:''}
+      <div class="fl" style="margin-bottom:12px"><label>Data de Pagamento</label><input class="fi" id="er-data-pagamento" type="date" value="${r.dataPagamento||''}"></div>
       <div id="er-comprovante-wrap" style="display:${r.status==='pago'?'block':'none'}">
-        ${r.comprovantePagamento?`<div class="sec-note" style="margin:0 0 10px">Comprovante já anexado: ${comprovanteChip(r.comprovantePagamento)}. Pode anexar outro abaixo pra substituir, se quiser.</div>`:''}
-        <div class="fl" style="margin-bottom:12px"><label>Comprovante de Pagamento ${r.comprovantePagamento?'(opcional — já existe um)':'<span style="color:var(--red)">*obrigatório para status Pago</span>'}</label><input class="fi" id="er-comprovante" type="file" accept=".pdf,image/*"></div>
+        ${r.comprovantePagamento?`<div class="sec-note" style="margin:0 0 10px">Comprovante 1 já anexado: ${comprovanteChip(r.comprovantePagamento)}. Pode anexar outro abaixo pra substituir, se quiser.</div>`:''}
+        <div class="fl" style="margin-bottom:12px"><label>Comprovante de Pagamento 1 ${r.comprovantePagamento?'(opcional — já existe um)':'<span style="color:var(--red)">*obrigatório para status Pago</span>'}</label><input class="fi" id="er-comprovante" type="file" accept=".pdf,image/*"></div>
+        ${r.comprovantePagamento2?`<div class="sec-note" style="margin:0 0 10px">Comprovante 2 já anexado: ${comprovanteChip(r.comprovantePagamento2)}.</div>`:''}
+        <div class="fl" style="margin-bottom:12px"><label>Comprovante de Pagamento 2 (opcional)</label><input class="fi" id="er-comprovante2" type="file" accept=".pdf,image/*"></div>
       </div>
       <div id="er-erro" style="font-size:12px;color:var(--red);margin-bottom:12px;display:none">Anexe o comprovante de pagamento para salvar como Pago.</div>
       <div class="fl" style="margin-bottom:20px"><label>Observações</label><input class="fi" id="er-obs" value="${(r.obs||'').replace(/"/g,'&quot;')}"></div>
@@ -896,6 +909,7 @@ function salvarEdicaoRepasse(id){
   if(!r)return;
   const novoStatus=document.getElementById('er-status').value;
   const fComp=document.getElementById('er-comprovante');
+  const fComp2=document.getElementById('er-comprovante2');
   if(novoStatus==='pago' && !r.comprovantePagamento && !fComp.files[0]){
     document.getElementById('er-erro').style.display='block';
     notify('Anexe o comprovante de pagamento para salvar como Pago','err');
@@ -909,8 +923,11 @@ function salvarEdicaoRepasse(id){
     r.formaPagamento=document.getElementById('er-forma').value;
     const statusAnterior=r.status;
     r.status=novoStatus;
-    if(novoStatus==='pago' && statusAnterior!=='pago'){
-      r.dataPagamento=new Date().toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+    const dataPagtoManual=document.getElementById('er-data-pagamento').value;
+    if(dataPagtoManual){
+      r.dataPagamento=dataPagtoManual;
+    }else if(novoStatus==='pago' && statusAnterior!=='pago'){
+      r.dataPagamento=today();
     }
     r.obs=document.getElementById('er-obs').value.trim();
     save(pkPeriodo('repasses'),lst);
@@ -919,8 +936,20 @@ function salvarEdicaoRepasse(id){
     notify('Lançamento atualizado','ok');render();
   };
   if(fComp.files[0]){
-    lerArquivo(fComp,()=>nomeAutomatico(imovelNome(r.imovelId),r.tipo+'-COMPROVANTE'),(comp)=>{
+    lerArquivo(fComp,()=>nomeAutomatico(imovelNome(r.imovelId),r.tipo+'-COMPROVANTE1'),(comp)=>{
       if(comp)r.comprovantePagamento=comp;
+      if(fComp2.files[0]){
+        lerArquivo(fComp2,()=>nomeAutomatico(imovelNome(r.imovelId),r.tipo+'-COMPROVANTE2'),(comp2)=>{
+          if(comp2)r.comprovantePagamento2=comp2;
+          salvarResto();
+        });
+      }else{
+        salvarResto();
+      }
+    });
+  } else if(fComp2.files[0]){
+    lerArquivo(fComp2,()=>nomeAutomatico(imovelNome(r.imovelId),r.tipo+'-COMPROVANTE2'),(comp2)=>{
+      if(comp2)r.comprovantePagamento2=comp2;
       salvarResto();
     });
   } else {
@@ -947,8 +976,10 @@ function marcarRepassePago(id){
     <div class="modal" style="width:420px">
       <h2>Marcar como Pago</h2>
       <p>Para marcar como pago é <strong>obrigatório</strong> anexar o comprovante de pagamento — garante que fique registrado o pagamento de fato.</p>
+      <div class="fl" style="margin-bottom:12px"><label>Data do Pagamento</label><input class="fi" id="mp-data" type="date" value="${today()}"></div>
       <div class="fl" style="margin-bottom:12px"><label>Boleto (opcional)</label><input class="fi" id="mp-boleto" type="file" accept=".pdf,image/*"></div>
-      <div class="fl" style="margin-bottom:8px"><label>Comprovante de Pagamento <span style="color:var(--red)">*obrigatório</span></label><input class="fi" id="mp-comp" type="file" accept=".pdf,image/*"></div>
+      <div class="fl" style="margin-bottom:8px"><label>Comprovante de Pagamento 1 <span style="color:var(--red)">*obrigatório</span></label><input class="fi" id="mp-comp" type="file" accept=".pdf,image/*"></div>
+      <div class="fl" style="margin-bottom:8px"><label>Comprovante de Pagamento 2 (opcional)</label><input class="fi" id="mp-comp2" type="file" accept=".pdf,image/*"></div>
       <div id="mp-erro" style="font-size:12px;color:var(--red);margin-bottom:12px;display:none">Anexe o comprovante de pagamento para poder marcar como pago.</div>
       <div style="display:flex;gap:10px">
         <button class="btn-gold" style="flex:1" onclick="confirmarRepassePago('${id}')">Confirmar Pagamento</button>
@@ -988,6 +1019,8 @@ function confirmarRepassePago(id){
   if(!it)return;
   const fBoleto=document.getElementById('mp-boleto');
   const fComp=document.getElementById('mp-comp');
+  const fComp2=document.getElementById('mp-comp2');
+  const dataPagto=document.getElementById('mp-data').value||today();
   if(!fComp.files[0] && !it.comprovantePagamento){
     document.getElementById('mp-erro').style.display='block';
     notify('Anexe o comprovante de pagamento para marcar como pago','err');
@@ -995,18 +1028,21 @@ function confirmarRepassePago(id){
   }
   lerArquivo(fBoleto,()=>nomeAutomatico(imovelNome(it.imovelId),it.tipo+'-BOLETO'),(boleto)=>{
     if(boleto)it.boleto=boleto;
-    lerArquivo(fComp,()=>nomeAutomatico(imovelNome(it.imovelId),it.tipo+'-COMPROVANTE'),(comp)=>{
+    lerArquivo(fComp,()=>nomeAutomatico(imovelNome(it.imovelId),it.tipo+'-COMPROVANTE1'),(comp)=>{
       if(comp)it.comprovantePagamento=comp;
-      if(!it.comprovantePagamento){
-        notify('Não foi possível confirmar o pagamento sem o comprovante.','err');
-        return;
-      }
-      it.status='pago';
-      it.dataPagamento=new Date().toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
-      save(pkPeriodo('repasses'),lst);
-      fecharModal();
-      notify('Marcado como pago','ok');render();
-      playSuccessSound();
+      lerArquivo(fComp2,()=>nomeAutomatico(imovelNome(it.imovelId),it.tipo+'-COMPROVANTE2'),(comp2)=>{
+        if(comp2)it.comprovantePagamento2=comp2;
+        if(!it.comprovantePagamento){
+          notify('Não foi possível confirmar o pagamento sem o comprovante.','err');
+          return;
+        }
+        it.status='pago';
+        it.dataPagamento=dataPagto;
+        save(pkPeriodo('repasses'),lst);
+        fecharModal();
+        notify('Marcado como pago','ok');render();
+        playSuccessSound();
+      });
     });
   });
 }
@@ -1464,6 +1500,25 @@ function calcMes(imovelIdFiltro){
 // ── DASHBOARD ──
 function renderDash(){
   const c=calcMes();
+  const modulos=montarModulos();
+  const blocoModulo=(mod)=>{
+    const idsDoModulo=mod.imoveis.map(i=>i.id);
+    const linhas=c.porImovel.filter(p=>idsDoModulo.includes(p.imovel.id));
+    const sub={liquido:0,despesas:0,condPend:0,iptuAPagar:0,saldo:0};
+    linhas.forEach(p=>{sub.liquido+=p.liquido;sub.despesas+=p.despesas;sub.condPend+=p.condPend;sub.iptuAPagar+=p.iptuAPagar;sub.saldo+=p.saldo;});
+    return `
+    <div class="form-card" style="margin-bottom:16px">
+      <div class="sec-hdr"><h2>🏠 ${mod.titulo}</h2><div class="sec-line"></div></div>
+      ${!mod.imoveis.length?`<div class="sec-note" style="margin:0">Nenhum imóvel cadastrado neste grupo ainda. Assim que cadastrar um imóvel com esse nome, ele entra aqui automaticamente.</div>`:`
+      <div class="tbl-wrap" style="margin-bottom:0"><table>
+        <thead><tr><th>Imóvel</th><th>Líquido</th><th>Despesas</th><th>Condomínio Pendente</th><th>IPTU a Pagar</th><th>Saldo</th></tr></thead>
+        <tbody>
+          ${linhas.length?linhas.map(p=>`<tr><td>${p.imovel.nome}</td><td class="pos">${fmt(p.liquido)}</td><td class="neg">${fmt(p.despesas)}</td><td style="color:var(--amber)">${fmt(p.condPend)}</td><td style="color:var(--red)">${fmt(p.iptuAPagar)}</td><td class="${vc(p.saldo)}"><strong>${fmt(p.saldo)}</strong></td></tr>`).join(''):`<tr><td colspan="6"><div class="empty">Nenhum lançamento neste mês para este grupo.</div></td></tr>`}
+        </tbody>
+        <tfoot><tr class="tfoot"><td>Subtotal — ${mod.titulo}</td><td class="pos">${fmt(sub.liquido)}</td><td class="neg">${fmt(sub.despesas)}</td><td style="color:var(--amber)">${fmt(sub.condPend)}</td><td style="color:var(--red)">${fmt(sub.iptuAPagar)}</td><td class="${vc(sub.saldo)}">${fmt(sub.saldo)}</td></tr></tfoot>
+      </table></div>`}
+    </div>`;
+  };
   return `
   <div class="kpi-grid">
     <div class="kpi"><div class="kpi-accent" style="background:var(--gold)"></div><div class="kpi-label">Líquido Recebido</div><div class="kpi-value pos">${fmt(c.totalLiquido)}</div></div>
@@ -1475,13 +1530,13 @@ function renderDash(){
     <div class="kpi"><div class="kpi-accent" style="background:var(--green)"></div><div class="kpi-label">Disponível Após Pessoal</div><div class="kpi-value ${vc(c.disponivelAposPessoal)}">${fmt(c.disponivelAposPessoal)}</div></div>
   </div>
   <div class="sec-hdr"><h2>Saldo por Imóvel</h2><div class="sec-line"></div></div>
-  <div class="tbl-wrap"><table>
-    <thead><tr><th>Imóvel</th><th>Líquido</th><th>Despesas</th><th>Condomínio Pendente</th><th>IPTU a Pagar</th><th>Saldo</th></tr></thead>
-    <tbody>
-      ${c.porImovel.length?c.porImovel.map(p=>`<tr><td>${p.imovel.nome}</td><td class="pos">${fmt(p.liquido)}</td><td class="neg">${fmt(p.despesas)}</td><td style="color:var(--amber)">${fmt(p.condPend)}</td><td style="color:var(--red)">${fmt(p.iptuAPagar)}</td><td class="${vc(p.saldo)}"><strong>${fmt(p.saldo)}</strong></td></tr>`).join(''):`<tr><td colspan="6"><div class="empty">Cadastre imóveis e lance o mês para ver o resultado aqui.</div></td></tr>`}
-    </tbody>
-    <tfoot><tr class="tfoot"><td>Total</td><td class="pos">${fmt(c.totalLiquido)}</td><td class="neg">${fmt(c.totalDespesas)}</td><td style="color:var(--amber)">${fmt(c.totalCondPend)}</td><td style="color:var(--red)">${fmt(c.totalIptuAPagar)}</td><td class="${vc(c.totalSaldo)}">${fmt(c.totalSaldo)}</td></tr></tfoot>
-  </table></div>`;
+  ${modulos.map(blocoModulo).join('')}
+  <div class="form-card" style="border-color:var(--gold-dim);background:var(--gold-bg)">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+      <span style="font-family:'Syne',sans-serif;font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.06em">Total Geral — Todos os Imóveis</span>
+      <span style="font-family:'Syne',sans-serif;font-size:20px;font-weight:800" class="${vc(c.totalSaldo)}">${fmt(c.totalSaldo)}</span>
+    </div>
+  </div>`;
 }
 
 // ── DRE ──
