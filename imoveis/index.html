@@ -517,7 +517,7 @@ function renderAlugueis(){
         <colgroup><col style="width:16%"><col style="width:10%"><col style="width:10%"><col style="width:11%"><col style="width:11%"><col style="width:14%"><col style="width:12%"><col style="width:10%"></colgroup>
         <thead><tr><th>Subunidade</th><th>Bruto</th><th>Líquido</th><th>Data de Repasse</th><th>Vencimento</th><th>Obs</th><th>Comprovante</th><th></th></tr></thead>
         <tbody>
-          ${linhas.length?linhas.map(r=>`<tr><td>${imovelNome(r.imovelId)}</td><td>${fmt(r.bruto)}</td><td class="pos">${fmt(r.liquido)}</td><td>${r.data||'—'}</td><td>${r.vencimento||'—'}</td><td class="dim" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.obs||'—'}</td><td>${comprovanteChip(r.comprovante)}</td><td><button class="btn-sm btn-ok" onclick="abrirEdicaoAluguel('${r.id}')">editar</button> <button class="btn-sm" onclick="delItem('alugueis','${r.id}')">excluir</button></td></tr>`).join(''):`<tr><td colspan="8"><div class="empty">Nenhum recebimento neste mês para este grupo.</div></td></tr>`}
+          ${linhas.length?linhas.map(r=>`<tr><td>${imovelNome(r.imovelId)}</td><td>${fmt(r.bruto)}</td><td class="pos">${fmt(r.liquido)}</td><td>${r.data||'—'}</td><td>${r.vencimento||'—'}</td><td class="dim" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.obs||'—'}</td><td>${comprovanteChipRotulo(r.comprovante,'📎 ANEXO')}</td><td><button class="btn-sm btn-ok" onclick="abrirEdicaoAluguel('${r.id}')">editar</button> <button class="btn-sm" onclick="delItem('alugueis','${r.id}')">excluir</button></td></tr>`).join(''):`<tr><td colspan="8"><div class="empty">Nenhum recebimento neste mês para este grupo.</div></td></tr>`}
         </tbody>
         <tfoot><tr class="tfoot"><td>Subtotal — ${mod.titulo}</td><td></td><td class="pos">${fmt(subtotal)}</td><td colspan="5"></td></tr></tfoot>
       </table></div>`}
@@ -812,6 +812,7 @@ function renderRepasses(){
   const tabelaModuloRepasse=(mod)=>{
     const idsDoModulo=mod.imoveis.map(i=>i.id);
     const linhas=lst.filter(r=>idsDoModulo.includes(r.imovelId)).sort((a,b)=>ordemNatural(imovelNome(a.imovelId),imovelNome(b.imovelId))||ordemNatural(a.tipo,b.tipo));
+    const subtotal=linhas.reduce((s,r)=>s+(+r.valor||0),0);
     return `
     <div class="form-card" style="margin-bottom:16px">
       <div class="sec-hdr"><h2>🏠 ${mod.titulo}</h2><div class="sec-line"></div></div>
@@ -822,6 +823,7 @@ function renderRepasses(){
         <tbody>
           ${linhas.length?linhas.map(r=>`<tr><td>${imovelNome(r.imovelId)}</td><td>${r.tipo}</td><td>${fmt(r.valor)}</td><td>${r.envio||'—'}</td><td>${r.dataPagamento?isoParaBR(r.dataPagamento):'—'}</td><td>${r.formaPagamento||'—'}</td><td>${statusBadge(r)}</td><td class="dim" style="text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.obs||'—'}</td><td>${comprovanteChipRotulo(r.boleto,'📄 BOLETO')}</td><td>${comprovanteChipRotulo(r.comprovantePagamento,'🧾 COMPROV. 1')}</td><td>${comprovanteChipRotulo(r.comprovantePagamento2,'🧾 COMPROV. 2')}</td><td style="white-space:nowrap">${r.status!=='pago'?`<button class="btn-sm btn-ok" onclick="marcarRepassePago('${r.id}')" title="marcar pago">✓</button> `:''}<button class="btn-sm btn-ok" onclick="abrirEdicaoRepasse('${r.id}')">editar</button> <button class="btn-sm" onclick="delItem('repasses','${r.id}')">excluir</button></td></tr>`).join(''):`<tr><td colspan="12"><div class="empty">Nenhum lançamento neste mês para este grupo.</div></td></tr>`}
         </tbody>
+        ${linhas.length?`<tfoot><tr class="tfoot"><td>Subtotal — ${mod.titulo}</td><td></td><td>${fmt(subtotal)}</td><td colspan="9"></td></tr></tfoot>`:''}
       </table></div>`}
     </div>`;
   };
@@ -897,9 +899,9 @@ function abrirEdicaoRepasse(id){
       <div class="fl" style="margin-bottom:12px"><label>Status</label><select class="fi" id="er-status" onchange="toggleComprovanteEdicao('${(r.comprovantePagamento?'1':'')}')">${statusOptions(r.status)}</select></div>
       <div class="fl" style="margin-bottom:12px"><label>Data de Pagamento</label><input class="fi" id="er-data-pagamento" type="date" value="${r.dataPagamento||''}"></div>
       <div id="er-comprovante-wrap" style="display:${r.status==='pago'?'block':'none'}">
-        ${r.comprovantePagamento?`<div class="sec-note" style="margin:0 0 10px">Comprovante 1 já anexado: ${comprovanteChip(r.comprovantePagamento)}. Pode anexar outro abaixo pra substituir, se quiser.</div>`:''}
+        ${r.comprovantePagamento?`<div class="sec-note" style="margin:0 0 10px">Comprovante 1 já anexado: ${comprovanteChipRotulo(r.comprovantePagamento,'🧾 COMPROV. 1')}. Pode anexar outro abaixo pra substituir, se quiser.</div>`:''}
         <div class="fl" style="margin-bottom:12px"><label>Comprovante de Pagamento 1 ${r.comprovantePagamento?'(opcional — já existe um)':'<span style="color:var(--red)">*obrigatório para status Pago</span>'}</label><input class="fi" id="er-comprovante" type="file" accept=".pdf,image/*"></div>
-        ${r.comprovantePagamento2?`<div class="sec-note" style="margin:0 0 10px">Comprovante 2 já anexado: ${comprovanteChip(r.comprovantePagamento2)}.</div>`:''}
+        ${r.comprovantePagamento2?`<div class="sec-note" style="margin:0 0 10px">Comprovante 2 já anexado: ${comprovanteChipRotulo(r.comprovantePagamento2,'🧾 COMPROV. 2')}.</div>`:''}
         <div class="fl" style="margin-bottom:12px"><label>Comprovante de Pagamento 2 (opcional)</label><input class="fi" id="er-comprovante2" type="file" accept=".pdf,image/*"></div>
       </div>
       <div id="er-erro" style="font-size:12px;color:var(--red);margin-bottom:12px;display:none">Anexe o comprovante de pagamento para salvar como Pago.</div>
@@ -1063,7 +1065,7 @@ function confirmarRepassePago(id){
 function comprovantesLista(r){
   const arr=[...(r.comprovantes||[]),...(r.comprovante?[r.comprovante]:[])];
   if(!arr.length) return `<span class="dim" style="font-size:11px">sem comprovante</span>`;
-  return arr.map(c=>comprovanteChip(c)).join(' ');
+  return arr.map((c,i)=>comprovanteChipRotulo(c,`🧾 COMPROV. ${i+1}`)).join(' ');
 }
 function renderDespesas(){
   const ims=getImoveis();
@@ -1187,6 +1189,18 @@ function calcularCotasAjustadas(valor,partes){
 function normalizarTextoPDF(text){
   return (text||'').replace(/[ \t]+/g,' ').replace(/\n{2,}/g,'\n').trim();
 }
+function parseLinhaDigitavelValor(text){
+  const candidatos=text.match(/[\d][\d.\s]{35,70}\d/g)||[];
+  for(const c of candidatos){
+    const digitos=c.replace(/\D/g,'');
+    if(digitos.length===47||digitos.length===48){
+      const centavos=digitos.slice(-10);
+      const valor=parseInt(centavos,10)/100;
+      if(valor>0)return valor;
+    }
+  }
+  return 0;
+}
 function parseValorTotalGenerico(textoOriginal){
   const text=normalizarTextoPDF(textoOriginal);
   console.log('TEXTO EXTRAÍDO DO PDF:',text);
@@ -1203,6 +1217,8 @@ function parseValorTotalGenerico(textoOriginal){
     const m=text.match(re);
     if(m){console.log('Parser: valor encontrado com padrão',re,'->',m[1]);return parseBRNum(m[1]);}
   }
+  const linhaDigitavel=parseLinhaDigitavelValor(text);
+  if(linhaDigitavel>0){console.log('Parser: valor encontrado pela linha digitável ->',linhaDigitavel);return linhaDigitavel;}
   const todos=[...text.matchAll(/R\$\s?([\d.,]+)/gi)].map(x=>parseBRNum(x[1]));
   if(todos.length){console.log('Parser: usando maior valor R$ encontrado como fallback ->',Math.max(...todos));return Math.max(...todos);}
   console.log('Parser: nenhum valor encontrado — deixando em branco para preenchimento manual.');
@@ -1273,10 +1289,10 @@ function handleRateioFile(input){
           fullText+=tc.items.map(it=>it.str).join(' ')+' ';
         }
         const valor=parseValorTotalGenerico(fullText);
-        if(valor>0){
+        if(valor>0 && fullText.trim().length>=10){
           aplicarResultado(valor,parseVencimentoGenerico(fullText),null);
         } else {
-          // PDF provavelmente escaneado (imagem) — sem texto útil. Tenta OCR na primeira página.
+          // PDF provavelmente escaneado (imagem) — texto vazio/curto ou sem valor útil. Tenta OCR na primeira página.
           const canvas=await pdfPrimeiraPaginaParaCanvas(new Uint8Array(readerBin.result));
           await tentarOcrImagem(canvas);
         }
@@ -1514,7 +1530,7 @@ function renderDash(){
   const c=calcMes();
   const modulos=montarModulos();
   const repassesMes=load(pkPeriodo('repasses'));
-  const despesasContasPorImovel=(imovelId)=>repassesMes.filter(r=>r.imovelId===imovelId).reduce((s,r)=>s+(+r.valor||0),0);
+  const despesasContasPorImovel=(imovelId)=>repassesMes.filter(r=>r.imovelId===imovelId && r.status==='pago').reduce((s,r)=>s+(+r.valor||0),0);
   const linhasCalc=c.porImovel.map(p=>{
     const despesasContas=despesasContasPorImovel(p.imovel.id);
     return {imovel:p.imovel,liquido:p.liquido,despesas:despesasContas,saldo:p.liquido-despesasContas};
@@ -1541,7 +1557,7 @@ function renderDash(){
   return `
   <div class="kpi-grid">
     <div class="kpi"><div class="kpi-accent" style="background:var(--gold)"></div><div class="kpi-label">Líquido Recebido</div><div class="kpi-value pos">${fmt(c.totalLiquido)}</div></div>
-    <div class="kpi"><div class="kpi-accent" style="background:var(--red)"></div><div class="kpi-label">Despesas Diretas</div><div class="kpi-value neg">${fmt(c.totalDespesas)}</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--red)"></div><div class="kpi-label">Despesas do Mês (Pago)</div><div class="kpi-value neg">${fmt(linhasCalc.reduce((s,p)=>s+p.despesas,0))}</div></div>
     <div class="kpi"><div class="kpi-accent" style="background:var(--amber)"></div><div class="kpi-label">Condomínio Pendente</div><div class="kpi-value" style="color:var(--amber)">${fmt(c.totalCondPend)}</div></div>
     <div class="kpi"><div class="kpi-accent" style="background:var(--red)"></div><div class="kpi-label">IPTU Recebido a Pagar</div><div class="kpi-value" style="color:var(--red)">${fmt(c.totalIptuAPagar)}</div></div>
     <div class="kpi"><div class="kpi-accent" style="background:var(--blue)"></div><div class="kpi-label">Saldo Imóveis</div><div class="kpi-value ${vc(c.totalSaldo)}">${fmt(c.totalSaldo)}</div></div>
@@ -1549,7 +1565,7 @@ function renderDash(){
     <div class="kpi"><div class="kpi-accent" style="background:var(--green)"></div><div class="kpi-label">Disponível Após Pessoal</div><div class="kpi-value ${vc(c.disponivelAposPessoal)}">${fmt(c.disponivelAposPessoal)}</div></div>
   </div>
   <div class="sec-hdr"><h2>Saldo por Imóvel</h2><div class="sec-line"></div></div>
-  <div class="sec-note" style="margin-top:-10px">Despesas aqui = soma dos lançamentos da aba <strong>Contas</strong> de cada imóvel neste mês. Saldo = Líquido − Despesas.</div>
+  <div class="sec-note" style="margin-top:-10px">Despesas aqui = soma dos lançamentos <strong>já pagos</strong> (status Pago) da aba Contas de cada imóvel neste mês. Contas "A Pagar", "A Vencer" ou "Vencida" não entram, porque ainda não saíram do seu caixa. Saldo = Líquido − Despesas Pagas.</div>
   ${modulos.map(blocoModulo).join('')}
   <div class="form-card" style="border-color:var(--gold-dim);background:var(--gold-bg)">
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
