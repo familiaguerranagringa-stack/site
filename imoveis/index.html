@@ -1189,14 +1189,19 @@ function calcularCotasAjustadas(valor,partes){
 function normalizarTextoPDF(text){
   return (text||'').replace(/[ \t]+/g,' ').replace(/\n{2,}/g,'\n').trim();
 }
+const VALOR_MAXIMO_RAZOAVEL=100000; // acima disso, é quase certo que o parser capturou código de barras/CNPJ/chave PIX por engano
 function parseLinhaDigitavelValor(text){
   const candidatos=text.match(/[\d][\d.\s]{35,70}\d/g)||[];
   for(const c of candidatos){
     const digitos=c.replace(/\D/g,'');
-    if(digitos.length===47||digitos.length===48){
-      const centavos=digitos.slice(-10);
-      const valor=parseInt(centavos,10)/100;
-      if(valor>0)return valor;
+    if(digitos.length===47){
+      // Boleto bancário: os últimos 10 dígitos são o valor (em centavos)
+      const valor=parseInt(digitos.slice(-10),10)/100;
+      if(valor>0 && valor<=VALOR_MAXIMO_RAZOAVEL)return valor;
+    } else if(digitos.length===48){
+      // Conta de concessionária (água/luz/IPTU): valor fica entre o 5º e o 15º dígito
+      const valor=parseInt(digitos.slice(4,15),10)/100;
+      if(valor>0 && valor<=VALOR_MAXIMO_RAZOAVEL)return valor;
     }
   }
   return 0;
@@ -1208,6 +1213,7 @@ function parseValorTotalGenerico(textoOriginal){
   const padroes=[
     new RegExp('total\\s*a\\s*pagar\\s*\\(r\\$\\)\\D{0,20}'+num,'i'),
     new RegExp('total\\s*a\\s*pagar\\D{0,20}'+num,'i'),
+    new RegExp('valor\\s*(?:do\\s*documento|cobrado)\\D{0,20}'+num,'i'),
     new RegExp('valor\\s*a\\s*pagar\\D{0,20}'+num,'i'),
     new RegExp('total\\s*\\(r\\$\\)\\D{0,20}'+num,'i'),
     new RegExp('pague\\s*sua\\s*conta\\s*com\\s*pix\\D{0,40}'+num,'i'),
@@ -1215,11 +1221,16 @@ function parseValorTotalGenerico(textoOriginal){
   ];
   for(const re of padroes){
     const m=text.match(re);
-    if(m){console.log('Parser: valor encontrado com padrão',re,'->',m[1]);return parseBRNum(m[1]);}
+    if(m){
+      const valor=parseBRNum(m[1]);
+      if(valor>VALOR_MAXIMO_RAZOAVEL){console.log('Parser: valor descartado por exceder o limite de sanidade ->',valor);continue;}
+      console.log('Parser: valor encontrado com padrão',re,'->',m[1]);
+      return valor;
+    }
   }
   const linhaDigitavel=parseLinhaDigitavelValor(text);
   if(linhaDigitavel>0){console.log('Parser: valor encontrado pela linha digitável ->',linhaDigitavel);return linhaDigitavel;}
-  const todos=[...text.matchAll(/R\$\s?([\d.,]+)/gi)].map(x=>parseBRNum(x[1]));
+  const todos=[...text.matchAll(/R\$\s?([\d.,]+)/gi)].map(x=>parseBRNum(x[1])).filter(v=>v<=VALOR_MAXIMO_RAZOAVEL);
   if(todos.length){console.log('Parser: usando maior valor R$ encontrado como fallback ->',Math.max(...todos));return Math.max(...todos);}
   console.log('Parser: nenhum valor encontrado — deixando em branco para preenchimento manual.');
   return 0;
@@ -1321,7 +1332,8 @@ function handleRateioFile(input){
 }
 function renderRateio(){
   const lanc=load(pkPeriodo('rateio_lanc'));
-  const qtd=ST.rateioQtd||3;
+  const editando=ST.rateioEditandoId?lanc.find(r=>r.id===ST.rateioEditandoId):null;
+  const qtd=editando&&editando.partes?editando.partes.length:(ST.rateioQtd||3);
   return `
   <div class="sec-note">Anexe a conta (PDF ou foto), escolha entre quantos imóveis ela será dividida e defina o percentual de cada um. O valor de cada parte é calculado automaticamente. Isso gera uma despesa direta e também um lançamento em "Contas" (com o mesmo boleto anexado) para cada imóvel selecionado.</div>
   <div class="form-card" style="border-color:var(--gold-dim)">
@@ -1329,28 +1341,34 @@ function renderRateio(){
     <input class="fi" type="file" id="rt-file-input" accept=".pdf,image/*" onchange="handleRateioFile(this)">
     <div id="rt-file-status" style="font-size:12px;color:var(--dim);margin-top:8px"></div>
   </div>
-  <div class="form-card">
-    <div class="sec-hdr"><h2>Lançar Rateio</h2><div class="sec-line"></div></div>
+  <div class="form-card" style="${editando?'border-color:var(--gold)':''}">
+    <div class="sec-hdr"><h2>${editando?'Editando Rateio':'Lançar Rateio'}</h2><div class="sec-line"></div></div>
+    ${editando?`<div class="sec-note" style="margin:0 0 14px">Ajustando o rateio de ${fmt(editando.valor)} lançado em ${editando.data||'—'}. Ao salvar, as despesas e os lançamentos em Contas vinculados serão recalculados.</div>`:''}
     <div class="fg">
-      <div class="fl"><label>Valor Total da Conta</label><input class="fi" id="rt-valor-total" type="number" step="0.01" placeholder="0,00" oninput="atualizarRateioPreview()"></div>
-      <div class="fl"><label>Data</label><input class="fi" id="rt-data" type="date" value="${today()}"></div>
+      <div class="fl"><label>Valor Total da Conta</label><input class="fi" id="rt-valor-total" type="number" step="0.01" placeholder="0,00" value="${editando?editando.valor:''}" oninput="atualizarRateioPreview()"></div>
+      <div class="fl"><label>Data</label><input class="fi" id="rt-data" type="date" value="${editando?(editando.data||today()):today()}"></div>
       <div class="fl"><label>Dividir em quantas partes?</label><select class="fi" id="rt-qtd" onchange="ST.rateioQtd=+this.value;renderRateioLinhas(+this.value)">${[1,2,3,4,5,6,7,8,9,10].map(n=>`<option value="${n}"${n===qtd?' selected':''}>${n}</option>`).join('')}</select></div>
-      <div class="fl"><label>Tipo</label><select class="fi" id="rt-tipo"><option>IPTU</option><option>Água</option><option>Condomínio</option><option>Luz</option><option>Internet</option><option>Manutenção</option><option>Outro</option></select></div>
-      <div class="fl"><label>Forma de Pagamento</label><select class="fi" id="rt-forma"><option>Boleto</option><option>Pix</option></select></div>
-      <div class="fl"><label>Status</label><select class="fi" id="rt-status">${statusOptions('a_pagar')}</select></div>
-      <div class="fl"><label>Observações</label><input class="fi" id="rt-obs" placeholder="opcional"></div>
+      <div class="fl"><label>Tipo</label><select class="fi" id="rt-tipo">${['IPTU','Água','Condomínio','Luz','Internet','Manutenção','Outro'].map(t=>`<option${editando&&editando.tipo===t?' selected':''}>${t}</option>`).join('')}</select></div>
+      <div class="fl"><label>Forma de Pagamento</label><select class="fi" id="rt-forma"><option${!editando||editando.formaPagamento==='Boleto'?' selected':''}>Boleto</option><option${editando&&editando.formaPagamento==='Pix'?' selected':''}>Pix</option></select></div>
+      <div class="fl"><label>Status</label><select class="fi" id="rt-status">${statusOptions(editando?editando.status:'a_pagar')}</select></div>
+      <div class="fl"><label>Observações</label><input class="fi" id="rt-obs" placeholder="opcional" value="${editando?(editando.obs||'').replace(/"/g,'&quot;'):''}"></div>
     </div>
     <div id="rt-linhas-container" style="margin:14px 0"></div>
     <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px">
       <span id="rt-soma-indicador" style="font-family:'Syne',sans-serif;font-size:13px;font-weight:700"></span>
     </div>
-    <button class="btn-gold" onclick="confirmarRateio()">CONFIRMAR RATEIO</button>
+    ${editando?`
+    <div style="display:flex;gap:10px">
+      <button class="btn-gold" style="flex:1" onclick="salvarEdicaoRateio('${editando.id}')">SALVAR ALTERAÇÕES</button>
+      <button class="btn-ghost" onclick="cancelarEdicaoRateio()">CANCELAR EDIÇÃO</button>
+    </div>`:`
+    <button class="btn-gold" onclick="confirmarRateio()">CONFIRMAR RATEIO</button>`}
   </div>
   <div class="sec-hdr"><h2>Rateios Lançados no Mês</h2><div class="sec-line"></div></div>
   <div class="tbl-wrap"><table>
     <thead><tr><th>Data</th><th>Valor Total</th><th>Divisão</th><th>Comprovantes</th><th></th></tr></thead>
     <tbody>
-      ${lanc.length?lanc.map(r=>{const cotas=(r.partes&&r.partes.length)?calcularCotasAjustadas(r.valor,r.partes).map(c=>`${imovelNome(c.imovelId)}: ${fmt(c.cota)} (${c.pct}%)`).join(' · '):'<span class="dim">registro antigo, sem detalhamento — pode excluir e relançar</span>';return `<tr><td>${r.data||'—'}</td><td>${fmt(r.valor)}</td><td style="font-size:11px;text-align:left">${cotas}</td><td>${comprovantesLista(r)}</td><td><button class="btn-sm btn-ok" onclick="abrirAnexarComprovanteRateio('${r.id}')">+ anexar</button> <button class="btn-sm" onclick="delRateioLanc('${r.id}')">excluir</button></td></tr>`}).join(''):`<tr><td colspan="5"><div class="empty">Nenhum rateio lançado neste mês.</div></td></tr>`}
+      ${lanc.length?lanc.map(r=>{const cotas=(r.partes&&r.partes.length)?calcularCotasAjustadas(r.valor,r.partes).map(c=>`${imovelNome(c.imovelId)}: ${fmt(c.cota)} (${c.pct}%)`).join(' · '):'<span class="dim">registro antigo, sem detalhamento — pode excluir e relançar</span>';return `<tr><td>${r.data||'—'}</td><td>${fmt(r.valor)}</td><td style="font-size:11px;text-align:left">${cotas}</td><td>${comprovantesLista(r)}</td><td><button class="btn-sm btn-ok" onclick="abrirEdicaoRateioLanc('${r.id}')">editar</button> <button class="btn-sm btn-ok" onclick="abrirAnexarComprovanteRateio('${r.id}')">+ anexar</button> <button class="btn-sm" onclick="delRateioLanc('${r.id}')">excluir</button></td></tr>`}).join(''):`<tr><td colspan="5"><div class="empty">Nenhum rateio lançado neste mês.</div></td></tr>`}
     </tbody>
   </table></div>`;
 }
@@ -1395,7 +1413,11 @@ function confirmarRateio(){
   const soma=partes.reduce((s,p)=>s+p.pct,0);
   if(Math.abs(soma-100)>0.05){notify(`Os percentuais somam ${soma.toFixed(2)}% — precisa totalizar exatamente 100% para confirmar.`,'err');return;}
   const data=document.getElementById('rt-data').value;
-  const base={id:uuid(),valor:total,data,partes,comprovantes:_rateioPendingFile?[_rateioPendingFile]:[]};
+  const tipoSel=document.getElementById('rt-tipo').value;
+  const formaSel=document.getElementById('rt-forma').value;
+  const statusSel=document.getElementById('rt-status').value;
+  const obsSel=document.getElementById('rt-obs').value.trim();
+  const base={id:uuid(),valor:total,data,partes,tipo:tipoSel,formaPagamento:formaSel,status:statusSel,obs:obsSel,comprovantes:_rateioPendingFile?[_rateioPendingFile]:[]};
   const lst=load(pkPeriodo('rateio_lanc'));
   lst.push(base);
   save(pkPeriodo('rateio_lanc'),lst);
@@ -1408,10 +1430,6 @@ function confirmarRateio(){
   });
   save(pkPeriodo('despesas'),desp);
   // gera também um lançamento em "Contas" (repasses) por imóvel, vinculado ao rateio
-  const tipoSel=document.getElementById('rt-tipo').value;
-  const formaSel=document.getElementById('rt-forma').value;
-  const statusSel=document.getElementById('rt-status').value;
-  const obsSel=document.getElementById('rt-obs').value.trim();
   const rep=load(pkPeriodo('repasses'));
   calcularCotasAjustadas(total,partes).forEach(c=>{
     if(c.cota>0){
@@ -1424,11 +1442,68 @@ function confirmarRateio(){
   _rateioPendingFile=null;
   notify('Rateio confirmado — lançado como despesa e em Contas para cada imóvel','ok');render();
 }
+function abrirEdicaoRateioLanc(id){
+  ST.rateioEditandoId=id;
+  const r=load(pkPeriodo('rateio_lanc')).find(x=>x.id===id);
+  if(r && r.partes)ST.rateioQtd=r.partes.length||3;
+  render();
+  notify('Editando rateio — ajuste os campos e clique em Salvar Alterações','info');
+}
+function cancelarEdicaoRateio(){
+  ST.rateioEditandoId=null;
+  _rateioPendingFile=null;
+  render();
+}
+function salvarEdicaoRateio(id){
+  const lst=load(pkPeriodo('rateio_lanc'));
+  const r=lst.find(x=>x.id===id);
+  if(!r){notify('Rateio não encontrado','err');return;}
+  const total=+document.getElementById('rt-valor-total').value||0;
+  if(total<=0){notify('Informe o valor total da conta','err');return;}
+  const selects=[...document.querySelectorAll('.rt-linha-im')];
+  const pcts=[...document.querySelectorAll('.rt-linha-pct')];
+  const partes=selects.map((sel,i)=>({imovelId:sel.value,pct:+pcts[i].value||0})).filter(p=>p.imovelId && p.pct>0);
+  if(!partes.length){notify('Selecione ao menos um imóvel e informe o percentual','err');return;}
+  const soma=partes.reduce((s,p)=>s+p.pct,0);
+  if(Math.abs(soma-100)>0.05){notify(`Os percentuais somam ${soma.toFixed(2)}% — precisa totalizar exatamente 100% para confirmar.`,'err');return;}
+  const data=document.getElementById('rt-data').value;
+  const tipoSel=document.getElementById('rt-tipo').value;
+  const formaSel=document.getElementById('rt-forma').value;
+  const statusSel=document.getElementById('rt-status').value;
+  const obsSel=document.getElementById('rt-obs').value.trim();
+  r.valor=total;r.data=data;r.partes=partes;r.tipo=tipoSel;r.formaPagamento=formaSel;r.status=statusSel;r.obs=obsSel;
+  if(_rateioPendingFile){
+    if(!r.comprovantes)r.comprovantes=[];
+    r.comprovantes.push(_rateioPendingFile);
+  }
+  save(pkPeriodo('rateio_lanc'),lst);
+  // regenera despesas e lançamentos em Contas vinculados a este rateio, com os valores atualizados
+  const desp=load(pkPeriodo('despesas')).filter(d=>d.rateioLancId!==id);
+  calcularCotasAjustadas(total,partes).forEach(c=>{
+    if(c.cota>0){
+      desp.push({id:uuid(),imovelId:c.imovelId,desc:`Conta rateada (${c.pct}%)`,valor:c.cota,forma:'Rateio',data,comprovantes:[],rateioLancId:id});
+    }
+  });
+  save(pkPeriodo('despesas'),desp);
+  const rep=load(pkPeriodo('repasses')).filter(x=>x.rateioLancId!==id);
+  calcularCotasAjustadas(total,partes).forEach(c=>{
+    if(c.cota>0){
+      rep.push({id:uuid(),imovelId:c.imovelId,tipo:tipoSel,valor:c.cota,envio:data,formaPagamento:formaSel,status:statusSel,obs:obsSel,boleto:(r.comprovantes&&r.comprovantes.length)?r.comprovantes[r.comprovantes.length-1]:null,rateioLancId:id});
+    }
+  });
+  save(pkPeriodo('repasses'),rep);
+  ST.rateioEditandoId=null;
+  document.getElementById('rt-file-input').value='';
+  document.getElementById('rt-file-status').textContent='';
+  _rateioPendingFile=null;
+  notify('Rateio atualizado — despesas e lançamentos em Contas foram recalculados','ok');render();
+}
 function delRateioLanc(id){
   if(!confirm('Excluir este rateio? As despesas e os lançamentos em Contas criados automaticamente para cada imóvel também serão removidos.'))return;
   save(pkPeriodo('rateio_lanc'),load(pkPeriodo('rateio_lanc')).filter(r=>r.id!==id));
   save(pkPeriodo('despesas'),load(pkPeriodo('despesas')).filter(d=>d.rateioLancId!==id));
   save(pkPeriodo('repasses'),load(pkPeriodo('repasses')).filter(r=>r.rateioLancId!==id));
+  if(ST.rateioEditandoId===id)ST.rateioEditandoId=null;
   notify('Rateio, despesas e lançamentos em Contas excluídos','ok');render();
 }
 function abrirAnexarComprovanteRateio(id){
@@ -1535,6 +1610,9 @@ function renderDash(){
     const despesasContas=despesasContasPorImovel(p.imovel.id);
     return {imovel:p.imovel,liquido:p.liquido,despesas:despesasContas,saldo:p.liquido-despesasContas};
   });
+  const totalDespesasPagas=linhasCalc.reduce((s,p)=>s+p.despesas,0);
+  const totalSaldoImoveis=linhasCalc.reduce((s,p)=>s+p.saldo,0);
+  const disponivelAposPessoalNovo=totalSaldoImoveis-c.totalTransf;
   const blocoModulo=(mod)=>{
     const idsDoModulo=mod.imoveis.map(i=>i.id);
     const linhas=linhasCalc.filter(p=>idsDoModulo.includes(p.imovel.id));
@@ -1557,12 +1635,12 @@ function renderDash(){
   return `
   <div class="kpi-grid">
     <div class="kpi"><div class="kpi-accent" style="background:var(--gold)"></div><div class="kpi-label">Líquido Recebido</div><div class="kpi-value pos">${fmt(c.totalLiquido)}</div></div>
-    <div class="kpi"><div class="kpi-accent" style="background:var(--red)"></div><div class="kpi-label">Despesas do Mês (Pago)</div><div class="kpi-value neg">${fmt(linhasCalc.reduce((s,p)=>s+p.despesas,0))}</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--red)"></div><div class="kpi-label">Despesas do Mês (Pago)</div><div class="kpi-value neg">${fmt(totalDespesasPagas)}</div></div>
     <div class="kpi"><div class="kpi-accent" style="background:var(--amber)"></div><div class="kpi-label">Condomínio Pendente</div><div class="kpi-value" style="color:var(--amber)">${fmt(c.totalCondPend)}</div></div>
     <div class="kpi"><div class="kpi-accent" style="background:var(--red)"></div><div class="kpi-label">IPTU Recebido a Pagar</div><div class="kpi-value" style="color:var(--red)">${fmt(c.totalIptuAPagar)}</div></div>
-    <div class="kpi"><div class="kpi-accent" style="background:var(--blue)"></div><div class="kpi-label">Saldo Imóveis</div><div class="kpi-value ${vc(c.totalSaldo)}">${fmt(c.totalSaldo)}</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--blue)"></div><div class="kpi-label">Saldo Imóveis</div><div class="kpi-value ${vc(totalSaldoImoveis)}">${fmt(totalSaldoImoveis)}</div></div>
     <div class="kpi"><div class="kpi-accent" style="background:var(--dim)"></div><div class="kpi-label">Transferido p/ Pessoal</div><div class="kpi-value neg">${fmt(c.totalTransf)}</div></div>
-    <div class="kpi"><div class="kpi-accent" style="background:var(--green)"></div><div class="kpi-label">Disponível Após Pessoal</div><div class="kpi-value ${vc(c.disponivelAposPessoal)}">${fmt(c.disponivelAposPessoal)}</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--green)"></div><div class="kpi-label">Disponível Após Pessoal</div><div class="kpi-value ${vc(disponivelAposPessoalNovo)}">${fmt(disponivelAposPessoalNovo)}</div></div>
   </div>
   <div class="sec-hdr"><h2>Saldo por Imóvel</h2><div class="sec-line"></div></div>
   <div class="sec-note" style="margin-top:-10px">Despesas aqui = soma dos lançamentos <strong>já pagos</strong> (status Pago) da aba Contas de cada imóvel neste mês. Contas "A Pagar", "A Vencer" ou "Vencida" não entram, porque ainda não saíram do seu caixa. Saldo = Líquido − Despesas Pagas.</div>
@@ -1570,7 +1648,7 @@ function renderDash(){
   <div class="form-card" style="border-color:var(--gold-dim);background:var(--gold-bg)">
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
       <span style="font-family:'Syne',sans-serif;font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.06em">Total Geral — Todos os Imóveis</span>
-      <span style="font-family:'Syne',sans-serif;font-size:20px;font-weight:800" class="${vc(linhasCalc.reduce((s,p)=>s+p.saldo,0))}">${fmt(linhasCalc.reduce((s,p)=>s+p.saldo,0))}</span>
+      <span style="font-family:'Syne',sans-serif;font-size:20px;font-weight:800" class="${vc(totalSaldoImoveis)}">${fmt(totalSaldoImoveis)}</span>
     </div>
   </div>`;
 }
@@ -1619,7 +1697,24 @@ function render(){
   const fns={dashboard:renderDash,alugueis:renderAlugueis,repasses:renderRepasses,despesas:renderDespesas,condominio:renderCondominio,rateio:renderRateio,imoveis:renderImoveis,pessoal:renderPessoal,dre:renderDRE};
   try{
     document.getElementById('content').innerHTML=(fns[ST.tab]||(()=>''))();
-    if(ST.tab==='rateio') renderRateioLinhas(ST.rateioQtd||3);
+    if(ST.tab==='rateio'){
+      if(ST.rateioEditandoId){
+        const r=load(pkPeriodo('rateio_lanc')).find(x=>x.id===ST.rateioEditandoId);
+        if(r && r.partes && r.partes.length){
+          renderRateioLinhas(r.partes.length);
+          setTimeout(()=>{
+            const selects=[...document.querySelectorAll('.rt-linha-im')];
+            const pcts=[...document.querySelectorAll('.rt-linha-pct')];
+            r.partes.forEach((p,i)=>{if(selects[i])selects[i].value=p.imovelId;if(pcts[i])pcts[i].value=p.pct;});
+            atualizarRateioPreview();
+          },0);
+        } else {
+          renderRateioLinhas(ST.rateioQtd||3);
+        }
+      } else {
+        renderRateioLinhas(ST.rateioQtd||3);
+      }
+    }
   }catch(e){
     console.error('Erro ao renderizar a aba',ST.tab,e);
     document.getElementById('content').innerHTML=`<div class="form-card" style="border-color:var(--red)">
