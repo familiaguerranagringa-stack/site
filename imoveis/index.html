@@ -1189,7 +1189,7 @@ function calcularCotasAjustadas(valor,partes){
 function normalizarTextoPDF(text){
   return (text||'').replace(/[ \t]+/g,' ').replace(/\n{2,}/g,'\n').trim();
 }
-const VALOR_MAXIMO_RAZOAVEL=100000; // acima disso, é quase certo que o parser capturou código de barras/CNPJ/chave PIX por engano
+const VALOR_MAXIMO_RAZOAVEL=50000; // acima disso, é quase certo que o parser capturou código de barras/CNPJ/chave PIX por engano
 function parseLinhaDigitavelValor(text){
   const candidatos=text.match(/[\d][\d.\s]{35,70}\d/g)||[];
   for(const c of candidatos){
@@ -1198,8 +1198,8 @@ function parseLinhaDigitavelValor(text){
       // Boleto bancário: os últimos 10 dígitos são o valor (em centavos)
       const valor=parseInt(digitos.slice(-10),10)/100;
       if(valor>0 && valor<=VALOR_MAXIMO_RAZOAVEL)return valor;
-    } else if(digitos.length===48){
-      // Conta de concessionária (água/luz/IPTU): valor fica entre o 5º e o 15º dígito
+    } else if(digitos.length===48||digitos.length===44){
+      // Conta de concessionária/IPTU (linha digitável de 48, ou código de barras cru de 44): valor entre o índice 4 e o 15
       const valor=parseInt(digitos.slice(4,15),10)/100;
       if(valor>0 && valor<=VALOR_MAXIMO_RAZOAVEL)return valor;
     }
@@ -1290,26 +1290,53 @@ function handleRateioFile(input){
   if(f.type==='application/pdf'){
     const readerBin=new FileReader();
     readerBin.onload=async()=>{
+      let fullText='';
+      let pdfDoc=null;
+      // ── ETAPA 1: texto nativo do PDF ──
       try{
         const typedarray=new Uint8Array(readerBin.result);
-        const pdf=await pdfjsLib.getDocument({data:typedarray}).promise;
-        let fullText='';
-        for(let p=1;p<=pdf.numPages;p++){
-          const page=await pdf.getPage(p);
+        pdfDoc=await pdfjsLib.getDocument({data:typedarray}).promise;
+        for(let p=1;p<=pdfDoc.numPages;p++){
+          const page=await pdfDoc.getPage(p);
           const tc=await page.getTextContent();
           fullText+=tc.items.map(it=>it.str).join(' ')+' ';
         }
-        const valor=parseValorTotalGenerico(fullText);
-        if(valor>0 && fullText.trim().length>=10){
-          aplicarResultado(valor,parseVencimentoGenerico(fullText),null);
-        } else {
-          // PDF provavelmente escaneado (imagem) — texto vazio/curto ou sem valor útil. Tenta OCR na primeira página.
-          const canvas=await pdfPrimeiraPaginaParaCanvas(new Uint8Array(readerBin.result));
-          await tentarOcrImagem(canvas);
+        console.log('ETAPA 1 — texto extraído do PDF:',fullText);
+      }catch(e){
+        console.error('ETAPA 1 falhou (texto nativo):',e);
+      }
+      // ── ETAPA 2: valor a partir do texto (padrões explícitos + linha digitável, ambos dentro de parseValorTotalGenerico) ──
+      let valor=0,venc=null;
+      try{
+        if(fullText && fullText.trim().length>=10){
+          valor=parseValorTotalGenerico(fullText);
+          venc=parseVencimentoGenerico(fullText);
         }
       }catch(e){
-        console.error(e);
-        statusEl.textContent='⚠ Não consegui ler este PDF. Preencha o valor manualmente abaixo.';
+        console.error('ETAPA 2 falhou (parse do texto):',e);
+      }
+      if(valor>0){
+        aplicarResultado(valor,venc,null);
+        finalizarAnexo();
+        return;
+      }
+      // ── ETAPA 3: OCR via canvas (PDF escaneado/sem camada de texto, ou etapas 1-2 não acharam nada) ──
+      try{
+        let canvas;
+        if(pdfDoc){
+          const page=await pdfDoc.getPage(1);
+          const viewport=page.getViewport({scale:2.5});
+          canvas=document.createElement('canvas');
+          canvas.width=viewport.width;canvas.height=viewport.height;
+          await page.render({canvasContext:canvas.getContext('2d'),viewport}).promise;
+        } else {
+          // Etapa 1 nem conseguiu abrir o PDF — tenta abrir de novo, isoladamente, só pra renderizar a página
+          canvas=await pdfPrimeiraPaginaParaCanvas(new Uint8Array(readerBin.result));
+        }
+        await tentarOcrImagem(canvas);
+      }catch(e){
+        console.error('ETAPA 3 falhou (OCR):',e);
+        statusEl.textContent='⚠ Não consegui ler este PDF automaticamente (texto, linha digitável e OCR falharam). Preencha o valor manualmente abaixo.';
       }
       finalizarAnexo();
     };
