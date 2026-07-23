@@ -97,7 +97,7 @@ tr:hover td{background:var(--bg-hover)}
 .empty{display:flex;flex-direction:column;align-items:center;padding:50px 20px;color:var(--dim);gap:10px;text-align:center;font-size:13px}
 .file-drop{border:1px dashed var(--border);border-radius:8px;padding:14px;font-size:12px;color:var(--muted);cursor:pointer;text-align:center;transition:all .15s}
 .file-drop:hover{border-color:var(--gold);color:var(--gold)}
-.file-chip{display:inline-flex;align-items:center;gap:6px;background:var(--bg-sub);border:1px solid var(--border);border-radius:5px;padding:4px 9px;font-size:11px;color:var(--text)}
+.file-chip{display:inline-flex;align-items:center;gap:6px;background:var(--bg-sub);border:1px solid var(--border);border-radius:5px;padding:4px 9px;font-size:11px;color:var(--text);white-space:nowrap;max-width:100%;overflow:hidden}
 .file-chip a{color:var(--gold);text-decoration:none}
 #notif{position:fixed;top:18px;right:18px;z-index:500;display:flex;flex-direction:column;gap:8px;pointer-events:none}
 .ni{background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:11px 15px;font-size:12px;display:flex;align-items:center;gap:8px;min-width:240px;pointer-events:all;animation:sli .2s ease}
@@ -333,6 +333,11 @@ function comprovanteChip(comp){
   if(!comp) return `<span class="dim" style="font-size:11px">sem comprovante</span>`;
   const dataAttr=JSON.stringify(comp).replace(/'/g,'&apos;');
   return `<span class="file-chip">📎 <a href="#" onclick="event.preventDefault();abrirComprovante(this)" data-file='${dataAttr}'>${comp.nomeFinal}</a> <a href="#" onclick="event.preventDefault();baixarComprovante(this)" data-file='${dataAttr}' title="baixar" style="color:var(--dim);text-decoration:none">⬇</a></span>`;
+}
+function comprovanteChipRotulo(comp,rotulo){
+  if(!comp) return `<span class="dim" style="font-size:11px">—</span>`;
+  const dataAttr=JSON.stringify(comp).replace(/'/g,'&apos;');
+  return `<span class="file-chip" style="white-space:nowrap;max-width:100%;overflow:hidden;display:inline-flex" title="${(comp.nomeFinal||'').replace(/"/g,'&quot;')}"><a href="#" onclick="event.preventDefault();abrirComprovante(this)" data-file='${dataAttr}' style="white-space:nowrap">${rotulo}</a> <a href="#" onclick="event.preventDefault();baixarComprovante(this)" data-file='${dataAttr}' title="baixar" style="color:var(--dim);text-decoration:none">⬇</a></span>`;
 }
 async function obterDadosArquivo(comp){
   if(comp.data) return comp.data; // arquivos salvos antes desta correção, ainda embutidos
@@ -815,7 +820,7 @@ function renderRepasses(){
         <colgroup><col style="width:12%"><col style="width:6%"><col style="width:7%"><col style="width:8%"><col style="width:8%"><col style="width:7%"><col style="width:8%"><col style="width:9%"><col style="width:8%"><col style="width:8%"><col style="width:8%"><col style="width:11%"></colgroup>
         <thead><tr><th>Imóvel</th><th>Tipo</th><th>Valor</th><th>Vencimento</th><th>Data Pagto</th><th>Forma Pgto</th><th>Status</th><th>Obs</th><th>Boleto</th><th>Comprov. 1</th><th>Comprov. 2</th><th>Ações</th></tr></thead>
         <tbody>
-          ${linhas.length?linhas.map(r=>`<tr><td>${imovelNome(r.imovelId)}</td><td>${r.tipo}</td><td>${fmt(r.valor)}</td><td>${r.envio||'—'}</td><td>${r.dataPagamento?isoParaBR(r.dataPagamento):'—'}</td><td>${r.formaPagamento||'—'}</td><td>${statusBadge(r)}</td><td class="dim" style="text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.obs||'—'}</td><td>${comprovanteChip(r.boleto)}</td><td>${comprovanteChip(r.comprovantePagamento)}</td><td>${comprovanteChip(r.comprovantePagamento2)}</td><td style="white-space:nowrap">${r.status!=='pago'?`<button class="btn-sm btn-ok" onclick="marcarRepassePago('${r.id}')" title="marcar pago">✓</button> `:''}<button class="btn-sm btn-ok" onclick="abrirEdicaoRepasse('${r.id}')">editar</button> <button class="btn-sm" onclick="delItem('repasses','${r.id}')">excluir</button></td></tr>`).join(''):`<tr><td colspan="12"><div class="empty">Nenhum lançamento neste mês para este grupo.</div></td></tr>`}
+          ${linhas.length?linhas.map(r=>`<tr><td>${imovelNome(r.imovelId)}</td><td>${r.tipo}</td><td>${fmt(r.valor)}</td><td>${r.envio||'—'}</td><td>${r.dataPagamento?isoParaBR(r.dataPagamento):'—'}</td><td>${r.formaPagamento||'—'}</td><td>${statusBadge(r)}</td><td class="dim" style="text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.obs||'—'}</td><td>${comprovanteChipRotulo(r.boleto,'📄 BOLETO')}</td><td>${comprovanteChipRotulo(r.comprovantePagamento,'🧾 COMPROV. 1')}</td><td>${comprovanteChipRotulo(r.comprovantePagamento2,'🧾 COMPROV. 2')}</td><td style="white-space:nowrap">${r.status!=='pago'?`<button class="btn-sm btn-ok" onclick="marcarRepassePago('${r.id}')" title="marcar pago">✓</button> `:''}<button class="btn-sm btn-ok" onclick="abrirEdicaoRepasse('${r.id}')">editar</button> <button class="btn-sm" onclick="delItem('repasses','${r.id}')">excluir</button></td></tr>`).join(''):`<tr><td colspan="12"><div class="empty">Nenhum lançamento neste mês para este grupo.</div></td></tr>`}
         </tbody>
       </table></div>`}
     </div>`;
@@ -1508,22 +1513,28 @@ function calcMes(imovelIdFiltro){
 function renderDash(){
   const c=calcMes();
   const modulos=montarModulos();
+  const repassesMes=load(pkPeriodo('repasses'));
+  const despesasContasPorImovel=(imovelId)=>repassesMes.filter(r=>r.imovelId===imovelId).reduce((s,r)=>s+(+r.valor||0),0);
+  const linhasCalc=c.porImovel.map(p=>{
+    const despesasContas=despesasContasPorImovel(p.imovel.id);
+    return {imovel:p.imovel,liquido:p.liquido,despesas:despesasContas,saldo:p.liquido-despesasContas};
+  });
   const blocoModulo=(mod)=>{
     const idsDoModulo=mod.imoveis.map(i=>i.id);
-    const linhas=c.porImovel.filter(p=>idsDoModulo.includes(p.imovel.id));
-    const sub={liquido:0,despesas:0,condPend:0,iptuAPagar:0,saldo:0};
-    linhas.forEach(p=>{sub.liquido+=p.liquido;sub.despesas+=p.despesas;sub.condPend+=p.condPend;sub.iptuAPagar+=p.iptuAPagar;sub.saldo+=p.saldo;});
+    const linhas=linhasCalc.filter(p=>idsDoModulo.includes(p.imovel.id));
+    const sub={liquido:0,despesas:0,saldo:0};
+    linhas.forEach(p=>{sub.liquido+=p.liquido;sub.despesas+=p.despesas;sub.saldo+=p.saldo;});
     return `
     <div class="form-card" style="margin-bottom:16px">
       <div class="sec-hdr"><h2>🏠 ${mod.titulo}</h2><div class="sec-line"></div></div>
       ${!mod.imoveis.length?`<div class="sec-note" style="margin:0">Nenhum imóvel cadastrado neste grupo ainda. Assim que cadastrar um imóvel com esse nome, ele entra aqui automaticamente.</div>`:`
       <div class="tbl-wrap" style="margin-bottom:0"><table style="table-layout:fixed;width:100%">
-        <colgroup><col style="width:30%"><col style="width:14%"><col style="width:14%"><col style="width:14%"><col style="width:14%"><col style="width:14%"></colgroup>
-        <thead><tr><th style="text-align:left">Imóvel</th><th style="text-align:right">Líquido</th><th style="text-align:right">Despesas</th><th style="text-align:right">Condomínio Pendente</th><th style="text-align:right">IPTU a Pagar</th><th style="text-align:right">Saldo</th></tr></thead>
+        <colgroup><col style="width:40%"><col style="width:20%"><col style="width:20%"><col style="width:20%"></colgroup>
+        <thead><tr><th style="text-align:left">Imóvel</th><th style="text-align:right">Líquido</th><th style="text-align:right">Despesas</th><th style="text-align:right">Saldo</th></tr></thead>
         <tbody>
-          ${linhas.length?linhas.map(p=>`<tr><td style="text-align:left">${p.imovel.nome}</td><td class="pos" style="text-align:right">${fmt(p.liquido)}</td><td class="neg" style="text-align:right">${fmt(p.despesas)}</td><td style="color:var(--amber);text-align:right">${fmt(p.condPend)}</td><td style="color:var(--red);text-align:right">${fmt(p.iptuAPagar)}</td><td class="${vc(p.saldo)}" style="text-align:right"><strong>${fmt(p.saldo)}</strong></td></tr>`).join(''):`<tr><td colspan="6"><div class="empty">Nenhum lançamento neste mês para este grupo.</div></td></tr>`}
+          ${linhas.length?linhas.map(p=>`<tr><td style="text-align:left">${p.imovel.nome}</td><td class="pos" style="text-align:right">${fmt(p.liquido)}</td><td class="neg" style="text-align:right">${fmt(p.despesas)}</td><td class="${vc(p.saldo)}" style="text-align:right"><strong>${fmt(p.saldo)}</strong></td></tr>`).join(''):`<tr><td colspan="4"><div class="empty">Nenhum lançamento neste mês para este grupo.</div></td></tr>`}
         </tbody>
-        <tfoot><tr class="tfoot"><td style="text-align:left">Subtotal — ${mod.titulo}</td><td class="pos" style="text-align:right">${fmt(sub.liquido)}</td><td class="neg" style="text-align:right">${fmt(sub.despesas)}</td><td style="color:var(--amber);text-align:right">${fmt(sub.condPend)}</td><td style="color:var(--red);text-align:right">${fmt(sub.iptuAPagar)}</td><td class="${vc(sub.saldo)}" style="text-align:right">${fmt(sub.saldo)}</td></tr></tfoot>
+        <tfoot><tr class="tfoot"><td style="text-align:left">Subtotal — ${mod.titulo}</td><td class="pos" style="text-align:right">${fmt(sub.liquido)}</td><td class="neg" style="text-align:right">${fmt(sub.despesas)}</td><td class="${vc(sub.saldo)}" style="text-align:right">${fmt(sub.saldo)}</td></tr></tfoot>
       </table></div>`}
     </div>`;
   };
@@ -1538,11 +1549,12 @@ function renderDash(){
     <div class="kpi"><div class="kpi-accent" style="background:var(--green)"></div><div class="kpi-label">Disponível Após Pessoal</div><div class="kpi-value ${vc(c.disponivelAposPessoal)}">${fmt(c.disponivelAposPessoal)}</div></div>
   </div>
   <div class="sec-hdr"><h2>Saldo por Imóvel</h2><div class="sec-line"></div></div>
+  <div class="sec-note" style="margin-top:-10px">Despesas aqui = soma dos lançamentos da aba <strong>Contas</strong> de cada imóvel neste mês. Saldo = Líquido − Despesas.</div>
   ${modulos.map(blocoModulo).join('')}
   <div class="form-card" style="border-color:var(--gold-dim);background:var(--gold-bg)">
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
       <span style="font-family:'Syne',sans-serif;font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.06em">Total Geral — Todos os Imóveis</span>
-      <span style="font-family:'Syne',sans-serif;font-size:20px;font-weight:800" class="${vc(c.totalSaldo)}">${fmt(c.totalSaldo)}</span>
+      <span style="font-family:'Syne',sans-serif;font-size:20px;font-weight:800" class="${vc(linhasCalc.reduce((s,p)=>s+p.saldo,0))}">${fmt(linhasCalc.reduce((s,p)=>s+p.saldo,0))}</span>
     </div>
   </div>`;
 }
