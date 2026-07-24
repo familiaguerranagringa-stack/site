@@ -16,6 +16,14 @@
   --text:#1B1D1B;--muted:#5C5E58;--dim:#94958E;
   --green:#1D8348;--red:#C0392B;--blue:#1F6B85;--amber:#B4740E;
 }
+.dark-mode{
+  --bg:#1A1D20;--bg-card:#22272B;--bg-hover:#282E33;--bg-section:#262B2F;--bg-sub:#262B2F;
+  --border:#333A3F;--border-lite:#2C3236;
+  --gold:#4FAE94;--gold-lt:#63C4A9;--gold-dim:#3A5A50;--gold-bg:#1E2C28;
+  --text:#E0E6ED;--muted:#90A4AE;--dim:#697680;
+  --green:#4ADE80;--red:#F87171;--blue:#5DADE2;--amber:#F5B041;
+}
+html,body,*{transition:background-color .2s ease,border-color .2s ease,color .2s ease}
 html,body{min-height:100vh;background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
 #app{display:flex;min-height:100vh}
 .sidebar{width:230px;min-width:230px;background:var(--bg-card);border-right:1px solid var(--border);display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto;box-shadow:1px 0 3px rgba(20,20,20,.03)}
@@ -139,6 +147,9 @@ tr:hover td{background:var(--bg-hover)}
     <button class="sb-item" data-tab="pessoal" onclick="setTab('pessoal',this)">↪ Transferência p/ Pessoal</button>
     <button class="sb-item" data-tab="dre" onclick="setTab('dre',this)">📊 DRE</button>
     <div class="sb-bottom">
+      <button class="sb-item" id="btn-theme-toggle" onclick="alternarTema()" style="width:100%;margin:0 0 4px;color:var(--muted);display:flex;align-items:center;justify-content:space-between">
+        <span id="theme-toggle-label">🌙 Modo Escuro</span>
+      </button>
       <button class="sb-item" onclick="syncManual()" style="width:100%;margin:0;color:var(--gold)">☁ Sincronizar</button>
       <button class="sb-item" onclick="doLogout()" style="width:100%;margin:4px 0 0;color:var(--dim)">↩ Sair</button>
     </div>
@@ -517,7 +528,7 @@ function renderAlugueis(){
         <colgroup><col style="width:16%"><col style="width:10%"><col style="width:10%"><col style="width:11%"><col style="width:11%"><col style="width:14%"><col style="width:12%"><col style="width:10%"></colgroup>
         <thead><tr><th>Subunidade</th><th>Bruto</th><th>Líquido</th><th>Data de Repasse</th><th>Vencimento</th><th>Obs</th><th>Comprovante</th><th></th></tr></thead>
         <tbody>
-          ${linhas.length?linhas.map(r=>`<tr><td>${imovelNome(r.imovelId)}</td><td>${fmt(r.bruto)}</td><td class="pos">${fmt(r.liquido)}</td><td>${r.data||'—'}</td><td>${r.vencimento||'—'}</td><td class="dim" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.obs||'—'}</td><td>${comprovanteChipRotulo(r.comprovante,'📎 ANEXO')}</td><td><button class="btn-sm btn-ok" onclick="abrirEdicaoAluguel('${r.id}')">editar</button> <button class="btn-sm" onclick="delItem('alugueis','${r.id}')">excluir</button></td></tr>`).join(''):`<tr><td colspan="8"><div class="empty">Nenhum recebimento neste mês para este grupo.</div></td></tr>`}
+          ${linhas.length?linhas.map(r=>`<tr><td>${imovelNome(r.imovelId)}</td><td>${fmt(r.bruto)}</td><td class="pos">${fmt(r.liquido)}</td><td>${r.data||'—'}</td><td>${r.vencimento||'—'}</td><td class="dim" title="${(r.obs||'').replace(/"/g,'&quot;')}" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.obs||'—'}</td><td>${comprovanteChipRotulo(r.comprovante,'📎 ANEXO')}</td><td><button class="btn-sm btn-ok" onclick="abrirEdicaoAluguel('${r.id}')">editar</button> <button class="btn-sm" onclick="delItem('alugueis','${r.id}')">excluir</button></td></tr>`).join(''):`<tr><td colspan="8"><div class="empty">Nenhum recebimento neste mês para este grupo.</div></td></tr>`}
         </tbody>
         <tfoot><tr class="tfoot"><td>Subtotal — ${mod.titulo}</td><td></td><td class="pos">${fmt(subtotal)}</td><td colspan="5"></td></tr></tfoot>
       </table></div>`}
@@ -821,7 +832,7 @@ function renderRepasses(){
         <colgroup><col style="width:12%"><col style="width:6%"><col style="width:7%"><col style="width:8%"><col style="width:8%"><col style="width:7%"><col style="width:8%"><col style="width:9%"><col style="width:8%"><col style="width:8%"><col style="width:8%"><col style="width:11%"></colgroup>
         <thead><tr><th>Imóvel</th><th>Tipo</th><th>Valor</th><th>Vencimento</th><th>Data Pagto</th><th>Forma Pgto</th><th>Status</th><th>Obs</th><th>Boleto</th><th>Comprov. 1</th><th>Comprov. 2</th><th>Ações</th></tr></thead>
         <tbody>
-          ${linhas.length?linhas.map(r=>`<tr><td>${imovelNome(r.imovelId)}</td><td>${r.tipo}</td><td>${fmt(r.valor)}</td><td>${r.envio||'—'}</td><td>${r.dataPagamento?isoParaBR(r.dataPagamento):'—'}</td><td>${r.formaPagamento||'—'}</td><td>${statusBadge(r)}</td><td class="dim" style="text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.obs||'—'}</td><td>${comprovanteChipRotulo(r.boleto,'📄 BOLETO')}</td><td>${comprovanteChipRotulo(r.comprovantePagamento,'🧾 COMPROV. 1')}</td><td>${comprovanteChipRotulo(r.comprovantePagamento2,'🧾 COMPROV. 2')}</td><td style="white-space:nowrap">${r.status!=='pago'?`<button class="btn-sm btn-ok" onclick="marcarRepassePago('${r.id}')" title="marcar pago">✓</button> `:''}<button class="btn-sm btn-ok" onclick="abrirEdicaoRepasse('${r.id}')">editar</button> <button class="btn-sm" onclick="delItem('repasses','${r.id}')">excluir</button></td></tr>`).join(''):`<tr><td colspan="12"><div class="empty">Nenhum lançamento neste mês para este grupo.</div></td></tr>`}
+          ${linhas.length?linhas.map(r=>`<tr><td>${imovelNome(r.imovelId)}</td><td>${r.tipo}</td><td>${fmt(r.valor)}</td><td>${r.envio||'—'}</td><td>${r.dataPagamento?isoParaBR(r.dataPagamento):'—'}</td><td>${r.formaPagamento||'—'}</td><td>${statusBadge(r)}</td><td class="dim" title="${(r.obs||'').replace(/"/g,'&quot;')}" style="text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.obs||'—'}</td><td>${comprovanteChipRotulo(r.boleto,'📄 BOLETO')}</td><td>${comprovanteChipRotulo(r.comprovantePagamento,'🧾 COMPROV. 1')}</td><td>${comprovanteChipRotulo(r.comprovantePagamento2,'🧾 COMPROV. 2')}</td><td style="white-space:nowrap">${r.status!=='pago'?`<button class="btn-sm btn-ok" onclick="marcarRepassePago('${r.id}')" title="marcar pago">✓</button> `:''}<button class="btn-sm btn-ok" onclick="abrirEdicaoRepasse('${r.id}')">editar</button> <button class="btn-sm" onclick="delItem('repasses','${r.id}')">excluir</button></td></tr>`).join(''):`<tr><td colspan="12"><div class="empty">Nenhum lançamento neste mês para este grupo.</div></td></tr>`}
         </tbody>
         ${linhas.length?`<tfoot><tr class="tfoot"><td>Subtotal — ${mod.titulo}</td><td></td><td>${fmt(subtotal)}</td><td colspan="9"></td></tr></tfoot>`:''}
       </table></div>`}
@@ -1242,8 +1253,10 @@ function parseVencimentoGenerico(textoOriginal){
 }
 async function ocrExtrairTexto(imageSourceCanvasOrDataUrl){
   if(!window.Tesseract) throw new Error('OCR indisponível (biblioteca não carregou)');
-  const {data}=await Tesseract.recognize(imageSourceCanvasOrDataUrl,'por');
-  return data.text||'';
+  const OCR_TIMEOUT_MS=5000;
+  const timeoutPromise=new Promise((_,reject)=>setTimeout(()=>reject(new Error('OCR excedeu o tempo limite de 5s')),OCR_TIMEOUT_MS));
+  const ocrPromise=Tesseract.recognize(imageSourceCanvasOrDataUrl,'por').then(r=>r.data.text||'');
+  return await Promise.race([ocrPromise,timeoutPromise]);
 }
 async function pdfPrimeiraPaginaParaCanvas(typedarray){
   const pdf=await pdfjsLib.getDocument({data:typedarray}).promise;
@@ -1279,12 +1292,12 @@ function handleRateioFile(input){
   };
   const tentarOcrImagem=async(src)=>{
     try{
-      statusEl.textContent='⟳ Não achei texto direto — tentando reconhecer por OCR (pode levar alguns segundos)...';
+      statusEl.textContent='⟳ Não achei texto direto — tentando reconhecer por OCR (até 5s)...';
       const texto=await ocrExtrairTexto(src);
       aplicarResultado(parseValorTotalGenerico(texto),parseVencimentoGenerico(texto),'via OCR');
     }catch(e){
-      console.error(e);
-      statusEl.textContent='⚠ Não consegui ler automaticamente (nem por texto, nem por OCR). Preencha manualmente abaixo.';
+      console.error('Erro na leitura do PDF:',e);
+      statusEl.textContent='⚠️ Arquivo em formato de imagem/escaneado. Digite o valor manualmente.';
     }
   };
   if(f.type==='application/pdf'){
@@ -1335,8 +1348,8 @@ function handleRateioFile(input){
         }
         await tentarOcrImagem(canvas);
       }catch(e){
-        console.error('ETAPA 3 falhou (OCR):',e);
-        statusEl.textContent='⚠ Não consegui ler este PDF automaticamente (texto, linha digitável e OCR falharam). Preencha o valor manualmente abaixo.';
+        console.error('Erro na leitura do PDF:',e);
+        statusEl.textContent='⚠️ Arquivo em formato de imagem/escaneado. Digite o valor manualmente.';
       }
       finalizarAnexo();
     };
@@ -1764,6 +1777,20 @@ function initApp(){
   ys.innerHTML=[y-1,y,y+1].map(v=>`<option value="${v}"${v===y?' selected':''}>${v}</option>`).join('');
   syncFromFB().then(render).catch(render);
 }
+
+// ── TEMA CLARO / ESCURO ──
+function aplicarTema(tema){
+  document.body.classList.toggle('dark-mode',tema==='dark');
+  const label=document.getElementById('theme-toggle-label');
+  if(label)label.textContent=tema==='dark'?'☀️ Modo Claro':'🌙 Modo Escuro';
+}
+function alternarTema(){
+  const atual=localStorage.getItem('imoveisfg_theme')==='dark'?'dark':'light';
+  const novo=atual==='dark'?'light':'dark';
+  localStorage.setItem('imoveisfg_theme',novo);
+  aplicarTema(novo);
+}
+aplicarTema(localStorage.getItem('imoveisfg_theme')==='dark'?'dark':'light');
 
 // ── BOOT ──
 if(sessionStorage.getItem('imoveisfg_auth')==='1'){
