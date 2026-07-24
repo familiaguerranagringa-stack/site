@@ -15,8 +15,6 @@
   --gold:#2F6F5E;--gold-lt:#255A4C;--gold-dim:#BFDFD5;--gold-bg:#EAF5F1;
   --text:#1B1D1B;--muted:#5C5E58;--dim:#94958E;
   --green:#1D8348;--red:#C0392B;--blue:#1F6B85;--amber:#B4740E;
-  --btn-neon-border-width:2px;
-  --btn-neon-bg:#22272B;--btn-neon-border-color:#10B981;--btn-neon-glow:rgba(16,185,129,.4);--btn-neon-text:#10B981;
 }
 .dark-mode{
   --bg:#1A1D20;--bg-card:#22272B;--bg-hover:#282E33;--bg-section:#262B2F;--bg-sub:#262B2F;
@@ -24,19 +22,8 @@
   --gold:#4FAE94;--gold-lt:#63C4A9;--gold-dim:#3A5A50;--gold-bg:#1E2C28;
   --text:#E0E6ED;--muted:#90A4AE;--dim:#697680;
   --green:#4ADE80;--red:#F87171;--blue:#5DADE2;--amber:#F5B041;
-  --btn-neon-bg:#12181B;--btn-neon-border-color:#34D399;--btn-neon-glow:rgba(52,211,153,.5);--btn-neon-text:#34D399;
 }
 html,body,*{transition:background-color .2s ease,border-color .2s ease,color .2s ease}
-button,.btn-gold,.btn-ghost,.btn-sm{
-  background-color:var(--btn-neon-bg)!important;
-  border:var(--btn-neon-border-width) solid var(--btn-neon-border-color)!important;
-  color:var(--btn-neon-text)!important;
-  box-shadow:0 0 10px var(--btn-neon-glow)!important;
-  transition:box-shadow .3s ease!important;
-}
-button:hover,.btn-gold:hover,.btn-ghost:hover,.btn-sm:hover{
-  box-shadow:0 0 15px var(--btn-neon-glow)!important;
-}
 html,body{min-height:100vh;background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
 #app{display:flex;min-height:100vh}
 .sidebar{width:230px;min-width:230px;background:var(--bg-card);border-right:1px solid var(--border);display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto;box-shadow:1px 0 3px rgba(20,20,20,.03)}
@@ -1271,19 +1258,33 @@ function parseVencimentoGenerico(textoOriginal){
 }
 async function ocrExtrairTexto(imageSourceCanvasOrDataUrl){
   if(!window.Tesseract) throw new Error('OCR indisponível (biblioteca não carregou)');
-  const OCR_TIMEOUT_MS=5000;
-  const timeoutPromise=new Promise((_,reject)=>setTimeout(()=>reject(new Error('OCR excedeu o tempo limite de 5s')),OCR_TIMEOUT_MS));
+  const OCR_TIMEOUT_MS=15000;
+  const timeoutPromise=new Promise((_,reject)=>setTimeout(()=>reject(new Error('OCR excedeu o tempo limite de 15s')),OCR_TIMEOUT_MS));
   const ocrPromise=Tesseract.recognize(imageSourceCanvasOrDataUrl,'por').then(r=>r.data.text||'');
   return await Promise.race([ocrPromise,timeoutPromise]);
+}
+function preprocessarCanvasParaOcr(canvas){
+  const ctx=canvas.getContext('2d');
+  const img=ctx.getImageData(0,0,canvas.width,canvas.height);
+  const d=img.data;
+  const contraste=1.35; // realça o texto e reduz marcas d'água de fundo
+  for(let i=0;i<d.length;i+=4){
+    const cinza=d[i]*0.299+d[i+1]*0.587+d[i+2]*0.114;
+    let v=(cinza-128)*contraste+128;
+    v=Math.max(0,Math.min(255,v));
+    d[i]=d[i+1]=d[i+2]=v;
+  }
+  ctx.putImageData(img,0,0);
+  return canvas;
 }
 async function pdfPrimeiraPaginaParaCanvas(typedarray){
   const pdf=await pdfjsLib.getDocument({data:typedarray}).promise;
   const page=await pdf.getPage(1);
-  const viewport=page.getViewport({scale:2.5});
+  const viewport=page.getViewport({scale:3});
   const canvas=document.createElement('canvas');
   canvas.width=viewport.width;canvas.height=viewport.height;
   await page.render({canvasContext:canvas.getContext('2d'),viewport}).promise;
-  return canvas;
+  return preprocessarCanvasParaOcr(canvas);
 }
 let _rateioPendingFile=null;
 function handleRateioFile(input){
@@ -1310,7 +1311,7 @@ function handleRateioFile(input){
   };
   const tentarOcrImagem=async(src)=>{
     try{
-      statusEl.textContent='⟳ Não achei texto direto — tentando reconhecer por OCR (até 5s)...';
+      statusEl.textContent='⟳ Não achei texto direto — tentando reconhecer por OCR (até 15s)...';
       const texto=await ocrExtrairTexto(src);
       aplicarResultado(parseValorTotalGenerico(texto),parseVencimentoGenerico(texto),'via OCR');
     }catch(e){
@@ -1356,10 +1357,11 @@ function handleRateioFile(input){
         let canvas;
         if(pdfDoc){
           const page=await pdfDoc.getPage(1);
-          const viewport=page.getViewport({scale:2.5});
+          const viewport=page.getViewport({scale:3});
           canvas=document.createElement('canvas');
           canvas.width=viewport.width;canvas.height=viewport.height;
           await page.render({canvasContext:canvas.getContext('2d'),viewport}).promise;
+          preprocessarCanvasParaOcr(canvas);
         } else {
           // Etapa 1 nem conseguiu abrir o PDF — tenta abrir de novo, isoladamente, só pra renderizar a página
           canvas=await pdfPrimeiraPaginaParaCanvas(new Uint8Array(readerBin.result));
@@ -1375,7 +1377,18 @@ function handleRateioFile(input){
   } else if(f.type.startsWith('image/')){
     const readerImg=new FileReader();
     readerImg.onload=async()=>{
-      await tentarOcrImagem(readerImg.result);
+      try{
+        const img=new Image();
+        await new Promise((res,rej)=>{img.onload=res;img.onerror=rej;img.src=readerImg.result;});
+        const canvas=document.createElement('canvas');
+        canvas.width=img.naturalWidth;canvas.height=img.naturalHeight;
+        canvas.getContext('2d').drawImage(img,0,0);
+        preprocessarCanvasParaOcr(canvas);
+        await tentarOcrImagem(canvas);
+      }catch(e){
+        console.error('Erro ao pré-processar imagem, tentando OCR direto:',e);
+        await tentarOcrImagem(readerImg.result);
+      }
       finalizarAnexo();
     };
     readerImg.onerror=()=>{
