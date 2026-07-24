@@ -15,6 +15,8 @@
   --gold:#2F6F5E;--gold-lt:#255A4C;--gold-dim:#BFDFD5;--gold-bg:#EAF5F1;
   --text:#1B1D1B;--muted:#5C5E58;--dim:#94958E;
   --green:#1D8348;--red:#C0392B;--blue:#1F6B85;--amber:#B4740E;
+  --btn-neon-border-width:2px;
+  --btn-neon-bg:#22272B;--btn-neon-border-color:#10B981;--btn-neon-glow:rgba(16,185,129,.4);--btn-neon-text:#10B981;
 }
 .dark-mode{
   --bg:#1A1D20;--bg-card:#22272B;--bg-hover:#282E33;--bg-section:#262B2F;--bg-sub:#262B2F;
@@ -22,8 +24,19 @@
   --gold:#4FAE94;--gold-lt:#63C4A9;--gold-dim:#3A5A50;--gold-bg:#1E2C28;
   --text:#E0E6ED;--muted:#90A4AE;--dim:#697680;
   --green:#4ADE80;--red:#F87171;--blue:#5DADE2;--amber:#F5B041;
+  --btn-neon-bg:#12181B;--btn-neon-border-color:#34D399;--btn-neon-glow:rgba(52,211,153,.5);--btn-neon-text:#34D399;
 }
 html,body,*{transition:background-color .2s ease,border-color .2s ease,color .2s ease}
+button,.btn-gold,.btn-ghost,.btn-sm{
+  background-color:var(--btn-neon-bg)!important;
+  border:var(--btn-neon-border-width) solid var(--btn-neon-border-color)!important;
+  color:var(--btn-neon-text)!important;
+  box-shadow:0 0 10px var(--btn-neon-glow)!important;
+  transition:box-shadow .3s ease!important;
+}
+button:hover,.btn-gold:hover,.btn-ghost:hover,.btn-sm:hover{
+  box-shadow:0 0 15px var(--btn-neon-glow)!important;
+}
 html,body{min-height:100vh;background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
 #app{display:flex;min-height:100vh}
 .sidebar{width:230px;min-width:230px;background:var(--bg-card);border-right:1px solid var(--border);display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto;box-shadow:1px 0 3px rgba(20,20,20,.03)}
@@ -88,6 +101,11 @@ tr:hover td{background:var(--bg-hover)}
 .b-late{background:#FBD5D0;color:#A6291A;border:1px solid #E8A599;font-weight:800}
 .b-soon{background:#FCE3B8;color:#8A5A00;border:1px solid #EFC372;font-weight:700}
 .b-blue{background:#E8F1F5;color:var(--blue);border:1px solid #C3DCE6}
+.dark-mode .dim,.dark-mode .muted,.dark-mode td.dim{color:#CBD5E1}
+.dark-mode th{color:#94A3B8;font-weight:600}
+.dark-mode .b-blue{background:rgba(16,185,129,.15);color:#34D399;border:1px solid rgba(52,211,153,.3)}
+.dark-mode .b-pend,.dark-mode .b-soon{background:rgba(245,158,11,.15);color:#FBBF24;border:1px solid rgba(251,191,36,.3);font-weight:700}
+.dark-mode .b-late{background:rgba(239,68,68,.15);color:#F87171;border:1px solid rgba(248,113,113,.3);font-weight:700}
 .b-info{background:var(--gold-bg);color:var(--gold);border:1px solid var(--gold-dim)}
 .tabs{display:flex;border-bottom:1px solid var(--border);margin-bottom:20px;overflow-x:auto;gap:0}
 .tab-btn{padding:9px 18px;font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);cursor:pointer;border:none;background:none;border-bottom:2px solid transparent;transition:all .2s;white-space:nowrap;font-family:'DM Sans',sans-serif}
@@ -148,7 +166,7 @@ tr:hover td{background:var(--bg-hover)}
     <button class="sb-item" data-tab="dre" onclick="setTab('dre',this)">📊 DRE</button>
     <div class="sb-bottom">
       <button class="sb-item" id="btn-theme-toggle" onclick="alternarTema()" style="width:100%;margin:0 0 4px;color:var(--muted);display:flex;align-items:center;justify-content:space-between">
-        <span id="theme-toggle-label">🌙 Modo Escuro</span>
+        <span id="theme-toggle-label">⚔️ Darkness</span>
       </button>
       <button class="sb-item" onclick="syncManual()" style="width:100%;margin:0;color:var(--gold)">☁ Sincronizar</button>
       <button class="sb-item" onclick="doLogout()" style="width:100%;margin:4px 0 0;color:var(--dim)">↩ Sair</button>
@@ -1782,7 +1800,7 @@ function initApp(){
 function aplicarTema(tema){
   document.body.classList.toggle('dark-mode',tema==='dark');
   const label=document.getElementById('theme-toggle-label');
-  if(label)label.textContent=tema==='dark'?'☀️ Modo Claro':'🌙 Modo Escuro';
+  if(label)label.textContent=tema==='dark'?'🛡️ Brightness':'⚔️ Darkness';
 }
 function alternarTema(){
   const atual=localStorage.getItem('imoveisfg_theme')==='dark'?'dark':'light';
