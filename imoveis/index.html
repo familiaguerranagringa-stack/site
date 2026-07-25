@@ -75,6 +75,7 @@ tr:hover td{background:var(--bg-hover)}
 .tfoot td{background:var(--bg-sub);border-top:1px solid var(--border);font-family:'Syne',sans-serif;font-size:12px;font-weight:700;border-bottom:none}
 .tfoot td:first-child{text-align:left}
 .pos{color:var(--green)}.neg{color:var(--red)}.gold{color:var(--gold)}.dim{color:var(--dim)}
+.data-cel{text-align:center;font-variant-numeric:tabular-nums;white-space:nowrap}
 .form-card{background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:20px;margin-bottom:22px;box-shadow:0 1px 3px rgba(20,20,20,.04)}
 .fg{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:14px;margin-bottom:14px}
 .fl{display:flex;flex-direction:column;gap:5px}
@@ -90,9 +91,10 @@ tr:hover td{background:var(--bg-hover)}
 .b-blue{background:#E8F1F5;color:var(--blue);border:1px solid #C3DCE6}
 .dark-mode .dim,.dark-mode .muted,.dark-mode td.dim{color:#CBD5E1}
 .dark-mode th{color:#94A3B8;font-weight:600}
-.dark-mode .b-blue{background:rgba(16,185,129,.15);color:#34D399;border:1px solid rgba(52,211,153,.3)}
-.dark-mode .b-pend,.dark-mode .b-soon{background:rgba(245,158,11,.15);color:#FBBF24;border:1px solid rgba(251,191,36,.3);font-weight:700}
-.dark-mode .b-late{background:rgba(239,68,68,.15);color:#F87171;border:1px solid rgba(248,113,113,.3);font-weight:700}
+.dark-mode .b-blue{background:rgba(56,189,248,.15);color:#38BDF8;border:1px solid rgba(56,189,248,.4);font-weight:700}
+.dark-mode .b-pend{background:rgba(250,204,21,.15);color:#FACC15;border:1px solid rgba(250,204,21,.4);font-weight:700}
+.dark-mode .b-soon{background:rgba(249,115,22,.15);color:#F97316;border:1px solid rgba(249,115,22,.4);font-weight:700}
+.dark-mode .b-late{background:rgba(239,68,68,.2);color:#EF4444;border:1px solid rgba(239,68,68,.5);font-weight:700}
 .b-info{background:var(--gold-bg);color:var(--gold);border:1px solid var(--gold-dim)}
 .tabs{display:flex;border-bottom:1px solid var(--border);margin-bottom:20px;overflow-x:auto;gap:0}
 .tab-btn{padding:9px 18px;font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);cursor:pointer;border:none;background:none;border-bottom:2px solid transparent;transition:all .2s;white-space:nowrap;font-family:'DM Sans',sans-serif}
@@ -531,9 +533,9 @@ function renderAlugueis(){
       ${!mod.imoveis.length?`<div class="sec-note" style="margin:0">Nenhum imóvel cadastrado neste grupo ainda. Assim que cadastrar um imóvel com esse nome, ele entra aqui automaticamente.</div>`:`
       <div class="tbl-wrap" style="margin-bottom:0"><table style="table-layout:fixed;width:100%">
         <colgroup><col style="width:16%"><col style="width:10%"><col style="width:10%"><col style="width:11%"><col style="width:11%"><col style="width:14%"><col style="width:12%"><col style="width:10%"></colgroup>
-        <thead><tr><th>Subunidade</th><th>Bruto</th><th>Líquido</th><th>Data de Repasse</th><th>Vencimento</th><th>Obs</th><th>Comprovante</th><th></th></tr></thead>
+        <thead><tr><th>Subunidade</th><th>Bruto</th><th>Líquido</th><th class="data-cel">Data de Repasse</th><th class="data-cel">Vencimento</th><th>Obs</th><th>Comprovante</th><th></th></tr></thead>
         <tbody>
-          ${linhas.length?linhas.map(r=>`<tr><td>${imovelNome(r.imovelId)}</td><td>${fmt(r.bruto)}</td><td class="pos">${fmt(r.liquido)}</td><td>${r.data||'—'}</td><td>${r.vencimento||'—'}</td><td class="dim" title="${(r.obs||'').replace(/"/g,'&quot;')}" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.obs||'—'}</td><td>${comprovanteChipRotulo(r.comprovante,'📎 ANEXO')}</td><td><button class="btn-sm btn-ok" onclick="abrirEdicaoAluguel('${r.id}')">editar</button> <button class="btn-sm" onclick="delItem('alugueis','${r.id}')">excluir</button></td></tr>`).join(''):`<tr><td colspan="8"><div class="empty">Nenhum recebimento neste mês para este grupo.</div></td></tr>`}
+          ${linhas.length?linhas.map(r=>`<tr><td>${imovelNome(r.imovelId)}</td><td>${fmt(r.bruto)}</td><td class="pos">${fmt(r.liquido)}</td><td class="data-cel">${r.data?formatarDataBR(r.data):'—'}</td><td class="data-cel">${r.vencimento?formatarDataBR(r.vencimento):'—'}</td><td class="dim" title="${(r.obs||'').replace(/"/g,'&quot;')}" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.obs||'—'}</td><td>${comprovanteChipRotulo(r.comprovante,'📎 ANEXO')}</td><td><button class="btn-sm btn-ok" onclick="abrirEdicaoAluguel('${r.id}')">editar</button> <button class="btn-sm" onclick="delItem('alugueis','${r.id}')">excluir</button></td></tr>`).join(''):`<tr><td colspan="8"><div class="empty">Nenhum recebimento neste mês para este grupo.</div></td></tr>`}
         </tbody>
         <tfoot><tr class="tfoot"><td>Subtotal — ${mod.titulo}</td><td></td><td class="pos">${fmt(subtotal)}</td><td colspan="5"></td></tr></tfoot>
       </table></div>`}
@@ -680,16 +682,19 @@ function matchImovel(addr){
   return bestScore>0?best:null;
 }
 let _pdfPendingFile=null;
+function formatarDataBR(iso){
+  if(!iso)return '';
+  const [yy,mm,dd]=String(iso).split('-');
+  if(!yy||!mm||!dd)return iso;
+  return `${dd}-${mm}-${yy}`;
+}
 function ddmmyyyy2iso(d){
   if(!d)return today();
   const [dd,mm,yy]=d.split('/');
   return `${yy}-${mm}-${dd}`;
 }
 function isoParaBR(iso){
-  if(!iso)return '';
-  const [yy,mm,dd]=iso.split('-');
-  if(!yy||!mm||!dd)return iso;
-  return `${dd}/${mm}/${yy}`;
+  return formatarDataBR(iso);
 }
 function handlePDFFile(input){
   const f=input.files[0];
@@ -835,9 +840,9 @@ function renderRepasses(){
       ${!mod.imoveis.length?`<div class="sec-note" style="margin:0">Nenhum imóvel cadastrado neste grupo ainda. Assim que cadastrar um imóvel com esse nome, ele entra aqui automaticamente.</div>`:`
       <div class="tbl-wrap" style="margin-bottom:0"><table style="table-layout:fixed;width:100%">
         <colgroup><col style="width:12%"><col style="width:6%"><col style="width:7%"><col style="width:8%"><col style="width:8%"><col style="width:7%"><col style="width:8%"><col style="width:9%"><col style="width:8%"><col style="width:8%"><col style="width:8%"><col style="width:11%"></colgroup>
-        <thead><tr><th>Imóvel</th><th>Tipo</th><th>Valor</th><th>Vencimento</th><th>Data Pagto</th><th>Forma Pgto</th><th>Status</th><th>Obs</th><th>Boleto</th><th>Comprov. 1</th><th>Comprov. 2</th><th>Ações</th></tr></thead>
+        <thead><tr><th>Imóvel</th><th>Tipo</th><th>Valor</th><th class="data-cel">Vencimento</th><th class="data-cel">Data Pagto</th><th>Forma Pgto</th><th>Status</th><th>Obs</th><th>Boleto</th><th>Comprov. 1</th><th>Comprov. 2</th><th>Ações</th></tr></thead>
         <tbody>
-          ${linhas.length?linhas.map(r=>`<tr><td>${imovelNome(r.imovelId)}</td><td>${r.tipo}</td><td>${fmt(r.valor)}</td><td>${r.envio||'—'}</td><td>${r.dataPagamento?isoParaBR(r.dataPagamento):'—'}</td><td>${r.formaPagamento||'—'}</td><td>${statusBadge(r)}</td><td class="dim" title="${(r.obs||'').replace(/"/g,'&quot;')}" style="text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.obs||'—'}</td><td>${comprovanteChipRotulo(r.boleto,'📄 BOLETO')}</td><td>${comprovanteChipRotulo(r.comprovantePagamento,'🧾 COMPROV. 1')}</td><td>${comprovanteChipRotulo(r.comprovantePagamento2,'🧾 COMPROV. 2')}</td><td style="white-space:nowrap">${r.status!=='pago'?`<button class="btn-sm btn-ok" onclick="marcarRepassePago('${r.id}')" title="marcar pago">✓</button> `:''}<button class="btn-sm btn-ok" onclick="abrirEdicaoRepasse('${r.id}')">editar</button> <button class="btn-sm" onclick="delItem('repasses','${r.id}')">excluir</button></td></tr>`).join(''):`<tr><td colspan="12"><div class="empty">Nenhum lançamento neste mês para este grupo.</div></td></tr>`}
+          ${linhas.length?linhas.map(r=>`<tr><td>${imovelNome(r.imovelId)}</td><td>${r.tipo}</td><td>${fmt(r.valor)}</td><td class="data-cel">${r.envio?formatarDataBR(r.envio):'—'}</td><td class="data-cel">${r.dataPagamento?formatarDataBR(r.dataPagamento):'—'}</td><td>${r.formaPagamento||'—'}</td><td>${statusBadge(r)}</td><td class="dim" title="${(r.obs||'').replace(/"/g,'&quot;')}" style="text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.obs||'—'}</td><td>${comprovanteChipRotulo(r.boleto,'📄 BOLETO')}</td><td>${comprovanteChipRotulo(r.comprovantePagamento,'🧾 COMPROV. 1')}</td><td>${comprovanteChipRotulo(r.comprovantePagamento2,'🧾 COMPROV. 2')}</td><td style="white-space:nowrap">${r.status!=='pago'?`<button class="btn-sm btn-ok" onclick="marcarRepassePago('${r.id}')" title="marcar pago">✓</button> `:''}<button class="btn-sm btn-ok" onclick="abrirEdicaoRepasse('${r.id}')">editar</button> <button class="btn-sm" onclick="delItem('repasses','${r.id}')">excluir</button></td></tr>`).join(''):`<tr><td colspan="12"><div class="empty">Nenhum lançamento neste mês para este grupo.</div></td></tr>`}
         </tbody>
         ${linhas.length?`<tfoot><tr class="tfoot"><td>Subtotal — ${mod.titulo}</td><td></td><td>${fmt(subtotal)}</td><td colspan="9"></td></tr></tfoot>`:''}
       </table></div>`}
@@ -1102,9 +1107,9 @@ function renderDespesas(){
     <button class="btn-gold" onclick="addDespesa()">+ Registrar Despesa</button>
   </div>
   <div class="tbl-wrap"><table>
-    <thead><tr><th>Imóvel</th><th>Descrição</th><th>Valor</th><th>Forma</th><th>Data</th><th>Comprovantes</th><th></th></tr></thead>
+    <thead><tr><th>Imóvel</th><th>Descrição</th><th>Valor</th><th>Forma</th><th class="data-cel">Data</th><th>Comprovantes</th><th></th></tr></thead>
     <tbody>
-      ${lst.length?lst.map(r=>`<tr><td>${imovelNome(r.imovelId)}</td><td>${r.desc}</td><td class="neg">${fmt(r.valor)}</td><td>${r.forma}</td><td>${r.data||'—'}</td><td>${comprovantesLista(r)}</td><td><button class="btn-sm btn-ok" onclick="abrirAnexarComprovanteDespesa('${r.id}')">+ anexar</button> <button class="btn-sm" onclick="delItem('despesas','${r.id}')">excluir</button></td></tr>`).join(''):`<tr><td colspan="7"><div class="empty">Nenhuma despesa neste mês.</div></td></tr>`}
+      ${lst.length?lst.map(r=>`<tr><td>${imovelNome(r.imovelId)}</td><td>${r.desc}</td><td class="neg">${fmt(r.valor)}</td><td>${r.forma}</td><td class="data-cel">${r.data?formatarDataBR(r.data):'—'}</td><td>${comprovantesLista(r)}</td><td><button class="btn-sm btn-ok" onclick="abrirAnexarComprovanteDespesa('${r.id}')">+ anexar</button> <button class="btn-sm" onclick="delItem('despesas','${r.id}')">excluir</button></td></tr>`).join(''):`<tr><td colspan="7"><div class="empty">Nenhuma despesa neste mês.</div></td></tr>`}
     </tbody>
     <tfoot><tr class="tfoot"><td>Total Despesas Diretas</td><td></td><td class="neg">${fmt(total)}</td><td colspan="4"></td></tr></tfoot>
   </table></div>`;
@@ -1170,9 +1175,9 @@ function renderCondominio(){
     <button class="btn-gold" onclick="addCondominio()">+ Registrar Adiantamento</button>
   </div>
   <div class="tbl-wrap"><table>
-    <thead><tr><th>Imóvel</th><th>Valor</th><th>Adiantado em</th><th>Status</th><th></th></tr></thead>
+    <thead><tr><th>Imóvel</th><th>Valor</th><th class="data-cel">Adiantado em</th><th>Status</th><th></th></tr></thead>
     <tbody>
-      ${lst.length?lst.map(r=>`<tr><td>${imovelNome(r.imovelId)}</td><td>${fmt(r.valor)}</td><td>${r.data||'—'}</td><td><span class="badge ${r.devolvido?'b-ok':'b-pend'}">${r.devolvido?'Devolvido':'Pendente'}</span></td><td>${r.devolvido?`<button class="btn-sm" onclick="delItem('condominio','${r.id}')">excluir</button>`:`<button class="btn-sm btn-ok" onclick="marcarDevolvido('${r.id}')">✓ marcar devolvido</button>`}</td></tr>`).join(''):`<tr><td colspan="5"><div class="empty">Nenhum adiantamento neste mês.</div></td></tr>`}
+      ${lst.length?lst.map(r=>`<tr><td>${imovelNome(r.imovelId)}</td><td>${fmt(r.valor)}</td><td class="data-cel">${r.data?formatarDataBR(r.data):'—'}</td><td><span class="badge ${r.devolvido?'b-ok':'b-pend'}">${r.devolvido?'Devolvido':'Pendente'}</span></td><td>${r.devolvido?`<button class="btn-sm" onclick="delItem('condominio','${r.id}')">excluir</button>`:`<button class="btn-sm btn-ok" onclick="marcarDevolvido('${r.id}')">✓ marcar devolvido</button>`}</td></tr>`).join(''):`<tr><td colspan="5"><div class="empty">Nenhum adiantamento neste mês.</div></td></tr>`}
     </tbody>
     <tfoot><tr class="tfoot"><td>Total Pendente de Devolução</td><td class="neg">${fmt(pendente)}</td><td colspan="3"></td></tr></tfoot>
   </table></div>`;
@@ -1437,9 +1442,9 @@ function renderRateio(){
   </div>
   <div class="sec-hdr"><h2>Rateios Lançados no Mês</h2><div class="sec-line"></div></div>
   <div class="tbl-wrap"><table>
-    <thead><tr><th>Data</th><th>Valor Total</th><th>Divisão</th><th>Comprovantes</th><th></th></tr></thead>
+    <thead><tr><th class="data-cel">Data</th><th>Valor Total</th><th>Divisão</th><th>Comprovantes</th><th></th></tr></thead>
     <tbody>
-      ${lanc.length?lanc.map(r=>{const cotas=(r.partes&&r.partes.length)?calcularCotasAjustadas(r.valor,r.partes).map(c=>`${imovelNome(c.imovelId)}: ${fmt(c.cota)} (${c.pct}%)`).join(' · '):'<span class="dim">registro antigo, sem detalhamento — pode excluir e relançar</span>';return `<tr><td>${r.data||'—'}</td><td>${fmt(r.valor)}</td><td style="font-size:11px;text-align:left">${cotas}</td><td>${comprovantesLista(r)}</td><td><button class="btn-sm btn-ok" onclick="abrirEdicaoRateioLanc('${r.id}')">editar</button> <button class="btn-sm btn-ok" onclick="abrirAnexarComprovanteRateio('${r.id}')">+ anexar</button> <button class="btn-sm" onclick="delRateioLanc('${r.id}')">excluir</button></td></tr>`}).join(''):`<tr><td colspan="5"><div class="empty">Nenhum rateio lançado neste mês.</div></td></tr>`}
+      ${lanc.length?lanc.map(r=>{const cotas=(r.partes&&r.partes.length)?calcularCotasAjustadas(r.valor,r.partes).map(c=>`${imovelNome(c.imovelId)}: ${fmt(c.cota)} (${c.pct}%)`).join(' · '):'<span class="dim">registro antigo, sem detalhamento — pode excluir e relançar</span>';return `<tr><td class="data-cel">${r.data?formatarDataBR(r.data):'—'}</td><td>${fmt(r.valor)}</td><td style="font-size:11px;text-align:left">${cotas}</td><td>${comprovantesLista(r)}</td><td><button class="btn-sm btn-ok" onclick="abrirEdicaoRateioLanc('${r.id}')">editar</button> <button class="btn-sm btn-ok" onclick="abrirAnexarComprovanteRateio('${r.id}')">+ anexar</button> <button class="btn-sm" onclick="delRateioLanc('${r.id}')">excluir</button></td></tr>`}).join(''):`<tr><td colspan="5"><div class="empty">Nenhum rateio lançado neste mês.</div></td></tr>`}
     </tbody>
   </table></div>`;
 }
@@ -1623,9 +1628,9 @@ function renderPessoal(){
     <button class="btn-gold" onclick="addTransferencia()">+ Registrar Transferência</button>
   </div>
   <div class="tbl-wrap"><table>
-    <thead><tr><th>Data</th><th>Valor</th><th>Observação</th><th></th></tr></thead>
+    <thead><tr><th class="data-cel">Data</th><th>Valor</th><th>Observação</th><th></th></tr></thead>
     <tbody>
-      ${lst.length?lst.map(r=>`<tr><td>${r.data||'—'}</td><td class="neg">${fmt(r.valor)}</td><td class="dim">${r.obs||'—'}</td><td><button class="btn-sm" onclick="delItem('transferencias','${r.id}')">excluir</button></td></tr>`).join(''):`<tr><td colspan="4"><div class="empty">Nenhuma transferência neste mês.</div></td></tr>`}
+      ${lst.length?lst.map(r=>`<tr><td class="data-cel">${r.data?formatarDataBR(r.data):'—'}</td><td class="neg">${fmt(r.valor)}</td><td class="dim">${r.obs||'—'}</td><td><button class="btn-sm" onclick="delItem('transferencias','${r.id}')">excluir</button></td></tr>`).join(''):`<tr><td colspan="4"><div class="empty">Nenhuma transferência neste mês.</div></td></tr>`}
     </tbody>
     <tfoot><tr class="tfoot"><td>Total Transferido para Pessoal</td><td class="neg">${fmt(total)}</td><td colspan="2"></td></tr></tfoot>
   </table></div>`;
