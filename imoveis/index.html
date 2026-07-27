@@ -297,8 +297,10 @@ function doLogin(){
   const extra=CREDS_EXTRA.find(c=>c.u===u && c.p===p);
   if((u===CREDS.u && p===CREDS.p) || extra){
     sessionStorage.setItem('imoveisfg_auth','1');
+    sessionStorage.setItem('imoveisfg_user',u);
     document.getElementById('login-screen').style.display='none';
     initApp();
+    sincronizarTemaComNuvem();
   } else {
     document.getElementById('l-err').style.display='block';
   }
@@ -559,7 +561,8 @@ function renderAlugueis(){
       <div class="fl"><label>Data de Vencimento</label><input class="fi" id="al-vencimento" type="date"></div>
       <div class="fl"><label>Observação</label><input class="fi" id="al-obs" placeholder="opcional"></div>
     </div>
-    <button class="btn-gold" onclick="addAluguel()">+ Registrar Recebimento</button>
+    <div class="fl" style="margin-bottom:14px"><label>Comprovante de Repasse (opcional)</label><input class="fi" id="al-comprovante" type="file" accept=".pdf,image/*"></div>
+    <button class="btn-gold" onclick="addAluguel(this)">+ Registrar Recebimento</button>
   </div>
   ${modulos.map(tabelaModulo).join('')}
   <div class="form-card" style="border-color:var(--gold-dim);background:var(--gold-bg)">
@@ -569,13 +572,22 @@ function renderAlugueis(){
     </div>
   </div>`;
 }
-function addAluguel(){
+function addAluguel(btn){
   const imovelId=document.getElementById('al-im').value;
   if(!imovelId){notify('Cadastre e selecione um imóvel','err');return;}
-  const lst=load(pkPeriodo('alugueis'));
-  lst.push({id:uuid(),imovelId,bruto:+document.getElementById('al-bruto').value||0,liquido:+document.getElementById('al-liquido').value||0,data:document.getElementById('al-data').value,vencimento:document.getElementById('al-vencimento').value,obs:document.getElementById('al-obs').value.trim()});
-  save(pkPeriodo('alugueis'),lst);
-  notify('Recebimento registrado','ok');render();
+  const base={id:uuid(),imovelId,bruto:+document.getElementById('al-bruto').value||0,liquido:+document.getElementById('al-liquido').value||0,data:document.getElementById('al-data').value,vencimento:document.getElementById('al-vencimento').value,obs:document.getElementById('al-obs').value.trim()};
+  const fComp=document.getElementById('al-comprovante');
+  const textoOriginal=btn?btn.textContent:null;
+  if(btn){btn.disabled=true;btn.textContent='Enviando...';btn.style.opacity='0.6';}
+  const restaurar=()=>{if(btn){btn.disabled=false;btn.textContent=textoOriginal;btn.style.opacity='1';}};
+  lerArquivo(fComp,()=>nomeAutomatico(imovelNome(imovelId),'RECIBO'),(comp)=>{
+    base.comprovante=comp;
+    const lst=load(pkPeriodo('alugueis'));
+    lst.push(base);
+    save(pkPeriodo('alugueis'),lst);
+    restaurar();
+    notify('Recebimento registrado','ok');render();
+  });
 }
 function abrirEdicaoAluguel(id){
   const lst=load(pkPeriodo('alugueis'));
@@ -595,7 +607,9 @@ function abrirEdicaoAluguel(id){
         <div class="fl"><label>Data do Repasse</label><input class="fi" id="ea-data" type="date" value="${r.data||today()}"></div>
         <div class="fl"><label>Data de Vencimento</label><input class="fi" id="ea-vencimento" type="date" value="${r.vencimento||''}"></div>
       </div>
-      <div class="fl" style="margin-bottom:20px"><label>Observação</label><input class="fi" id="ea-obs" value="${(r.obs||'').replace(/"/g,'&quot;')}"></div>
+      <div class="fl" style="margin-bottom:12px"><label>Observação</label><input class="fi" id="ea-obs" value="${(r.obs||'').replace(/"/g,'&quot;')}"></div>
+      ${r.comprovante?`<div class="sec-note" style="margin:0 0 10px">Comprovante já anexado: ${comprovanteChipRotulo(r.comprovante,'📎 ANEXO')}. Pode anexar outro abaixo pra substituir, se quiser.</div>`:''}
+      <div class="fl" style="margin-bottom:20px"><label>Anexar/Alterar Comprovante de Repasse</label><input class="fi" id="ea-comprovante" type="file" accept=".pdf,image/*"></div>
       <div style="display:flex;gap:10px">
         <button class="btn-gold" style="flex:1" onclick="salvarEdicaoAluguel('${id}')">Salvar Alterações</button>
         <button class="btn-ghost" onclick="fecharModal()">Cancelar</button>
@@ -607,15 +621,26 @@ function salvarEdicaoAluguel(id){
   const lst=load(pkPeriodo('alugueis'));
   const r=lst.find(x=>x.id===id);
   if(!r)return;
-  r.imovelId=document.getElementById('ea-im').value;
-  r.bruto=+document.getElementById('ea-bruto').value||0;
-  r.liquido=+document.getElementById('ea-liquido').value||0;
-  r.data=document.getElementById('ea-data').value;
-  r.vencimento=document.getElementById('ea-vencimento').value;
-  r.obs=document.getElementById('ea-obs').value.trim();
-  save(pkPeriodo('alugueis'),lst);
-  fecharModal();
-  notify('Recebimento atualizado','ok');render();
+  const salvarResto=()=>{
+    r.imovelId=document.getElementById('ea-im').value;
+    r.bruto=+document.getElementById('ea-bruto').value||0;
+    r.liquido=+document.getElementById('ea-liquido').value||0;
+    r.data=document.getElementById('ea-data').value;
+    r.vencimento=document.getElementById('ea-vencimento').value;
+    r.obs=document.getElementById('ea-obs').value.trim();
+    save(pkPeriodo('alugueis'),lst);
+    fecharModal();
+    notify('Recebimento atualizado','ok');render();
+  };
+  const fComp=document.getElementById('ea-comprovante');
+  if(fComp && fComp.files[0]){
+    lerArquivo(fComp,()=>nomeAutomatico(imovelNome(document.getElementById('ea-im').value),'RECIBO'),(comp)=>{
+      if(comp)r.comprovante=comp;
+      salvarResto();
+    });
+  } else {
+    salvarResto();
+  }
 }
 
 // ── IMPORTAÇÃO DE RELATÓRIO PDF (Aprisco/Alude) ──
@@ -700,8 +725,16 @@ function handlePDFFile(input){
   const f=input.files[0];
   if(!f)return;
   document.getElementById('pdf-import-status').textContent='⟳ Lendo PDF...';
+  // 1) Sempre guarda o arquivo, independente do resultado da leitura/parse abaixo
+  const readerB64=new FileReader();
+  readerB64.onload=()=>{
+    _pdfPendingFile={nomeOriginal:f.name,mime:f.type,data:readerB64.result,tamanho:f.size};
+  };
+  readerB64.readAsDataURL(f);
+  // 2) Tenta extrair texto e dados — se falhar, o arquivo já foi guardado acima mesmo assim
   const readerBin=new FileReader();
   readerBin.onload=async()=>{
+    let parsed={};
     try{
       const typedarray=new Uint8Array(readerBin.result);
       const pdf=await pdfjsLib.getDocument({data:typedarray}).promise;
@@ -711,18 +744,13 @@ function handlePDFFile(input){
         const tc=await page.getTextContent();
         fullText+=tc.items.map(it=>it.str).join(' ')+' ';
       }
-      const parsed=parseRelatorioAlude(fullText);
-      const readerB64=new FileReader();
-      readerB64.onload=()=>{
-        _pdfPendingFile={nomeOriginal:f.name,mime:f.type,data:readerB64.result,tamanho:f.size};
-        abrirPreviewImportPDF(parsed);
-        document.getElementById('pdf-import-status').textContent='✓ PDF lido — confira os dados abaixo antes de lançar.';
-      };
-      readerB64.readAsDataURL(f);
+      parsed=parseRelatorioAlude(fullText);
+      document.getElementById('pdf-import-status').textContent='✓ PDF lido — confira os dados abaixo antes de lançar.';
     }catch(e){
       console.error(e);
-      document.getElementById('pdf-import-status').textContent='⚠ Não consegui ler este PDF automaticamente. Lance manualmente abaixo.';
+      document.getElementById('pdf-import-status').textContent='⚠ Não consegui ler os dados automaticamente, mas o arquivo foi anexado — preencha os campos manualmente abaixo.';
     }
+    abrirPreviewImportPDF(parsed);
   };
   readerBin.readAsArrayBuffer(f);
 }
@@ -865,7 +893,7 @@ function renderRepasses(){
     <div class="fg">
       <div class="fl"><label>Boleto (a conta a ser paga)</label><input class="fi" id="rp-file-boleto" type="file" accept=".pdf,image/*"></div>
       <div class="fl"><label>Comprovante de Pagamento 1</label><input class="fi" id="rp-file-comp" type="file" accept=".pdf,image/*"></div>
-      <div class="fl"><label>Comprovante de Pagamento 2 (opcional)</label><input class="fi" id="rp-file-comp2" type="file" accept=".pdf,image/*"></div>
+      <div class="fl"><label>Comprovante de Pagamento 2</label><input class="fi" id="rp-file-comp2" type="file" accept=".pdf,image/*"></div>
     </div>
     <button class="btn-gold" style="margin-top:14px" onclick="addRepasse(this)">+ Registrar</button>
   </div>
@@ -923,7 +951,7 @@ function abrirEdicaoRepasse(id){
         ${r.comprovantePagamento?`<div class="sec-note" style="margin:0 0 10px">Comprovante 1 já anexado: ${comprovanteChipRotulo(r.comprovantePagamento,'🧾 COMPROV. 1')}. Pode anexar outro abaixo pra substituir, se quiser.</div>`:''}
         <div class="fl" style="margin-bottom:12px"><label>Comprovante de Pagamento 1 ${r.comprovantePagamento?'(opcional — já existe um)':'<span style="color:var(--red)">*obrigatório para status Pago</span>'}</label><input class="fi" id="er-comprovante" type="file" accept=".pdf,image/*"></div>
         ${r.comprovantePagamento2?`<div class="sec-note" style="margin:0 0 10px">Comprovante 2 já anexado: ${comprovanteChipRotulo(r.comprovantePagamento2,'🧾 COMPROV. 2')}.</div>`:''}
-        <div class="fl" style="margin-bottom:12px"><label>Comprovante de Pagamento 2 (opcional)</label><input class="fi" id="er-comprovante2" type="file" accept=".pdf,image/*"></div>
+        <div class="fl" style="margin-bottom:12px"><label>Comprovante de Pagamento 2</label><input class="fi" id="er-comprovante2" type="file" accept=".pdf,image/*"></div>
       </div>
       <div id="er-erro" style="font-size:12px;color:var(--red);margin-bottom:12px;display:none">Anexe o comprovante de pagamento para salvar como Pago.</div>
       <div class="fl" style="margin-bottom:20px"><label>Observações</label><input class="fi" id="er-obs" value="${(r.obs||'').replace(/"/g,'&quot;')}"></div>
@@ -1014,7 +1042,7 @@ function marcarRepassePago(id){
       <div class="fl" style="margin-bottom:12px"><label>Data do Pagamento</label><input class="fi" id="mp-data" type="date" value="${today()}"></div>
       <div class="fl" style="margin-bottom:12px"><label>Boleto (opcional)</label><input class="fi" id="mp-boleto" type="file" accept=".pdf,image/*"></div>
       <div class="fl" style="margin-bottom:8px"><label>Comprovante de Pagamento 1 <span style="color:var(--red)">*obrigatório</span></label><input class="fi" id="mp-comp" type="file" accept=".pdf,image/*"></div>
-      <div class="fl" style="margin-bottom:8px"><label>Comprovante de Pagamento 2 (opcional)</label><input class="fi" id="mp-comp2" type="file" accept=".pdf,image/*"></div>
+      <div class="fl" style="margin-bottom:8px"><label>Comprovante de Pagamento 2</label><input class="fi" id="mp-comp2" type="file" accept=".pdf,image/*"></div>
       <div id="mp-erro" style="font-size:12px;color:var(--red);margin-bottom:12px;display:none">Anexe o comprovante de pagamento para poder marcar como pago.</div>
       <div style="display:flex;gap:10px">
         <button class="btn-gold" style="flex:1" onclick="confirmarRepassePago('${id}')">Confirmar Pagamento</button>
@@ -1816,7 +1844,7 @@ function initApp(){
 
 // ── TEMA CLARO / ESCURO ──
 function aplicarTema(tema){
-  document.body.classList.toggle('dark-mode',tema==='dark');
+  document.documentElement.classList.toggle('dark-mode',tema==='dark');
   const label=document.getElementById('theme-toggle-label');
   if(label)label.textContent=tema==='dark'?'🛡️ Brightness':'⚔️ Darkness';
 }
@@ -1825,13 +1853,36 @@ function alternarTema(){
   const novo=atual==='dark'?'light':'dark';
   localStorage.setItem('imoveisfg_theme',novo);
   aplicarTema(novo);
+  const usuario=sessionStorage.getItem('imoveisfg_user');
+  if(usuario){
+    localStorage.setItem('imoveisfg_theme_'+usuario,novo);
+    _db.ref('imoveisfg_theme/'+usuario).set(novo).catch(e=>console.error('Erro ao sincronizar tema:',e));
+  }
 }
-aplicarTema(localStorage.getItem('imoveisfg_theme')==='dark'?'dark':'light');
+function sincronizarTemaComNuvem(){
+  const usuario=sessionStorage.getItem('imoveisfg_user');
+  if(!usuario)return;
+  _db.ref('imoveisfg_theme/'+usuario).once('value').then(snap=>{
+    const remoto=snap.val();
+    if(remoto && remoto!==localStorage.getItem('imoveisfg_theme')){
+      localStorage.setItem('imoveisfg_theme',remoto);
+      localStorage.setItem('imoveisfg_theme_'+usuario,remoto);
+      aplicarTema(remoto);
+    }
+  }).catch(e=>console.error('Erro ao buscar tema salvo:',e));
+}
+// Aplica na hora, direto do localStorage (evita flash de tela clara antes de escurecer)
+(function(){
+  const usuario=sessionStorage.getItem('imoveisfg_user');
+  const temaSalvo=(usuario && localStorage.getItem('imoveisfg_theme_'+usuario))||localStorage.getItem('imoveisfg_theme');
+  aplicarTema(temaSalvo==='dark'?'dark':'light');
+})();
 
 // ── BOOT ──
 if(sessionStorage.getItem('imoveisfg_auth')==='1'){
   document.getElementById('login-screen').style.display='none';
   initApp();
+  sincronizarTemaComNuvem();
 } else {
   document.getElementById('login-screen').style.display='flex';
 }
