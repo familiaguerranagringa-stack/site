@@ -843,14 +843,13 @@ function statusBadge(r){
   const status=typeof r==='string'?r:r.status;
   const badgeDe=(v,labelFallback)=>{const s=STATUS_REPASSE.find(x=>x.v===v);return `<span class="badge ${s?s.badge:'b-pend'}">${s?s.l:labelFallback}</span>`;};
   if(status==='pago') return badgeDe('pago','Pago');
-  if(status==='vencida') return badgeDe('vencida','Vencida'); // override manual
-  if(status==='a_vencer') return badgeDe('a_vencer','A Vencer'); // override manual
+  // A Vencer/Vencida NUNCA ficam travados no valor salvo — são sempre recalculados pela data de vencimento
   const vencStr=typeof r==='object'?r.envio:null;
   const dias=diasParaVencimento(vencStr);
-  if(dias!==null){
-    if(dias<0) return badgeDe('vencida','Vencida');
-    if(dias<=5) return badgeDe('a_vencer','A Vencer');
-  }
+  if(dias===null) return badgeDe('a_pagar','A Pagar'); // sem data cadastrada
+  if(dias<0) return badgeDe('vencida','Vencida');
+  if(dias===0) return badgeDe('a_pagar','A Pagar'); // vence hoje
+  if(dias<=5) return badgeDe('a_vencer','A Vencer');
   return badgeDe('a_pagar','A Pagar');
 }
 function renderRepasses(){
@@ -1291,8 +1290,8 @@ function parseVencimentoGenerico(textoOriginal){
 }
 async function ocrExtrairTexto(imageSourceCanvasOrDataUrl){
   if(!window.Tesseract) throw new Error('OCR indisponível (biblioteca não carregou)');
-  const OCR_TIMEOUT_MS=15000;
-  const timeoutPromise=new Promise((_,reject)=>setTimeout(()=>reject(new Error('OCR excedeu o tempo limite de 15s')),OCR_TIMEOUT_MS));
+  const OCR_TIMEOUT_MS=3000;
+  const timeoutPromise=new Promise((_,reject)=>setTimeout(()=>reject(new Error('OCR excedeu o tempo limite de 3s')),OCR_TIMEOUT_MS));
   const ocrPromise=Tesseract.recognize(imageSourceCanvasOrDataUrl,'por').then(r=>r.data.text||'');
   return await Promise.race([ocrPromise,timeoutPromise]);
 }
@@ -1323,7 +1322,10 @@ let _rateioPendingFile=null;
 function handleRateioFile(input){
   const f=input.files[0];
   if(!f)return;
-  const statusEl=document.getElementById('rt-file-status');
+  const statusEl={
+    get textContent(){const el=document.getElementById('rt-file-status');return el?el.textContent:'';},
+    set textContent(v){const el=document.getElementById('rt-file-status');if(el)el.textContent=v;}
+  };
   statusEl.textContent='⟳ Lendo arquivo...';
   const finalizarAnexo=()=>{
     lerArquivoCore(f,()=>nomeAutomatico('RATEIO','CONTA'),(comp)=>{ _rateioPendingFile=comp; });
@@ -1333,23 +1335,29 @@ function handleRateioFile(input){
       document.getElementById('rt-valor-total').value=valor.toFixed(2);
       atualizarRateioPreview();
       statusEl.textContent='✓ Valor lido'+(origem?' ('+origem+')':'')+': '+fmt(valor)+(venc?' — vencimento '+venc:'')+' — confira antes de confirmar.';
-    }else{
-      statusEl.textContent='⚠ Não consegui identificar o valor total automaticamente. Preencha manualmente abaixo.';
+      return true;
     }
     if(venc){
       const [dd,mm,yyyy]=venc.split('/');
       const dataEl=document.getElementById('rt-data');
       if(dataEl)dataEl.value=`${yyyy}-${mm}-${dd}`;
     }
+    return false;
+  };
+  const desistirComFoco=()=>{
+    statusEl.textContent='Preencha o valor manualmente (arquivo salvo com sucesso)';
+    const campoValor=document.getElementById('rt-valor-total');
+    if(campoValor)campoValor.focus();
   };
   const tentarOcrImagem=async(src)=>{
     try{
-      statusEl.textContent='⟳ Não achei texto direto — tentando reconhecer por OCR (até 15s)...';
+      statusEl.textContent='⟳ Não achei texto direto — tentando reconhecer por OCR (até 3s)...';
       const texto=await ocrExtrairTexto(src);
-      aplicarResultado(parseValorTotalGenerico(texto),parseVencimentoGenerico(texto),'via OCR');
+      const achou=aplicarResultado(parseValorTotalGenerico(texto),parseVencimentoGenerico(texto),'via OCR');
+      if(!achou)desistirComFoco();
     }catch(e){
       console.error('Erro na leitura do PDF:',e);
-      statusEl.textContent='⚠️ Arquivo em formato de imagem/escaneado. Digite o valor manualmente.';
+      desistirComFoco();
     }
   };
   if(f.type==='application/pdf'){
@@ -1357,20 +1365,20 @@ function handleRateioFile(input){
     readerBin.onload=async()=>{
       let fullText='';
       let pdfDoc=null;
+      const bytes=new Uint8Array(readerBin.result);
       // ── ETAPA 1: texto nativo do PDF ──
       try{
-        const typedarray=new Uint8Array(readerBin.result);
-        pdfDoc=await pdfjsLib.getDocument({data:typedarray}).promise;
+        pdfDoc=await pdfjsLib.getDocument({data:bytes}).promise;
         for(let p=1;p<=pdfDoc.numPages;p++){
           const page=await pdfDoc.getPage(p);
           const tc=await page.getTextContent();
           fullText+=tc.items.map(it=>it.str).join(' ')+' ';
         }
-        console.log('ETAPA 1 — texto extraído do PDF:',fullText);
+        console.log('Linhas de texto extraídas do PDF:',fullText);
       }catch(e){
         console.error('ETAPA 1 falhou (texto nativo):',e);
       }
-      // ── ETAPA 2: valor a partir do texto (padrões explícitos + linha digitável, ambos dentro de parseValorTotalGenerico) ──
+      // ── ETAPA 2: valor a partir do texto (padrões explícitos + linha digitável, dentro de parseValorTotalGenerico) ──
       let valor=0,venc=null;
       try{
         if(fullText && fullText.trim().length>=10){
@@ -1385,7 +1393,22 @@ function handleRateioFile(input){
         finalizarAnexo();
         return;
       }
-      // ── ETAPA 3: OCR via canvas (PDF escaneado/sem camada de texto, ou etapas 1-2 não acharam nada) ──
+      // ── ETAPA 2.5: varredura da linha digitável direto nos bytes crus do arquivo ──
+      // Contas de água/concessionária costumam manter a linha digitável no fluxo de dados
+      // do PDF mesmo quando o texto visual é imagem/vetor — procuramos aqui antes de partir pro OCR.
+      try{
+        const textoBruto=new TextDecoder('latin1').decode(bytes);
+        console.log('Linhas de texto extraídas do PDF (varredura bruta):',textoBruto.slice(0,2000));
+        const valorBruto=parseLinhaDigitavelValor(textoBruto);
+        if(valorBruto>0){
+          aplicarResultado(valorBruto,null,'linha digitável');
+          finalizarAnexo();
+          return;
+        }
+      }catch(e){
+        console.error('ETAPA 2.5 falhou (varredura de bytes crus):',e);
+      }
+      // ── ETAPA 3: OCR via canvas, com prazo curto — se não achar em 3s, desiste e libera o preenchimento manual ──
       try{
         let canvas;
         if(pdfDoc){
@@ -1397,12 +1420,12 @@ function handleRateioFile(input){
           preprocessarCanvasParaOcr(canvas);
         } else {
           // Etapa 1 nem conseguiu abrir o PDF — tenta abrir de novo, isoladamente, só pra renderizar a página
-          canvas=await pdfPrimeiraPaginaParaCanvas(new Uint8Array(readerBin.result));
+          canvas=await pdfPrimeiraPaginaParaCanvas(bytes);
         }
         await tentarOcrImagem(canvas);
       }catch(e){
         console.error('Erro na leitura do PDF:',e);
-        statusEl.textContent='⚠️ Arquivo em formato de imagem/escaneado. Digite o valor manualmente.';
+        desistirComFoco();
       }
       finalizarAnexo();
     };
@@ -1454,8 +1477,11 @@ function renderRateio(){
       <div class="fl"><label>Dividir em quantas partes?</label><select class="fi" id="rt-qtd" onchange="ST.rateioQtd=+this.value;renderRateioLinhas(+this.value)">${[1,2,3,4,5,6,7,8,9,10].map(n=>`<option value="${n}"${n===qtd?' selected':''}>${n}</option>`).join('')}</select></div>
       <div class="fl"><label>Tipo</label><select class="fi" id="rt-tipo">${['IPTU','Água','Condomínio','Luz','Internet','Manutenção','Outro'].map(t=>`<option${editando&&editando.tipo===t?' selected':''}>${t}</option>`).join('')}</select></div>
       <div class="fl"><label>Forma de Pagamento</label><select class="fi" id="rt-forma"><option${!editando||editando.formaPagamento==='Boleto'?' selected':''}>Boleto</option><option${editando&&editando.formaPagamento==='Pix'?' selected':''}>Pix</option></select></div>
-      <div class="fl"><label>Status</label><select class="fi" id="rt-status">${statusOptions(editando?editando.status:'a_pagar')}</select></div>
+      <div class="fl"><label>Status</label><select class="fi" id="rt-status" onchange="toggleComprovantePgtoRateio()">${statusOptions(editando?editando.status:'a_pagar')}</select></div>
       <div class="fl"><label>Observações</label><input class="fi" id="rt-obs" placeholder="opcional" value="${editando?(editando.obs||'').replace(/"/g,'&quot;'):''}"></div>
+    </div>
+    <div id="rt-comprovante-pgto-wrap" style="display:${editando&&editando.status==='pago'?'block':'none'};margin-bottom:14px">
+      <div class="fl"><label>Anexar Comprovante de Pagamento <span style="color:var(--red)">*obrigatório</span></label><input class="fi" id="rt-comprovante-pgto" type="file" accept=".pdf,image/*"></div>
     </div>
     <div id="rt-linhas-container" style="margin:14px 0"></div>
     <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px">
@@ -1489,6 +1515,18 @@ function renderRateioLinhas(n){
   const container=document.getElementById('rt-linhas-container');
   if(container){container.innerHTML=html;atualizarRateioPreview();}
 }
+function toggleComprovantePgtoRateio(){
+  const status=document.getElementById('rt-status').value;
+  const wrap=document.getElementById('rt-comprovante-pgto-wrap');
+  const input=document.getElementById('rt-comprovante-pgto');
+  if(status==='pago'){
+    wrap.style.display='block';
+    if(input)input.setAttribute('required','required');
+  } else {
+    wrap.style.display='none';
+    if(input){input.removeAttribute('required');input.value='';}
+  }
+}
 function atualizarRateioPreview(){
   const total=+document.getElementById('rt-valor-total')?.value||0;
   const pcts=[...document.querySelectorAll('.rt-linha-pct')];
@@ -1521,30 +1559,42 @@ function confirmarRateio(){
   const formaSel=document.getElementById('rt-forma').value;
   const statusSel=document.getElementById('rt-status').value;
   const obsSel=document.getElementById('rt-obs').value.trim();
-  const base={id:uuid(),valor:total,data,partes,tipo:tipoSel,formaPagamento:formaSel,status:statusSel,obs:obsSel,comprovantes:_rateioPendingFile?[_rateioPendingFile]:[]};
-  const lst=load(pkPeriodo('rateio_lanc'));
-  lst.push(base);
-  save(pkPeriodo('rateio_lanc'),lst);
-  // gera automaticamente uma despesa direta por imóvel, com a cota calculada
-  const desp=load(pkPeriodo('despesas'));
-  calcularCotasAjustadas(total,partes).forEach(c=>{
-    if(c.cota>0){
-      desp.push({id:uuid(),imovelId:c.imovelId,desc:`Conta rateada (${c.pct}%)`,valor:c.cota,forma:'Rateio',data,comprovantes:[],rateioLancId:base.id});
-    }
-  });
-  save(pkPeriodo('despesas'),desp);
-  // gera também um lançamento em "Contas" (repasses) por imóvel, vinculado ao rateio
-  const rep=load(pkPeriodo('repasses'));
-  calcularCotasAjustadas(total,partes).forEach(c=>{
-    if(c.cota>0){
-      rep.push({id:uuid(),imovelId:c.imovelId,tipo:tipoSel,valor:c.cota,envio:data,formaPagamento:formaSel,status:statusSel,obs:obsSel,boleto:_rateioPendingFile||null,rateioLancId:base.id});
-    }
-  });
-  save(pkPeriodo('repasses'),rep);
-  document.getElementById('rt-file-input').value='';
-  document.getElementById('rt-file-status').textContent='';
-  _rateioPendingFile=null;
-  notify('Rateio confirmado — lançado como despesa e em Contas para cada imóvel','ok');render();
+  const fComprovantePgto=document.getElementById('rt-comprovante-pgto');
+  if(statusSel==='pago' && (!fComprovantePgto||!fComprovantePgto.files[0])){
+    notify('Status "Pago" exige o comprovante de pagamento anexado','err');
+    return;
+  }
+  const finalizar=(comprovantePgto)=>{
+    const base={id:uuid(),valor:total,data,partes,tipo:tipoSel,formaPagamento:formaSel,status:statusSel,obs:obsSel,comprovantes:_rateioPendingFile?[_rateioPendingFile]:[]};
+    const lst=load(pkPeriodo('rateio_lanc'));
+    lst.push(base);
+    save(pkPeriodo('rateio_lanc'),lst);
+    // gera automaticamente uma despesa direta por imóvel, com a cota calculada
+    const desp=load(pkPeriodo('despesas'));
+    calcularCotasAjustadas(total,partes).forEach(c=>{
+      if(c.cota>0){
+        desp.push({id:uuid(),imovelId:c.imovelId,desc:`Conta rateada (${c.pct}%)`,valor:c.cota,forma:'Rateio',data,comprovantes:[],rateioLancId:base.id});
+      }
+    });
+    save(pkPeriodo('despesas'),desp);
+    // gera também um lançamento em "Contas" (repasses) por imóvel, vinculado ao rateio
+    const rep=load(pkPeriodo('repasses'));
+    calcularCotasAjustadas(total,partes).forEach(c=>{
+      if(c.cota>0){
+        rep.push({id:uuid(),imovelId:c.imovelId,tipo:tipoSel,valor:c.cota,envio:data,formaPagamento:formaSel,status:statusSel,obs:obsSel,boleto:_rateioPendingFile||null,comprovantePagamento:comprovantePgto||null,dataPagamento:statusSel==='pago'?today():null,rateioLancId:base.id});
+      }
+    });
+    save(pkPeriodo('repasses'),rep);
+    document.getElementById('rt-file-input').value='';
+    document.getElementById('rt-file-status').textContent='';
+    _rateioPendingFile=null;
+    notify('Rateio confirmado — lançado como despesa e em Contas para cada imóvel','ok');render();
+  };
+  if(statusSel==='pago' && fComprovantePgto.files[0]){
+    lerArquivo(fComprovantePgto,()=>nomeAutomatico('RATEIO',tipoSel+'-COMPROVANTE'),(comp)=>{finalizar(comp);});
+  } else {
+    finalizar(null);
+  }
 }
 function abrirEdicaoRateioLanc(id){
   ST.rateioEditandoId=id;
@@ -1575,32 +1625,45 @@ function salvarEdicaoRateio(id){
   const formaSel=document.getElementById('rt-forma').value;
   const statusSel=document.getElementById('rt-status').value;
   const obsSel=document.getElementById('rt-obs').value.trim();
-  r.valor=total;r.data=data;r.partes=partes;r.tipo=tipoSel;r.formaPagamento=formaSel;r.status=statusSel;r.obs=obsSel;
-  if(_rateioPendingFile){
-    if(!r.comprovantes)r.comprovantes=[];
-    r.comprovantes.push(_rateioPendingFile);
+  const fComprovantePgto=document.getElementById('rt-comprovante-pgto');
+  const jaTemComprovantePgto=load(pkPeriodo('repasses')).find(x=>x.rateioLancId===id&&x.comprovantePagamento);
+  if(statusSel==='pago' && !jaTemComprovantePgto && (!fComprovantePgto||!fComprovantePgto.files[0])){
+    notify('Status "Pago" exige o comprovante de pagamento anexado','err');
+    return;
   }
-  save(pkPeriodo('rateio_lanc'),lst);
-  // regenera despesas e lançamentos em Contas vinculados a este rateio, com os valores atualizados
-  const desp=load(pkPeriodo('despesas')).filter(d=>d.rateioLancId!==id);
-  calcularCotasAjustadas(total,partes).forEach(c=>{
-    if(c.cota>0){
-      desp.push({id:uuid(),imovelId:c.imovelId,desc:`Conta rateada (${c.pct}%)`,valor:c.cota,forma:'Rateio',data,comprovantes:[],rateioLancId:id});
+  const finalizarEdicao=(comprovantePgto)=>{
+    r.valor=total;r.data=data;r.partes=partes;r.tipo=tipoSel;r.formaPagamento=formaSel;r.status=statusSel;r.obs=obsSel;
+    if(_rateioPendingFile){
+      if(!r.comprovantes)r.comprovantes=[];
+      r.comprovantes.push(_rateioPendingFile);
     }
-  });
-  save(pkPeriodo('despesas'),desp);
-  const rep=load(pkPeriodo('repasses')).filter(x=>x.rateioLancId!==id);
-  calcularCotasAjustadas(total,partes).forEach(c=>{
-    if(c.cota>0){
-      rep.push({id:uuid(),imovelId:c.imovelId,tipo:tipoSel,valor:c.cota,envio:data,formaPagamento:formaSel,status:statusSel,obs:obsSel,boleto:(r.comprovantes&&r.comprovantes.length)?r.comprovantes[r.comprovantes.length-1]:null,rateioLancId:id});
-    }
-  });
-  save(pkPeriodo('repasses'),rep);
-  ST.rateioEditandoId=null;
-  document.getElementById('rt-file-input').value='';
-  document.getElementById('rt-file-status').textContent='';
-  _rateioPendingFile=null;
-  notify('Rateio atualizado — despesas e lançamentos em Contas foram recalculados','ok');render();
+    save(pkPeriodo('rateio_lanc'),lst);
+    // regenera despesas e lançamentos em Contas vinculados a este rateio, com os valores atualizados
+    const desp=load(pkPeriodo('despesas')).filter(d=>d.rateioLancId!==id);
+    calcularCotasAjustadas(total,partes).forEach(c=>{
+      if(c.cota>0){
+        desp.push({id:uuid(),imovelId:c.imovelId,desc:`Conta rateada (${c.pct}%)`,valor:c.cota,forma:'Rateio',data,comprovantes:[],rateioLancId:id});
+      }
+    });
+    save(pkPeriodo('despesas'),desp);
+    const rep=load(pkPeriodo('repasses')).filter(x=>x.rateioLancId!==id);
+    calcularCotasAjustadas(total,partes).forEach(c=>{
+      if(c.cota>0){
+        rep.push({id:uuid(),imovelId:c.imovelId,tipo:tipoSel,valor:c.cota,envio:data,formaPagamento:formaSel,status:statusSel,obs:obsSel,boleto:(r.comprovantes&&r.comprovantes.length)?r.comprovantes[r.comprovantes.length-1]:null,comprovantePagamento:comprovantePgto||(jaTemComprovantePgto?jaTemComprovantePgto.comprovantePagamento:null),dataPagamento:statusSel==='pago'?today():null,rateioLancId:id});
+      }
+    });
+    save(pkPeriodo('repasses'),rep);
+    ST.rateioEditandoId=null;
+    document.getElementById('rt-file-input').value='';
+    document.getElementById('rt-file-status').textContent='';
+    _rateioPendingFile=null;
+    notify('Rateio atualizado — despesas e lançamentos em Contas foram recalculados','ok');render();
+  };
+  if(statusSel==='pago' && fComprovantePgto && fComprovantePgto.files[0]){
+    lerArquivo(fComprovantePgto,()=>nomeAutomatico('RATEIO',tipoSel+'-COMPROVANTE'),(comp)=>{finalizarEdicao(comp);});
+  } else {
+    finalizarEdicao(null);
+  }
 }
 function delRateioLanc(id){
   if(!confirm('Excluir este rateio? As despesas e os lançamentos em Contas criados automaticamente para cada imóvel também serão removidos.'))return;
@@ -1802,6 +1865,7 @@ function render(){
   try{
     document.getElementById('content').innerHTML=(fns[ST.tab]||(()=>''))();
     if(ST.tab==='rateio'){
+      toggleComprovantePgtoRateio();
       if(ST.rateioEditandoId){
         const r=load(pkPeriodo('rateio_lanc')).find(x=>x.id===ST.rateioEditandoId);
         if(r && r.partes && r.partes.length){
