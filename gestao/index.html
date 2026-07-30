@@ -169,6 +169,7 @@ tr:hover td{background:var(--bg-hover)}
     <button class="sb-item" data-tab="verificacao" onclick="setTab('verificacao',this)">📋 Verificação Mensal</button>
     <button class="sb-item" data-tab="markup" onclick="setTab('markup',this)">📐 Markup</button>
     <button class="sb-item" data-tab="dre" onclick="setTab('dre',this)">📊 DRE</button>
+<button class="sb-item" data-tab="bancaria" onclick="setTab('bancaria',this)">🏦 Gestão Bancária</button>
     <div class="sb-bottom">
 
       <button class="sb-item" id="wake-toggle-btn" onclick="toggleWakeMode()" style="width:100%;margin:0">🔇 Modo Alexa: OFF</button>
@@ -395,7 +396,7 @@ function changePeriod(){
 
 
 // TAB
-const TITLES={dashboard:'Dashboard',entradas:'Entradas',saidas:'Saídas',financeiras:'Financeiras',verificacao:'Verificação Mensal',markup:'Markup',dre:'DRE — Resultado do Exercício'};
+const TITLES={bancaria:'Gestão Bancária',dashboard:'Dashboard',entradas:'Entradas',saidas:'Saídas',financeiras:'Financeiras',verificacao:'Verificação Mensal',markup:'Markup',dre:'DRE — Resultado do Exercício'};
 function setTab(tab,btn){
   ST.tab=tab;
   document.querySelectorAll('.sb-item').forEach(b=>b.classList.remove('active'));
@@ -406,7 +407,7 @@ function render(){
   const t=document.getElementById('tb-title');
   t.textContent=TITLES[ST.tab]||'';t.dataset.orig=t.textContent;
   document.getElementById('content').innerHTML='';
-  ({dashboard:renderDash,entradas:renderEntradas,saidas:renderSaidas,financeiras:renderFin,verificacao:renderVerif,markup:renderMarkup,dre:renderDRE}[ST.tab]||function(){})();
+  ({dashboard:renderDash,entradas:renderEntradas,saidas:renderSaidas,financeiras:renderFin,verificacao:renderVerif,markup:renderMarkup,dre:renderDRE,bancaria:renderBancaria}[ST.tab]||function(){})();
 }
 
 // CALCS
@@ -723,7 +724,8 @@ function renderSaidas(){
     <div class="fg">
       <div class="fl"><label>Data</label><input class="fi" type="date" id="s-dt" value="${today()}"></div>
       <div class="fl"><label>Categoria</label><select class="fi" id="s-cat">${catO}</select></div>
-      <div class="fl"><label>Forma de Pagamento</label><select class="fi" id="s-forma">${fmO}</select></div>
+      <div class="fl"><label>Banco Débito</label><select class="fi" id="s-banco"><option value="pagbank">PagBank</option><option value="infinitepay">InfinitePay</option><option value="malote">Malote</option><option value="getnet">GetNet</option></select></div>
+<div class="fl"><label>Forma de Pagamento</label><select class="fi" id="s-forma">${fmO}</select></div>
       <div class="fl"><label>Valor R$</label><input class="fi" type="number" step="0.01" id="s-val" placeholder="0,00" onkeydown="enterNext(event,'s-desc')"></div>
       <div class="fl" style="grid-column:span 2"><label>Descrição / Fornecedor</label><input class="fi" type="text" id="s-desc" placeholder="Ex: Conta de luz, Passagem Gerson, Compra Korai..." onkeydown="if(event.key==='Enter'){event.preventDefault();addSaida()}"></div>
     </div>
@@ -766,7 +768,7 @@ function addSaida(){
   if(!dt){notify('Selecione a data','err');return}
   const val=+document.getElementById('s-val').value;
   if(!val){notify('Informe o valor','err');return}
-  data.push({id:uuid(),data:dt,cat:document.getElementById('s-cat').value,forma:document.getElementById('s-forma').value,val,desc:document.getElementById('s-desc').value});
+  data.push({id:uuid(),data:dt,cat:document.getElementById('s-cat').value,forma:document.getElementById('s-forma').value,banco:(document.getElementById('s-banco')||{}).value||'pagbank',val,desc:document.getElementById('s-desc').value});
   data.sort((a,b)=>a.data.localeCompare(b.data));
   save('saidas',data);notify('Saída registrada!','ok');renderSaidas();
 }
@@ -1537,15 +1539,17 @@ function renderDRE(){
   const totalSaidas=verifMensal+bancoSaidas+t.compras;
 
   // ── Bancos
-  // Taxas individuais por banco (PagBank e GetNet separados)
-  const tcartSum=t.en.reduce((s,r)=>s+(+r.tcart||0),0);  // taxa cartão PagBank
-  const tpixSum =t.en.reduce((s,r)=>s+(+r.tpix||0),0);   // taxa PIX
-  const tgetnetSum=t.en.reduce((s,r)=>s+(+r.tgetnet||0),0); // taxa GetNet
-  // PagBank: (cart líq) + (pix líq) + rendimentos + fin.recebidas - saídas - verif - compras
-  const pagbank=(t.cart-tcartSum)+(t.pix-tpixSum)+t.rend+t.finRecebido-bancoSaidas-verifMensal-t.compras;
+  // Bancos: usar calcSaldoBancos() para consistência com Gestão Bancária
+  const _sb=calcSaldoBancos();
+  const tcartSum=t.en.reduce((s,r)=>s+(+r.tcart||0),0);
+  const tpixSum =t.en.reduce((s,r)=>s+(+r.tpix||0),0);
+  const tgetnetSum=t.en.reduce((s,r)=>s+(+r.tgetnet||0),0);
+  const pagbank=_sb.pagbank;
   const malote=t.din;
-  const santander=(t.getnet||0)-tgetnetSum; // GetNet líquido
-  const totalBancos=pagbank+malote+santander;
+  const santander=_sb.getnet; // GetNet líquido
+  const maloteB=_sb.malote; // Dinheiro (Malote)
+  const infinitepay=_sb.infinitepay; // InfinitePay (PIX)
+  const totalBancos=pagbank+maloteB+santander+infinitepay;
 
   // ── Faturamento
   const fatTotal=t.din+t.pix+t.cart+(t.getnet||0)+t.finVendas+t.rend+t.cred;
@@ -1598,7 +1602,8 @@ function renderDRE(){
 
     ${card(`${H('Bancos','#7FB8C9')}
       ${R('PagBank',pagbank,'pos')}
-      ${R('Saldo Malote',malote,'pos')}
+      ${R('InfinitePay',infinitepay,'pos')}
+      ${R('Malote (Dinheiro)',maloteB,'pos')}
       ${R('Santander (GetNet)',santander,'pos')}
       ${Rtot('TOTAL',totalBancos,'pos')}`)}
 
@@ -2552,6 +2557,130 @@ function migrarVendedores(){
       console.log('[migrarVendedores] concluído');
     }
   }catch(e){console.warn('migrarVendedores:',e);}
+}
+
+// ── GESTÃO BANCÁRIA ─────────────────────────────────────
+function getTransferencias(){return JSON.parse(localStorage.getItem('srcapas_trans_'+ST.empresa+'_'+ST.ano+'_'+String(ST.mes).padStart(2,'0'))||'[]');}
+function saveTransferencias(arr){localStorage.setItem('srcapas_trans_'+ST.empresa+'_'+ST.ano+'_'+String(ST.mes).padStart(2,'0'),JSON.stringify(arr));scheduleSync();}
+
+function calcSaldoBancos(){
+  const t=calcTotais();
+  const sa=t.sa;
+  const trans=getTransferencias();
+  const v=getVerif();
+  const creds_b=v.cred||[];
+
+  // Taxa por banco
+  const tcartB=t.en.reduce((s,r)=>s+(+r.tcart||0),0);
+  const tpixB =t.en.reduce((s,r)=>s+(+r.tpix||0),0);
+  const tgetnetB=t.en.reduce((s,r)=>s+(+r.tgetnet||0),0);
+
+  // Saídas por banco (excluindo compras que ficam em pagbank por padrão)
+  const saiBanco=(bid)=>sa.filter(r=>(r.banco||'pagbank')===bid).reduce((s,r)=>s+(+r.val||0),0);
+  const comprasBanco=(bid)=>sa.filter(r=>(r.banco||'pagbank')===bid&&r.cat==='Compra Mercadoria').reduce((s,r)=>s+(+r.val||0),0);
+
+  // Transferências
+  const tIn=(bid)=>trans.filter(tr=>tr.para===bid).reduce((s,tr)=>s+(+tr.valor||0),0);
+  const tOut=(bid)=>trans.filter(tr=>tr.de===bid).reduce((s,tr)=>s+(+tr.valor||0),0);
+
+  // Verificação mensal (pessoal pago + custos pagos) → débita do PagBank
+  const pessoalPagoB=(v.f||[]).filter(f=>f.st==='PAGO').reduce((s,f)=>{
+    const bon=+f.bonificacao||0;
+    const parc=((v.cred||[]).filter(cr=>cr.funId===f.id&&cr.st==='ativo').reduce((ps,cr)=>{
+      if(!cr.dataInicio)return ps+(+cr.valorParcela||0);
+      const ini=new Date(cr.dataInicio+'T12:00:00');
+      const md=(ST.ano-ini.getFullYear())*12+(ST.mes-(ini.getMonth()+1));
+      return md>=0&&md<(+cr.parcelas||1)?ps+(+cr.valorParcela||0):ps;
+    },0));
+    const vaiFun=(v.c||[]).filter(cu=>cu.cat==='VALES'&&cu.funId===f.id);
+    const erros=vaiFun.filter(va=>va.tipo==='ERRO').reduce((ps,va)=>ps+(+va.val||0),0);
+    const adiP=vaiFun.filter(va=>va.tipo==='ADIANTAMENTO'&&va.st==='PAGO').reduce((ps,va)=>ps+(+va.val||0),0);
+    return s+(+f.sal||0)-(+f.adi||0)-(+f.vale||0)+bon-parc-erros-adiP;
+  },0);
+  const custosPagosB=(v.c||[]).filter(c=>c.st==='PAGO'&&c.cat!=='VALES').reduce((s,c)=>s+(+c.val||0),0);
+  const verifB=pessoalPagoB+custosPagosB;
+
+  return{
+    pagbank:(t.cart-tcartB)+t.rend+t.finRecebido-saiBanco('pagbank')-verifB-comprasBanco('pagbank')+tIn('pagbank')-tOut('pagbank'),
+    infinitepay:(t.pix-tpixB)-saiBanco('infinitepay')+tIn('infinitepay')-tOut('infinitepay'),
+    malote:t.din-saiBanco('malote')+tIn('malote')-tOut('malote'),
+    getnet:(t.getnet||0)-tgetnetB-saiBanco('getnet')+tIn('getnet')-tOut('getnet'),
+    trans,v,t
+  };
+}
+
+function addTransferencia(){
+  const de=document.getElementById('tr-de').value;
+  const para=document.getElementById('tr-para').value;
+  const valor=+document.getElementById('tr-val').value||0;
+  const data=document.getElementById('tr-dt').value||today();
+  const obs=document.getElementById('tr-obs').value;
+  if(de===para){notify('Bancos de origem e destino devem ser diferentes','err');return;}
+  if(!valor){notify('Informe o valor','err');return;}
+  const arr=getTransferencias();
+  arr.push({id:uuid(),de,para,valor,data,obs});
+  saveTransferencias(arr);
+  pushToFB();
+  renderBancaria();
+  notify('Transferência registrada!','ok');
+}
+function delTransferencia(id){
+  saveTransferencias(getTransferencias().filter(t=>t.id!==id));
+  pushToFB();renderBancaria();
+}
+
+function renderBancaria(){
+  const {pagbank,infinitepay,malote,getnet,trans}=calcSaldoBancos();
+  const saldos={pagbank,infinitepay,malote,getnet};
+  const nomeBanco={pagbank:'PagBank',infinitepay:'InfinitePay',malote:'Malote (Dinheiro)',getnet:'Santander (GetNet)'};
+  const corBanco={pagbank:'#4A90D9',infinitepay:'#7FC47F',malote:'#C8A86B',getnet:'#E05252'};
+  const c=document.getElementById('content');
+
+  const bancoOpts=Object.keys(nomeBanco).map(k=>`<option value="${k}">${nomeBanco[k]}</option>`).join('');
+  const transRows=trans.sort((a,b)=>b.data.localeCompare(a.data)).map(tr=>`<tr>
+    <td style="font-size:11px">${tr.data?new Date(tr.data+'T12:00:00').toLocaleDateString('pt-BR'):'—'}</td>
+    <td>${nomeBanco[tr.de]||tr.de}</td>
+    <td style="color:var(--gold)">→</td>
+    <td>${nomeBanco[tr.para]||tr.para}</td>
+    <td class="gold" style="font-weight:700">${fmt(tr.valor)}</td>
+    <td style="font-size:11px;color:var(--dim)">${tr.obs||''}</td>
+    <td><button class="btn-sm" onclick="delTransferencia('${tr.id}')">×</button></td>
+  </tr>`).join('');
+
+  c.innerHTML=`
+    <div class="sec-hdr" style="margin-bottom:16px"><h2>Gestão Bancária — ${MESES[ST.mes-1]} ${ST.ano}</h2><div class="sec-line"></div></div>
+
+    <!-- SALDOS -->
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px">
+      ${Object.keys(saldos).map(bid=>`
+        <div style="border:1px solid var(--border);border-radius:10px;padding:16px;background:var(--bg-card);border-top:3px solid ${corBanco[bid]}">
+          <div style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:8px">${nomeBanco[bid]}</div>
+          <div style="font-family:'Syne',sans-serif;font-size:22px;font-weight:800;color:${saldos[bid]>=0?'var(--green)':'var(--red)'}">R$ ${fmt(saldos[bid])}</div>
+        </div>`).join('')}
+    </div>
+
+    <!-- TRANSFERÊNCIA -->
+    <div class="form-card" style="margin-bottom:20px">
+      <div class="sec-hdr" style="margin-bottom:12px"><h2>↕ Nova Transferência</h2><div class="sec-line"></div></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 2fr auto;gap:8px;align-items:end">
+        <div class="fl" style="margin:0"><label>Origem</label><select class="fi" id="tr-de">${bancoOpts}</select></div>
+        <div class="fl" style="margin:0"><label>Destino</label><select class="fi" id="tr-para">${bancoOpts}</select></div>
+        <div class="fl" style="margin:0"><label>Valor R$</label><input class="fi" type="number" step="0.01" id="tr-val" placeholder="0,00"></div>
+        <div class="fl" style="margin:0"><label>Data</label><input class="fi" type="date" id="tr-dt" value="${today()}"></div>
+        <div class="fl" style="margin:0"><label>Obs.</label><input class="fi" type="text" id="tr-obs" placeholder="Motivo..."></div>
+        <button class="btn-gold" onclick="addTransferencia()" style="height:36px;white-space:nowrap">+ Transferir</button>
+      </div>
+    </div>
+
+    <!-- HISTÓRICO DE TRANSFERÊNCIAS -->
+    ${trans.length?`<div class="form-card">
+      <div class="sec-hdr" style="margin-bottom:10px"><h2>Histórico de Transferências</h2><div class="sec-line"></div></div>
+      <div class="tbl-wrap"><table>
+        <tr><th>Data</th><th>Origem</th><th></th><th>Destino</th><th>Valor</th><th style="text-align:left">Obs.</th><th></th></tr>
+        ${transRows}
+      </table></div>
+    </div>`:'<div class="empty">Nenhuma transferência registrada.</div>'}
+  `;
 }
 // ── NOTIFICAÇÕES ──────────────────────────────────────────────
 function notify(msg, tipo) {
