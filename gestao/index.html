@@ -1129,7 +1129,7 @@ function renderVerif(){
     const showVar='show'+showKey;
     const isOpen=window[showVar]||false;
     const total=itens.reduce((s,cu)=>s+(+cu.val||0),0);
-    const pago=itens.filter(cu=>cu.st==='PAGO'||cu.tipo==='ERRO').reduce((s,cu)=>s+(+cu.val||0),0);
+    const pago=itens.filter(cu=>cu.st==='PAGO'&&cu.tipo!=='ERRO').reduce((s,cu)=>s+(+cu.val||0),0); // ERRO não é pagável
     const tblRows=itens.map(cu=>cuRow(cu)).join('');
     const hdCols='<tr><th style="text-align:left">Descrição</th><th>Valor</th><th>Vencimento</th><th>Pago em</th><th>Forma</th><th>Status</th><th style="text-align:left">Obs.</th><th>Ações</th></tr>';
     return`<div class="form-card" style="margin-bottom:16px;padding:0;overflow:hidden">
@@ -1300,7 +1300,7 @@ function renderVerif(){
 
   // ── TOTALIZADOR GERAL ──
   const totalGeral=totalF+todosC.reduce((s,cu)=>s+(+cu.val||0),0);
-  const pagoGeral=todosC.filter(cu=>cu.st==='PAGO'||cu.tipo==='ERRO').reduce((s,cu)=>s+(+cu.val||0),0)+
+  const pagoGeral=todosC.filter(cu=>cu.st==='PAGO'&&cu.tipo!=='ERRO').reduce((s,cu)=>s+(+cu.val||0),0)+ // ERRO não é pagável
     funs.filter(f=>f.st==='PAGO').reduce((s,f)=>{const vf=valesFun(f.id);return s+(+f.sal||0)-(+f.adi||0)-(+f.vale||0)+(+f.bonificacao||0)-parcelaCred(f.id)-vf.erros-vf.adiPagos;},0);
 
   c.innerHTML=`
