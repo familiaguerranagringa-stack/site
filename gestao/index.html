@@ -2577,7 +2577,6 @@ function calcSaldoBancos(){
 
   // Saídas por banco (excluindo compras que ficam em pagbank por padrão)
   const saiBanco=(bid)=>sa.filter(r=>(r.banco||'pagbank')===bid).reduce((s,r)=>s+(+r.val||0),0);
-  const comprasBanco=(bid)=>sa.filter(r=>(r.banco||'pagbank')===bid&&r.cat==='Compra Mercadoria').reduce((s,r)=>s+(+r.val||0),0);
 
   // Transferências
   const tIn=(bid)=>trans.filter(tr=>tr.para===bid).reduce((s,tr)=>s+(+tr.valor||0),0);
@@ -2601,7 +2600,7 @@ function calcSaldoBancos(){
   const verifB=pessoalPagoB+custosPagosB;
 
   return{
-    pagbank:(t.cart-tcartB)+t.rend+t.finRecebido-saiBanco('pagbank')-verifB-comprasBanco('pagbank')+tIn('pagbank')-tOut('pagbank'),
+    pagbank:(t.cart-tcartB)+t.rend+t.finRecebido-saiBanco('pagbank')-verifB+tIn('pagbank')-tOut('pagbank'),
     infinitepay:(t.pix-tpixB)-saiBanco('infinitepay')+tIn('infinitepay')-tOut('infinitepay'),
     malote:t.din-saiBanco('malote')+tIn('malote')-tOut('malote'),
     getnet:(t.getnet||0)-tgetnetB-saiBanco('getnet')+tIn('getnet')-tOut('getnet'),
