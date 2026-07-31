@@ -50,6 +50,11 @@ html,body{min-height:100vh;background:var(--bg);color:var(--text);font-family:'D
 .btn-toggle-aba:hover{background-color:var(--bg-hover);border-color:var(--gold-dim);color:var(--gold)}
 .painel-rateio-container{max-height:0;opacity:0;overflow:hidden;transition:max-height .35s cubic-bezier(0.4,0,0.2,1),opacity .25s ease-in-out,margin-top .35s ease;will-change:max-height,opacity;transform:translateZ(0)}
 .painel-rateio-container.aberto{max-height:3000px;opacity:1;margin-top:15px}
+.rodape-acoes{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:20px;padding-top:15px;border-top:1px solid var(--border);flex-wrap:wrap}
+.grupo-anexo{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:13px;flex:1;min-width:220px}
+.grupo-anexo label{font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);white-space:nowrap}
+.btn-submit-acao{height:38px;display:inline-flex;align-items:center;justify-content:center;padding:0 20px;background-color:var(--gold);color:#fff;border:none;border-radius:6px;font-family:'Syne',sans-serif;font-weight:700;font-size:11px;letter-spacing:.08em;text-transform:uppercase;cursor:pointer}
+.grupo-anexo .fi{height:38px}
 .btn-ghost:hover{border-color:var(--gold);color:var(--gold)}
 .btn-gold{background:var(--gold);color:#fff;font-family:'Syne',sans-serif;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;border:none;border-radius:6px;padding:9px 18px;cursor:pointer;transition:background .15s}
 .btn-gold:hover{background:var(--gold-lt)}
@@ -419,6 +424,10 @@ function selectImoveis(id,onchange){
 function renderImoveis(){
   const ims=imoveisOrdenados();
   return `
+  <div class="header-pagina" style="margin-bottom:0">
+    <button id="btnToggleImovel" class="btn-toggle-aba" onclick="toggleJanela('btnToggleImovel','painelNovoImovel','+ Novo Imóvel')">+ Novo Imóvel</button>
+  </div>
+  <div id="painelNovoImovel" class="painel-rateio-container">
   <div class="form-card">
     <div class="sec-hdr"><h2>Novo Imóvel</h2><div class="sec-line"></div></div>
     <div class="fg">
@@ -428,7 +437,10 @@ function renderImoveis(){
       <div class="fl"><label>Imobiliária / Corretor</label><input class="fi" id="im-corr" placeholder="Ex: Aprisco, Gerson..."></div>
       <div class="fl"><label>Valor Aluguel Contratado</label><input class="fi" id="im-val" type="number" step="0.01" placeholder="0,00"></div>
     </div>
-    <button class="btn-gold" onclick="addImovel()">+ Adicionar Imóvel</button>
+    <div class="rodape-acoes" style="justify-content:flex-end">
+      <button class="btn-submit-acao" onclick="addImovel()">+ ADICIONAR IMÓVEL</button>
+    </div>
+  </div>
   </div>
   <div class="sec-hdr"><h2>Imóveis Cadastrados</h2><div class="sec-line"></div></div>
   <div class="tbl-wrap"><table>
@@ -548,15 +560,14 @@ function renderAlugueis(){
     </div>`;
   };
   return `
-  <div class="sec-note">Lance aqui o valor <strong>líquido</strong> que a imobiliária de fato repassou — já descontado o que ela paga direto (IPTU/água, quando for o caso). O bruto é só referência.</div>
-  <div class="form-card" style="border-color:var(--gold-dim)">
-    <div class="sec-hdr"><h2>Importar Relatório da Imobiliária</h2><div class="sec-line"></div></div>
-    <p style="font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.6">Suba o PDF do relatório de administração (Aprisco/Alude) e o sistema lê o imóvel, os valores cobrados e o que foi repassado automaticamente — você só confere antes de lançar.</p>
-    <input class="fi" type="file" id="pdf-import-input" accept="application/pdf" onchange="handlePDFFile(this)">
-    <div id="pdf-import-status" style="font-size:12px;color:var(--dim);margin-top:8px"></div>
+  <div class="header-pagina" style="margin-bottom:0">
+    <button id="btnToggleAluguel" class="btn-toggle-aba" onclick="toggleJanela('btnToggleAluguel','painelNovoAluguel','+ Novo Recebimento')">+ Novo Recebimento</button>
   </div>
+  <div id="painelNovoAluguel" class="painel-rateio-container">
+  <div class="sec-note">Lance aqui o valor <strong>líquido</strong> que a imobiliária de fato repassou — já descontado o que ela paga direto (IPTU/água, quando for o caso). O bruto é só referência. Se anexar um relatório da imobiliária (Aprisco/Alude) em PDF no rodapé, os campos abaixo são preenchidos automaticamente pra você conferir.</div>
   <div class="form-card">
-    <div class="sec-hdr"><h2>Novo Recebimento (manual)</h2><div class="sec-line"></div></div>
+    <div class="sec-hdr"><h2>Novo Recebimento (Manual ou Relatório)</h2><div class="sec-line"></div></div>
+    <div id="al-import-status" style="font-size:12px;color:var(--dim);margin-bottom:10px"></div>
     <div class="fg">
       <div class="fl"><label>Imóvel</label><select class="fi" id="al-im">${selectImoveis()}</select></div>
       <div class="fl"><label>Valor Boleto (bruto)</label><input class="fi" id="al-bruto" type="number" step="0.01" placeholder="0,00"></div>
@@ -565,8 +576,14 @@ function renderAlugueis(){
       <div class="fl"><label>Data de Vencimento</label><input class="fi" id="al-vencimento" type="date"></div>
       <div class="fl"><label>Observação</label><input class="fi" id="al-obs" placeholder="opcional"></div>
     </div>
-    <div class="fl" style="margin-bottom:14px"><label>Comprovante de Repasse (opcional)</label><input class="fi" id="al-comprovante" type="file" accept=".pdf,image/*"></div>
-    <button class="btn-gold" onclick="addAluguel(this)">+ Registrar Recebimento</button>
+    <div class="rodape-acoes">
+      <div class="grupo-anexo">
+        <label>Anexar Relatório / Comprovante (PDF)</label>
+        <input class="fi" type="file" id="al-comprovante" accept=".pdf,image/*" onchange="handleAluguelAnexo(this)">
+      </div>
+      <button class="btn-submit-acao" onclick="addAluguel(this)">+ REGISTRAR RECEBIMENTO</button>
+    </div>
+  </div>
   </div>
   ${modulos.map(tabelaModulo).join('')}
   <div class="form-card" style="border-color:var(--gold-dim);background:var(--gold-bg)">
@@ -725,6 +742,41 @@ function ddmmyyyy2iso(d){
 function isoParaBR(iso){
   return formatarDataBR(iso);
 }
+function handleAluguelAnexo(input){
+  const f=input.files[0];
+  if(!f)return;
+  const statusEl=document.getElementById('al-import-status');
+  if(f.type!=='application/pdf'){
+    if(statusEl)statusEl.textContent='📎 Arquivo anexado como comprovante.';
+    return;
+  }
+  if(statusEl)statusEl.textContent='⟳ Lendo PDF...';
+  const readerBin=new FileReader();
+  readerBin.onload=async()=>{
+    try{
+      const typedarray=new Uint8Array(readerBin.result);
+      const pdf=await pdfjsLib.getDocument({data:typedarray}).promise;
+      let fullText='';
+      for(let p=1;p<=pdf.numPages;p++){
+        const page=await pdf.getPage(p);
+        const tc=await page.getTextContent();
+        fullText+=tc.items.map(it=>it.str).join(' ')+' ';
+      }
+      const parsed=parseRelatorioAlude(fullText);
+      const match=matchImovel(parsed.imovelAddr);
+      if(match){const sel=document.getElementById('al-im');if(sel)sel.value=match.id;}
+      if(parsed.totalCobrado)document.getElementById('al-bruto').value=parsed.totalCobrado;
+      if(parsed.valorRepassado)document.getElementById('al-liquido').value=parsed.valorRepassado;
+      if(parsed.dataRepasse)document.getElementById('al-data').value=ddmmyyyy2iso(parsed.dataRepasse);
+      if(parsed.dataVencimento)document.getElementById('al-vencimento').value=ddmmyyyy2iso(parsed.dataVencimento);
+      if(statusEl)statusEl.textContent=(parsed.totalCobrado||parsed.valorRepassado)?'✓ Dados preenchidos automaticamente — confira antes de registrar. O arquivo será anexado como comprovante.':'⚠ Não consegui identificar os dados automaticamente, mas o arquivo será anexado como comprovante. Preencha manualmente.';
+    }catch(e){
+      console.error('Erro ao ler relatório PDF:',e);
+      if(statusEl)statusEl.textContent='⚠ Não consegui ler os dados automaticamente, mas o arquivo será anexado como comprovante. Preencha manualmente.';
+    }
+  };
+  readerBin.readAsArrayBuffer(f);
+}
 function handlePDFFile(input){
   const f=input.files[0];
   if(!f)return;
@@ -880,6 +932,10 @@ function renderRepasses(){
     </div>`;
   };
   return `
+  <div class="header-pagina" style="margin-bottom:0">
+    <button id="btnToggleContas" class="btn-toggle-aba" onclick="toggleJanela('btnToggleContas','painelNovaConta','+ Nova Conta')">+ Nova Conta</button>
+  </div>
+  <div id="painelNovaConta" class="painel-rateio-container">
   ${temRelatorioAntigo?`<div class="sec-note" style="background:var(--gold-bg);border:1px solid var(--gold-dim);border-radius:8px;padding:12px 14px;color:var(--text)">Existem relatórios antigos anexados automaticamente (de antes da correção). <button class="btn-sm btn-ok" onclick="limparRelatoriosAntigos()">🧹 Remover relatórios antigos</button></div>`:''}
   <div class="sec-note">Contas que você manda para o corretor pagar com o próprio aluguel (IPTU, água, condomínio). Ficam registradas com boleto e comprovante para conferência — <strong>não entram no cálculo do seu saldo</strong>, porque já saem do valor líquido repassado.</div>
   <div class="form-card">
@@ -893,12 +949,15 @@ function renderRepasses(){
       <div class="fl"><label>Status</label><select class="fi" id="rp-status">${statusOptions('a_pagar')}</select></div>
       <div class="fl"><label>Observações</label><input class="fi" id="rp-obs" placeholder="opcional"></div>
     </div>
-    <div class="fg">
-      <div class="fl"><label>Boleto (a conta a ser paga)</label><input class="fi" id="rp-file-boleto" type="file" accept=".pdf,image/*"></div>
-      <div class="fl"><label>Comprovante de Pagamento 1</label><input class="fi" id="rp-file-comp" type="file" accept=".pdf,image/*"></div>
-      <div class="fl"><label>Comprovante de Pagamento 2</label><input class="fi" id="rp-file-comp2" type="file" accept=".pdf,image/*"></div>
+    <div class="rodape-acoes">
+      <div class="grupo-anexo" style="flex-wrap:wrap">
+        <div><label>Boleto</label><input class="fi" type="file" id="rp-file-boleto" accept=".pdf,image/*" style="width:180px"></div>
+        <div><label>Comprov. 1</label><input class="fi" type="file" id="rp-file-comp" accept=".pdf,image/*" style="width:180px"></div>
+        <div><label>Comprov. 2</label><input class="fi" type="file" id="rp-file-comp2" accept=".pdf,image/*" style="width:180px"></div>
+      </div>
+      <button class="btn-submit-acao" onclick="addRepasse(this)">+ REGISTRAR</button>
     </div>
-    <button class="btn-gold" style="margin-top:14px" onclick="addRepasse(this)">+ Registrar</button>
+  </div>
   </div>
   ${modulos.map(tabelaModuloRepasse).join('')}`;
 }
@@ -1124,6 +1183,10 @@ function renderDespesas(){
   const lst=load(pkPeriodo('despesas'));
   const total=lst.reduce((s,r)=>s+(+r.valor||0),0);
   return `
+  <div class="header-pagina" style="margin-bottom:0">
+    <button id="btnToggleDespesa" class="btn-toggle-aba" onclick="toggleJanela('btnToggleDespesa','painelNovaDespesa','+ Nova Despesa')">+ Nova Despesa</button>
+  </div>
+  <div id="painelNovaDespesa" class="painel-rateio-container">
   <div class="sec-note">Gastos que <strong>você paga direto</strong> (não passam pelo corretor): manutenção, reparos, gastos diversos. Essas entram no saldo do imóvel. Se o pagamento foi parcelado (ex: metade no início, metade no final), lance o valor total uma vez e anexe cada comprovante separadamente.</div>
   <div class="form-card">
     <div class="sec-hdr"><h2>Nova Despesa Direta</h2><div class="sec-line"></div></div>
@@ -1134,8 +1197,14 @@ function renderDespesas(){
       <div class="fl"><label>Forma de Pagamento</label><select class="fi" id="ds-forma"><option>PIX</option><option>Boleto</option><option>Dinheiro</option><option>Cartão</option></select></div>
       <div class="fl"><label>Data</label><input class="fi" id="ds-data" type="date" value="${today()}"></div>
     </div>
-    <div class="fl" style="margin-bottom:14px"><label>Comprovante (opcional — pode anexar mais depois)</label><input class="fi" id="ds-file" type="file" accept=".pdf,image/*"></div>
-    <button class="btn-gold" onclick="addDespesa()">+ Registrar Despesa</button>
+    <div class="rodape-acoes">
+      <div class="grupo-anexo">
+        <label>Anexar Comprovante</label>
+        <input class="fi" type="file" id="ds-file" accept=".pdf,image/*">
+      </div>
+      <button class="btn-submit-acao" onclick="addDespesa()">+ REGISTRAR DESPESA</button>
+    </div>
+  </div>
   </div>
   <div class="tbl-wrap"><table>
     <thead><tr><th>Imóvel</th><th>Descrição</th><th>Valor</th><th>Forma</th><th class="data-cel">Data</th><th>Comprovantes</th><th></th></tr></thead>
@@ -1195,6 +1264,10 @@ function renderCondominio(){
   const lst=load(pkPeriodo('condominio'));
   const pendente=lst.filter(r=>!r.devolvido).reduce((s,r)=>s+(+r.valor||0),0);
   return `
+  <div class="header-pagina" style="margin-bottom:0">
+    <button id="btnToggleCondominio" class="btn-toggle-aba" onclick="toggleJanela('btnToggleCondominio','painelNovoCondominio','+ Novo Adiantamento')">+ Novo Adiantamento</button>
+  </div>
+  <div id="painelNovoCondominio" class="painel-rateio-container">
   <div class="sec-note">Condomínio que você paga adiantado e o inquilino devolve no dia do aluguel. Fica pendente (some do seu saldo) até ser marcado como devolvido.</div>
   <div class="form-card">
     <div class="sec-hdr"><h2>Novo Adiantamento</h2><div class="sec-line"></div></div>
@@ -1203,7 +1276,10 @@ function renderCondominio(){
       <div class="fl"><label>Valor Adiantado</label><input class="fi" id="cd-val" type="number" step="0.01" placeholder="0,00"></div>
       <div class="fl"><label>Data do Adiantamento</label><input class="fi" id="cd-data" type="date" value="${today()}"></div>
     </div>
-    <button class="btn-gold" onclick="addCondominio()">+ Registrar Adiantamento</button>
+    <div class="rodape-acoes" style="justify-content:flex-end">
+      <button class="btn-submit-acao" onclick="addCondominio()">+ REGISTRAR ADIANTAMENTO</button>
+    </div>
+  </div>
   </div>
   <div class="tbl-wrap"><table>
     <thead><tr><th>Imóvel</th><th>Valor</th><th class="data-cel">Adiantado em</th><th>Status</th><th></th></tr></thead>
@@ -1460,6 +1536,15 @@ function handleRateioFile(input){
     statusEl.textContent='📎 Arquivo anexado — não dá pra ler o valor automaticamente deste tipo de arquivo. Preencha manualmente abaixo.';
     finalizarAnexo();
   }
+}
+function toggleJanela(idBotao,idPainel,textoAbrir){
+  const painel=document.getElementById(idPainel);
+  const btn=document.getElementById(idBotao);
+  if(!painel)return;
+  const abrir=!painel.classList.contains('aberto');
+  painel.classList.toggle('aberto',abrir);
+  if(btn)btn.textContent=abrir?'Fechar':textoAbrir;
+  return abrir;
 }
 function toggleRateioForm(){
   const container=document.getElementById('painelRateioContainer');
@@ -1730,6 +1815,10 @@ function renderPessoal(){
   const lst=load(pkPeriodo('transferencias'));
   const total=lst.reduce((s,r)=>s+(+r.valor||0),0);
   return `
+  <div class="header-pagina" style="margin-bottom:0">
+    <button id="btnTogglePessoal" class="btn-toggle-aba" onclick="toggleJanela('btnTogglePessoal','painelNovaTransferencia','+ Nova Transferência')">+ Nova Transferência</button>
+  </div>
+  <div id="painelNovaTransferencia" class="painel-rateio-container">
   <div class="sec-note">Registro explícito de quanto da sobra dos aluguéis foi usado para pagar despesas pessoais no Brasil — cria um vínculo rastreável entre os dois controles, sem misturar os dados.</div>
   <div class="form-card">
     <div class="sec-hdr"><h2>Nova Transferência</h2><div class="sec-line"></div></div>
@@ -1738,7 +1827,10 @@ function renderPessoal(){
       <div class="fl"><label>Data</label><input class="fi" id="ps-data" type="date" value="${today()}"></div>
       <div class="fl"><label>Observação</label><input class="fi" id="ps-obs" placeholder="Ex: pagamento mesada + contas"></div>
     </div>
-    <button class="btn-gold" onclick="addTransferencia()">+ Registrar Transferência</button>
+    <div class="rodape-acoes" style="justify-content:flex-end">
+      <button class="btn-submit-acao" onclick="addTransferencia()">+ REGISTRAR TRANSFERÊNCIA</button>
+    </div>
+  </div>
   </div>
   <div class="tbl-wrap"><table>
     <thead><tr><th class="data-cel">Data</th><th>Valor</th><th>Observação</th><th></th></tr></thead>
