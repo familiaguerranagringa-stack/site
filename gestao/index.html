@@ -138,6 +138,13 @@ tr:hover td{background:var(--bg-hover)}
 #login-screen{position:fixed;inset:0;background:linear-gradient(135deg,#F0F4FF 0%,#E8F0FF 100%);z-index:1000;display:flex;align-items:center;justify-content:center}
 @media(max-width:768px){.sidebar{display:none}.content{padding:14px 12px 80px}.kpi-grid{grid-template-columns:1fr 1fr}}
 @media print{.sidebar,.topbar,#voice-btn,#vp{display:none!important}.content{padding:0}body{background:#fff;color:#000}}
+body.dark-mode{--bg:#0A0A0A;--bg-card:#141414;--bg-hover:#1A1A1A;--bg-section:#101010;--bg-sub:#181818;--border:#262626;--border-lite:#1E1E1E;--gold:#C9A850;--gold-lt:#E8D080;--gold-dim:#6A5520;--gold-bg:#1A1400;--text:#EBEBEB;--muted:#8A8A8A;--dim:#444444;--green:#4ADE80;--red:#F87171;--blue:#7FB8C9;--amber:#F5A623;--green-bg:#052010;}
+body.dark-mode .b-pend{background:#2A1F00;color:#F5A623;border-color:#4A3800}
+body.dark-mode .b-ok{background:#0D2A0D;color:#4ADE80;border-color:#1A4A1A}
+body.dark-mode .b-late{background:#2A0808;color:#F87171;border-color:#3A1010}
+body.dark-mode .pos{color:#4ADE80}body.dark-mode .neg{color:#F87171}body.dark-mode .gold{color:#C9A850}
+body.dark-mode .form-card,body.dark-mode .chart-block{box-shadow:none}
+body.dark-mode .mkBg-high{background:#052010!important}
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
@@ -173,7 +180,8 @@ tr:hover td{background:var(--bg-hover)}
 <button class="sb-item" data-tab="bancaria" onclick="setTab('bancaria',this)">🏦 Gestão Bancária</button>
     <div class="sb-bottom">
 
-      <button class="sb-item" id="wake-toggle-btn" onclick="toggleWakeMode()" style="width:100%;margin:0">🔇 Modo Alexa: OFF</button>
+      <button id="theme-btn" onclick="toggleTheme()" style="width:100%;margin:0 0 6px;display:flex;align-items:center;gap:8px;padding:9px 14px;background:transparent;border:1px solid var(--border);border-radius:7px;cursor:pointer;font-size:12px;color:var(--muted);font-family:inherit;transition:all .2s">🌙 Modo Escuro</button>
+<button class="sb-item" id="wake-toggle-btn" onclick="toggleWakeMode()" style="width:100%;margin:0">🔇 Modo Alexa: OFF</button>
       <button class="sb-item" onclick="doLogout()" style="width:100%;margin:4px 0 0;color:var(--dim)">↩ Sair</button>
     </div>
   </aside>
@@ -1533,7 +1541,7 @@ function renderDRE(){
   },0);
   // Custos pagos (TRIBUTOS + FIXO PAGOS; excluir VALES - já descontados dos funcionários)
   const custosVerifPagos=(v.c||[]).filter(c=>c.st==='PAGO'&&c.cat!=='VALES').reduce((s,c)=>s+(+c.val||0),0);
-  const verifMensal=pessoalPago+custosVerifPagos;
+  const verifMensal=calcVerifPago();
 
   // ── Saídas: banco = tudo exceto compras (excl. verificação mensal q é separada)
   const bancoSaidas=sa.filter(r=>r.cat!=='Compra Mercadoria').reduce((s,r)=>s+(+r.val||0),0);
@@ -2560,6 +2568,17 @@ function migrarVendedores(){
   }catch(e){console.warn('migrarVendedores:',e);}
 }
 
+
+function calcVerifPago(){
+  const v=getVerif();const todosC=v.c||[];const funs=v.f||[];const creds_v=v.cred||[];
+  function _parc(funId){const ano=ST.ano,mes=ST.mes;return creds_v.filter(cr=>cr.funId===funId&&cr.st==='ativo').reduce((s,cr)=>{if(!cr.dataInicio)return s+(+cr.valorParcela||0);const ini=new Date(cr.dataInicio+'T12:00:00');const md=(ano-ini.getFullYear())*12+(mes-(ini.getMonth()+1));return md>=0&&md<(+cr.parcelas||1)?s+(+cr.valorParcela||0):s;},0);}
+  function _vales(funId){const vaiFun=todosC.filter(cu=>cu.cat==='VALES'&&cu.funId===funId);return{erros:vaiFun.filter(va=>va.tipo==='ERRO').reduce((s,va)=>s+(+va.val||0),0),adiPagos:vaiFun.filter(va=>va.tipo==='ADIANTAMENTO'&&va.st==='PAGO').reduce((s,va)=>s+(+va.val||0),0)};}
+  const custosPagos=todosC.filter(cu=>cu.st==='PAGO'&&cu.tipo!=='ERRO').reduce((s,cu)=>s+(+cu.val||0),0);
+  const pessoalPago=funs.filter(f=>f.st==='PAGO').reduce((s,f)=>{const bon=+f.bonificacao||0;const parc=_parc(f.id);const vf=_vales(f.id);return s+(+f.sal||0)-(+f.adi||0)-(+f.vale||0)+bon-parc-vf.erros-vf.adiPagos;},0);
+  return pessoalPago+custosPagos;
+}
+function toggleTheme(){const dark=document.body.classList.toggle('dark-mode');const btn=document.getElementById('theme-btn');if(btn)btn.textContent=dark?'☀ Modo Claro':'🌙 Modo Escuro';localStorage.setItem('srcapas_theme',dark?'dark':'light');}
+(function(){const t=localStorage.getItem('srcapas_theme');if(t==='dark'){document.body.classList.add('dark-mode');setTimeout(()=>{const b=document.getElementById('theme-btn');if(b)b.textContent='☀ Modo Claro';},200);}})();
 // ── GESTÃO BANCÁRIA ─────────────────────────────────────
 function getTransferencias(){return JSON.parse(localStorage.getItem('srcapas_trans_'+ST.empresa+'_'+ST.ano+'_'+String(ST.mes).padStart(2,'0'))||'[]');}
 function saveTransferencias(arr){localStorage.setItem('srcapas_trans_'+ST.empresa+'_'+ST.ano+'_'+String(ST.mes).padStart(2,'0'),JSON.stringify(arr));scheduleSync();}
@@ -2598,7 +2617,7 @@ function calcSaldoBancos(){
     return s+(+f.sal||0)-(+f.adi||0)-(+f.vale||0)+bon-parc-erros-adiP;
   },0);
   const custosPagosB=(v.c||[]).filter(c=>c.st==='PAGO'&&c.cat!=='VALES').reduce((s,c)=>s+(+c.val||0),0);
-  const verifB=pessoalPagoB+custosPagosB;
+  const verifB=calcVerifPago();
 
   return{
     pagbank:(t.cart-tcartB)+t.rend+t.finRecebido-saiBanco('pagbank')-verifB+tIn('pagbank')-tOut('pagbank'),
