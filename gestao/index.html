@@ -1744,7 +1744,15 @@ function mkPizzaSVG(slices,colors){
   return out;
 }
 function mkColor(p){if(!p)return'var(--dim)';if(p>=1.05)return'#22c55e';if(p>=1.00)return'#4ade80';if(p>=0.95)return'#facc15';if(p>=0.90)return'#fb923c';return'var(--red)'}
-function mkBg(p){if(!p)return'transparent';if(p>=1.05)return'#DCFCE7';if(p>=1.00)return'#F0FDF4';if(p>=0.95)return'#2A2000';if(p>=0.90)return'#2A1000';return'#2A0808'}
+function mkBg(p){
+  const dk=document.body.classList.contains('dark-mode');
+  if(!p)return'transparent';
+  if(p>=1.05)return dk?'#052010':'#DCFCE7';
+  if(p>=1.00)return dk?'#082A14':'#F0FDF4';
+  if(p>=0.95)return dk?'#2A2000':'#FEF3C7';
+  if(p>=0.90)return dk?'#2A1000':'#FEF9EC';
+  return dk?'#2A0808':'#FEE2E2';
+}
 function saveMkField(k,v){const d=mkCfg();d[k]=v;saveMkCfg(d)}
 
 function renderMarkup(){
@@ -2091,24 +2099,46 @@ function toggleLeao(dt,nome){
 function editVendCats(nome){
   const ed=document.getElementById('vend-cat-editor');
   if(!ed)return;
+  // Toggle: fechar se já está aberto para o mesmo vendedor
+  if(ed.dataset.vend===nome){
+    ed.innerHTML='';
+    delete ed.dataset.vend;
+    return;
+  }
+  ed.dataset.vend=nome;
   const vd=mkVend();
   const vendData=vd[nome]||{};
   ed.innerHTML=`<div class="form-card" style="margin-bottom:16px">
-    <div class="sec-hdr" style="margin-bottom:12px"><h2>Total Vendido — ${nome}</h2><div class="sec-line"></div></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div class="sec-hdr" style="margin:0"><h2>Total Vendido — ${nome}</h2><div class="sec-line"></div></div>
+      <button class="btn-ghost" onclick="const e=document.getElementById('vend-cat-editor');e.innerHTML='';delete e.dataset.vend" style="font-size:11px">✕ Fechar</button>
+    </div>
     <div class="fg">
       ${CAT_PRODUTO.map(cat=>`<div class="fl"><label>${cat}</label>
         <input class="fi" type="number" step="0.01" value="${vendData[cat]||''}" placeholder="0,00"
-          onchange="saveVendCat('${nome}','${cat}',+this.value)">
+          oninput="saveVendCatLive('${nome}','${cat}',+this.value)">
       </div>`).join('')}
     </div>
   </div>`;
 }
-function saveVendCat(nome,cat,v){
+function saveVendCatLive(nome,cat,v){
   const d=mkVend();
   if(!d[nome])d[nome]={};
   d[nome][cat]=v;
   saveMkVend(d);
+  // Atualizar só a tabela de meta por vendedor sem fechar o editor
+  const vf=mkVend();
+  const nomes2=document.querySelectorAll('.vend-row-nome');
+  // Re-renderizar a tabela principal do markup preservando o editor aberto
+  const ed=document.getElementById('vend-cat-editor');
+  const vendAberto=ed?ed.dataset.vend:null;
+  renderMarkup();
+  // Restaurar editor após re-render
+  if(vendAberto){
+    setTimeout(()=>{const e=document.getElementById('vend-cat-editor');if(e)editVendCats(vendAberto);},10);
+  }
 }
+function saveVendCat(nome,cat,v){saveVendCatLive(nome,cat,v);}
 
 
 let recognition=null,vListening=false,vPending=null;
