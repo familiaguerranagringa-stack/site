@@ -46,6 +46,10 @@ html,body{min-height:100vh;background:var(--bg);color:var(--text);font-family:'D
 .tb-sel{background:var(--bg);border:1px solid var(--border);border-radius:5px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:12px;padding:5px 9px;outline:none;cursor:pointer}
 .tb-sel:focus{border-color:var(--gold)}
 .btn-ghost{background:transparent;border:1px solid var(--border);color:var(--muted);font-family:'DM Sans',sans-serif;font-size:12px;padding:6px 14px;border-radius:5px;cursor:pointer;transition:all .15s}
+.btn-toggle-aba{background-color:var(--bg-card);color:var(--text);border:1px solid var(--border);padding:9px 18px;border-radius:6px;font-family:'Syne',sans-serif;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;transition:background-color .2s ease,border-color .2s ease}
+.btn-toggle-aba:hover{background-color:var(--bg-hover);border-color:var(--gold-dim);color:var(--gold)}
+.painel-rateio-container{max-height:0;opacity:0;overflow:hidden;transition:max-height .35s cubic-bezier(0.4,0,0.2,1),opacity .25s ease-in-out,margin-top .35s ease;will-change:max-height,opacity;transform:translateZ(0)}
+.painel-rateio-container.aberto{max-height:3000px;opacity:1;margin-top:15px}
 .btn-ghost:hover{border-color:var(--gold);color:var(--gold)}
 .btn-gold{background:var(--gold);color:#fff;font-family:'Syne',sans-serif;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;border:none;border-radius:6px;padding:9px 18px;cursor:pointer;transition:background .15s}
 .btn-gold:hover{background:var(--gold-lt)}
@@ -1458,9 +1462,14 @@ function handleRateioFile(input){
   }
 }
 function toggleRateioForm(){
-  ST.rateioFormAberto=!ST.rateioFormAberto;
-  if(!ST.rateioFormAberto)ST.rateioEditandoId=null;
-  render();
+  const container=document.getElementById('painelRateioContainer');
+  const btn=document.getElementById('btnToggleForm');
+  if(!container){ST.rateioFormAberto=!ST.rateioFormAberto;render();return;}
+  const abrir=!container.classList.contains('aberto');
+  container.classList.toggle('aberto',abrir);
+  if(btn)btn.textContent=abrir?'Fechar':'+ Novo Lançamento';
+  ST.rateioFormAberto=abrir;
+  if(!abrir)ST.rateioEditandoId=null;
 }
 function renderRateio(){
   const lanc=load(pkPeriodo('rateio_lanc'));
@@ -1468,10 +1477,10 @@ function renderRateio(){
   const aberto=!!(ST.rateioFormAberto||editando);
   const qtd=editando&&editando.partes?editando.partes.length:(ST.rateioQtd||3);
   return `
-  <div class="top-bar-controle" style="margin-bottom:16px">
-    <button id="btnToggleForm" class="${aberto?'btn-ghost':'btn-gold'}" onclick="toggleRateioForm()">${aberto?'Fechar':'+ Novo Lançamento'}</button>
+  <div class="top-bar-controle" style="margin-bottom:0">
+    <button id="btnToggleForm" class="btn-toggle-aba" onclick="toggleRateioForm()">${aberto?'Fechar':'+ Novo Lançamento'}</button>
   </div>
-  ${!aberto?'':`
+  <div id="painelRateioContainer" class="painel-rateio-container${aberto?' aberto':''}">
   <div class="sec-note">Anexe a conta (PDF ou foto) no rodapé do formulário abaixo, escolha entre quantos imóveis ela será dividida e defina o percentual de cada um. O valor de cada parte é calculado automaticamente. Isso gera uma despesa direta e também um lançamento em "Contas" (com o mesmo boleto anexado) para cada imóvel selecionado.</div>
   <div class="form-card" style="${editando?'border-color:var(--gold)':''}">
     <div class="sec-hdr"><h2>${editando?'Editando Rateio':'Lançar Rateio'}</h2><div class="sec-line"></div></div>
@@ -1505,7 +1514,8 @@ function renderRateio(){
       </div>`:`
       <button class="btn-gold" onclick="confirmarRateio()">CONFIRMAR RATEIO</button>`}
     </div>
-  </div>`}
+  </div>
+  </div>
   <div class="sec-hdr"><h2>Rateios Lançados no Mês</h2><div class="sec-line"></div></div>
   <div class="tbl-wrap"><table>
     <thead><tr><th class="data-cel">Data</th><th>Valor Total</th><th>Divisão</th><th>Comprovantes</th><th></th></tr></thead>
