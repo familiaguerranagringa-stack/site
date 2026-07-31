@@ -2116,27 +2116,40 @@ function editVendCats(nome){
     <div class="fg">
       ${CAT_PRODUTO.map(cat=>`<div class="fl"><label>${cat}</label>
         <input class="fi" type="number" step="0.01" value="${vendData[cat]||''}" placeholder="0,00"
-          oninput="saveVendCatLive('${nome}','${cat}',+this.value)">
+          data-cat="${cat}" oninput="saveVendCatLive('${nome}','${cat}',+this.value)">
       </div>`).join('')}
     </div>
   </div>`;
 }
+let _vendTimer=null;
 function saveVendCatLive(nome,cat,v){
+  // Salvar imediatamente
   const d=mkVend();
   if(!d[nome])d[nome]={};
   d[nome][cat]=v;
   saveMkVend(d);
-  // Atualizar só a tabela de meta por vendedor sem fechar o editor
-  const vf=mkVend();
-  const nomes2=document.querySelectorAll('.vend-row-nome');
-  // Re-renderizar a tabela principal do markup preservando o editor aberto
-  const ed=document.getElementById('vend-cat-editor');
-  const vendAberto=ed?ed.dataset.vend:null;
-  renderMarkup();
-  // Restaurar editor após re-render
-  if(vendAberto){
-    setTimeout(()=>{const e=document.getElementById('vend-cat-editor');if(e)editVendCats(vendAberto);},10);
-  }
+  // Re-renderizar com debounce de 700ms (só depois que o usuário parar de digitar)
+  clearTimeout(_vendTimer);
+  _vendTimer=setTimeout(()=>{
+    const ed=document.getElementById('vend-cat-editor');
+    const vendAberto=ed?ed.dataset.vend:null;
+    const focusedId=document.activeElement?document.activeElement.id:null;
+    const focusedCat=document.activeElement?document.activeElement.dataset.cat:null;
+    renderMarkup();
+    if(vendAberto){
+      setTimeout(()=>{
+        const e=document.getElementById('vend-cat-editor');
+        if(e){
+          editVendCats(vendAberto);
+          // Restaurar foco no campo que estava ativo
+          if(focusedCat){
+            const inputs=e.querySelectorAll('input');
+            inputs.forEach(inp=>{if(inp.dataset.cat===focusedCat){inp.focus();const len=inp.value.length;inp.setSelectionRange(len,len);}});
+          }
+        }
+      },20);
+    }
+  },700);
 }
 function saveVendCat(nome,cat,v){saveVendCatLive(nome,cat,v);}
 
