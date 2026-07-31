@@ -46,10 +46,11 @@ html,body{min-height:100vh;background:var(--bg);color:var(--text);font-family:'D
 .tb-sel{background:var(--bg);border:1px solid var(--border);border-radius:5px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:12px;padding:5px 9px;outline:none;cursor:pointer}
 .tb-sel:focus{border-color:var(--gold)}
 .btn-ghost{background:transparent;border:1px solid var(--border);color:var(--muted);font-family:'DM Sans',sans-serif;font-size:12px;padding:6px 14px;border-radius:5px;cursor:pointer;transition:all .15s}
-.btn-toggle-aba{background-color:var(--bg-card);color:var(--text);border:1px solid var(--border);padding:9px 18px;border-radius:6px;font-family:'Syne',sans-serif;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;transition:background-color .2s ease,border-color .2s ease}
+.btn-toggle-aba{background-color:var(--bg-card);color:var(--text);border:1px solid var(--border);padding:9px 18px;border-radius:6px;font-family:'Syne',sans-serif;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;transition:background-color .2s ease,border-color .2s ease;margin-bottom:20px!important;display:inline-block}
 .btn-toggle-aba:hover{background-color:var(--bg-hover);border-color:var(--gold-dim);color:var(--gold)}
-.painel-rateio-container{max-height:0;opacity:0;overflow:hidden;transition:max-height .35s cubic-bezier(0.4,0,0.2,1),opacity .25s ease-in-out,margin-top .35s ease;will-change:max-height,opacity;transform:translateZ(0)}
-.painel-rateio-container.aberto{max-height:3000px;opacity:1;margin-top:15px}
+.painel-rateio-container{max-height:0;opacity:0;overflow:hidden;transition:max-height .35s cubic-bezier(0.4,0,0.2,1),opacity .25s ease-in-out,margin-top .35s ease,padding-top .35s ease;will-change:max-height,opacity;transform:translateZ(0)}
+.painel-rateio-container.aberto{max-height:3000px!important;opacity:1;margin-top:15px;padding-top:10px}
+.painel-rateio-container>.sec-note,.painel-rateio-container>p,.texto-instrucao{margin-top:10px;margin-bottom:15px;line-height:1.5}
 .rodape-acoes{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:20px;padding-top:15px;border-top:1px solid var(--border);flex-wrap:wrap}
 .grupo-anexo{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:13px;flex:1;min-width:220px}
 .grupo-anexo label{font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);white-space:nowrap}
