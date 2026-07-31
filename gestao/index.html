@@ -1135,26 +1135,30 @@ function renderVerif(){
 
   // ─ Template de módulo (header + tabela + footer) ─
   function modulo(icon,titulo,itens,showKey,formHtml,totalExtra){
-    const showVar='show'+showKey;
-    const isOpen=window[showVar]||false;
+    const isOpen=window['show'+showKey]||false;
+    const isMin=window['min'+showKey]||false;
     const total=itens.reduce((s,cu)=>s+(+cu.val||0),0);
-    const pago=itens.filter(cu=>cu.st==='PAGO'&&cu.tipo!=='ERRO').reduce((s,cu)=>s+(+cu.val||0),0); // ERRO não é pagável
+    const pago=itens.filter(cu=>cu.st==='PAGO'&&cu.tipo!=='ERRO').reduce((s,cu)=>s+(+cu.val||0),0);
     const tblRows=itens.map(cu=>cuRow(cu)).join('');
     const hdCols='<tr><th style="text-align:left">Descrição</th><th>Valor</th><th>Vencimento</th><th>Pago em</th><th>Forma</th><th>Status</th><th style="text-align:left">Obs.</th><th>Ações</th></tr>';
     return`<div class="form-card" style="margin-bottom:16px;padding:0;overflow:hidden">
       <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;background:var(--bg-card);border-bottom:1px solid var(--border)">
-        <span style="font-family:'Syne',sans-serif;font-size:13px;font-weight:800;letter-spacing:.08em">${icon} ${titulo}</span>
+        <div style="display:flex;align-items:center;gap:10px">
+          <button onclick="window['min${showKey}']=!window['min${showKey}'];renderVerif()" title="${isMin?'Expandir':'Minimizar'}"
+            style="background:none;border:none;cursor:pointer;font-size:14px;color:var(--muted);padding:2px 6px;border-radius:4px;line-height:1">${isMin?'▶':'▼'}</button>
+          <span style="font-family:'Syne',sans-serif;font-size:13px;font-weight:800;letter-spacing:.08em">${icon} ${titulo}</span>
+        </div>
         <div style="display:flex;align-items:center;gap:12px">
           <span style="font-size:11px;color:var(--muted)">Pago: <span style="color:var(--green);font-weight:700">${fmt(pago)}</span> · Total: <span style="color:var(--gold);font-weight:700">${fmt(total+(totalExtra||0))}</span></span>
-          <button class="btn-ghost" onclick="window['show${showKey}']=!window['show${showKey}'];renderVerif()" style="font-size:11px">${isOpen?'− Fechar':'+ Lançamento'}</button>
+          ${isMin?'':`<button class="btn-ghost" onclick="window['show${showKey}']=!window['show${showKey}'];renderVerif()" style="font-size:11px">${isOpen?'− Fechar':'+ Lançamento'}</button>`}
         </div>
       </div>
-      ${isOpen?`<div style="padding:12px 16px;border-bottom:1px solid var(--border);background:var(--bg)">${formHtml}</div>`:''}
-      <div style="padding:12px 16px">
+      ${isMin?'':isOpen?`<div style="padding:12px 16px;border-bottom:1px solid var(--border);background:var(--bg)">${formHtml}</div>`:''}
+      ${isMin?'':`<div style="padding:12px 16px">
         ${itens.length?`<div class="tbl-wrap"><table>${hdCols}${tblRows}
           <tr class="tfoot"><td>TOTAL</td><td class="neg">${fmt(total)}</td><td colspan="2">Pago: <span class="pos">${fmt(pago)}</span></td><td>Pendente: <span class="gold">${fmt(total-pago)}</span></td><td colspan="3"></td></tr>
         </table></div>`:'<div class="empty" style="padding:10px 0;font-size:12px">Nenhuma despesa cadastrada nesta categoria.</div>'}
-      </div>
+      </div>`}
     </div>`;
   }
 
@@ -1240,16 +1244,21 @@ function renderVerif(){
   <button class="btn-gold" onclick="addCred()">Registrar Crediário</button>`;
 
   const isOpen1=window['showQUADRO']||false;
+  const isMin1=window['minQUADRO']||false;
   const mod1=`<div class="form-card" style="margin-bottom:16px;padding:0;overflow:hidden">
     <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;background:var(--bg-card);border-bottom:1px solid var(--border)">
-      <span style="font-family:'Syne',sans-serif;font-size:13px;font-weight:800;letter-spacing:.08em">👥 QUADRO DE FUNCIONÁRIOS</span>
+      <div style="display:flex;align-items:center;gap:10px">
+        <button onclick="window['minQUADRO']=!window['minQUADRO'];renderVerif()" title="${isMin1?'Expandir':'Minimizar'}"
+          style="background:none;border:none;cursor:pointer;font-size:14px;color:var(--muted);padding:2px 6px;border-radius:4px;line-height:1">${isMin1?'▶':'▼'}</button>
+        <span style="font-family:'Syne',sans-serif;font-size:13px;font-weight:800;letter-spacing:.08em">👥 QUADRO DE FUNCIONÁRIOS</span>
+      </div>
       <div style="display:flex;align-items:center;gap:12px">
         <span style="font-size:11px;color:var(--muted)">Total pessoal: <span style="color:var(--gold);font-weight:700">${fmt(totalF)}</span></span>
-        <button class="btn-ghost" onclick="window['showQUADRO']=!window['showQUADRO'];renderVerif()" style="font-size:11px">${isOpen1?'− Fechar':'+ Lançamento'}</button>
+        ${isMin1?'':`<button class="btn-ghost" onclick="window['showQUADRO']=!window['showQUADRO'];renderVerif()" style="font-size:11px">${isOpen1?'− Fechar':'+ Lançamento'}</button>`}
       </div>
     </div>
-    ${isOpen1?`<div style="padding:12px 16px;border-bottom:1px solid var(--border);background:var(--bg)">${mod1Form}</div>`:''}
-    <div style="padding:12px 16px">
+    ${isMin1?'':(isOpen1?`<div style="padding:12px 16px;border-bottom:1px solid var(--border);background:var(--bg)">${mod1Form}</div>`:'')}
+    ${isMin1?'<span style="display:none">':`<div style="padding:12px 16px">`}
       ${funs.length?`<div class="tbl-wrap" style="margin-bottom:16px"><table>
         <tr><th style="text-align:left">Nome</th><th>Salário</th><th>Adiant.</th><th>Vales</th><th>Bonific.</th><th>Crediário</th><th>Vales Mod.</th><th>Total</th><th>Status</th><th></th></tr>
         ${fRows}
@@ -1260,7 +1269,7 @@ function renderVerif(){
           <tr><th style="text-align:left">Descrição</th><th style="text-align:left">Funcionário</th><th>Total</th><th>Parcelas</th><th>Parcela/Mês</th><th>Status</th><th></th></tr>
           ${credRows}
         </table></div>`:''}
-    </div>
+    ${isMin1?'</span>':'</div>'}
   </div>`;
 
   // ── MOD 2: VALES FUNCIONÁRIOS ──
@@ -1570,7 +1579,7 @@ function renderDRE(){
   const lucroLiq=lucroBruto-t.taxas-despesas-t.cred-t.perdas; // Perdas subtraídas separadamente
 
   // ── Saldo de recompra
-  const disponivel=cmvManual-t.compras-t.perdas;
+  const disponivel=cmvManual-t.compras+t.perdas; // Perdas somam no disponível (não são compras)
 
   // ── Conferência
   const totalConf=totalBancos+t.finAReceber;
