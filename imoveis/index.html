@@ -1457,17 +1457,22 @@ function handleRateioFile(input){
     finalizarAnexo();
   }
 }
+function toggleRateioForm(){
+  ST.rateioFormAberto=!ST.rateioFormAberto;
+  if(!ST.rateioFormAberto)ST.rateioEditandoId=null;
+  render();
+}
 function renderRateio(){
   const lanc=load(pkPeriodo('rateio_lanc'));
   const editando=ST.rateioEditandoId?lanc.find(r=>r.id===ST.rateioEditandoId):null;
+  const aberto=!!(ST.rateioFormAberto||editando);
   const qtd=editando&&editando.partes?editando.partes.length:(ST.rateioQtd||3);
   return `
-  <div class="sec-note">Anexe a conta (PDF ou foto), escolha entre quantos imóveis ela será dividida e defina o percentual de cada um. O valor de cada parte é calculado automaticamente. Isso gera uma despesa direta e também um lançamento em "Contas" (com o mesmo boleto anexado) para cada imóvel selecionado.</div>
-  <div class="form-card" style="border-color:var(--gold-dim)">
-    <div class="sec-hdr"><h2>Anexar Conta para Rateio</h2><div class="sec-line"></div></div>
-    <input class="fi" type="file" id="rt-file-input" accept=".pdf,image/*" onchange="handleRateioFile(this)">
-    <div id="rt-file-status" style="font-size:12px;color:var(--dim);margin-top:8px"></div>
+  <div class="top-bar-controle" style="margin-bottom:16px">
+    <button id="btnToggleForm" class="${aberto?'btn-ghost':'btn-gold'}" onclick="toggleRateioForm()">${aberto?'Fechar':'+ Novo Lançamento'}</button>
   </div>
+  ${!aberto?'':`
+  <div class="sec-note">Anexe a conta (PDF ou foto) no rodapé do formulário abaixo, escolha entre quantos imóveis ela será dividida e defina o percentual de cada um. O valor de cada parte é calculado automaticamente. Isso gera uma despesa direta e também um lançamento em "Contas" (com o mesmo boleto anexado) para cada imóvel selecionado.</div>
   <div class="form-card" style="${editando?'border-color:var(--gold)':''}">
     <div class="sec-hdr"><h2>${editando?'Editando Rateio':'Lançar Rateio'}</h2><div class="sec-line"></div></div>
     ${editando?`<div class="sec-note" style="margin:0 0 14px">Ajustando o rateio de ${fmt(editando.valor)} lançado em ${editando.data||'—'}. Ao salvar, as despesas e os lançamentos em Contas vinculados serão recalculados.</div>`:''}
@@ -1487,13 +1492,20 @@ function renderRateio(){
     <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px">
       <span id="rt-soma-indicador" style="font-family:'Syne',sans-serif;font-size:13px;font-weight:700"></span>
     </div>
-    ${editando?`
-    <div style="display:flex;gap:10px">
-      <button class="btn-gold" style="flex:1" onclick="salvarEdicaoRateio('${editando.id}')">SALVAR ALTERAÇÕES</button>
-      <button class="btn-ghost" onclick="cancelarEdicaoRateio()">CANCELAR EDIÇÃO</button>
-    </div>`:`
-    <button class="btn-gold" onclick="confirmarRateio()">CONFIRMAR RATEIO</button>`}
-  </div>
+    <div id="rt-file-status" style="font-size:12px;color:var(--dim);margin-bottom:10px"></div>
+    <div class="rodape-acoes" style="display:flex;align-items:center;justify-content:space-between;gap:15px;flex-wrap:wrap;padding-top:15px;border-top:1px solid var(--border)">
+      <div class="grupo-anexo" style="display:flex;align-items:center;gap:10px;flex:1;min-width:220px">
+        <label style="font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);white-space:nowrap">Anexar Conta/Comprovante</label>
+        <input class="fi" type="file" id="rt-file-input" accept=".pdf,image/*" onchange="handleRateioFile(this)">
+      </div>
+      ${editando?`
+      <div style="display:flex;gap:10px">
+        <button class="btn-gold" onclick="salvarEdicaoRateio('${editando.id}')">SALVAR ALTERAÇÕES</button>
+        <button class="btn-ghost" onclick="cancelarEdicaoRateio()">CANCELAR EDIÇÃO</button>
+      </div>`:`
+      <button class="btn-gold" onclick="confirmarRateio()">CONFIRMAR RATEIO</button>`}
+    </div>
+  </div>`}
   <div class="sec-hdr"><h2>Rateios Lançados no Mês</h2><div class="sec-line"></div></div>
   <div class="tbl-wrap"><table>
     <thead><tr><th class="data-cel">Data</th><th>Valor Total</th><th>Divisão</th><th>Comprovantes</th><th></th></tr></thead>
@@ -1864,7 +1876,7 @@ function render(){
   const fns={dashboard:renderDash,alugueis:renderAlugueis,repasses:renderRepasses,despesas:renderDespesas,condominio:renderCondominio,rateio:renderRateio,imoveis:renderImoveis,pessoal:renderPessoal,dre:renderDRE};
   try{
     document.getElementById('content').innerHTML=(fns[ST.tab]||(()=>''))();
-    if(ST.tab==='rateio'){
+    if(ST.tab==='rateio' && document.getElementById('rt-linhas-container')){
       toggleComprovantePgtoRateio();
       if(ST.rateioEditandoId){
         const r=load(pkPeriodo('rateio_lanc')).find(x=>x.id===ST.rateioEditandoId);
