@@ -1544,7 +1544,7 @@ function renderDRE(){
   const verifMensal=calcVerifPago();
 
   // ── Saídas: banco = tudo exceto compras (excl. verificação mensal q é separada)
-  const bancoSaidas=sa.filter(r=>r.cat!=='Compra Mercadoria').reduce((s,r)=>s+(+r.val||0),0);
+  const bancoSaidas=sa.filter(r=>r.cat!=='Compra Mercadoria'&&r.cat!=='Perda').reduce((s,r)=>s+(+r.val||0),0); // Perda não sai do banco
   const totalSaidas=verifMensal+bancoSaidas+t.compras;
 
   // ── Bancos
@@ -1567,7 +1567,7 @@ function renderDRE(){
   const cmvManual=t.cmvEntradas||0; // CMV acumulado das Entradas
   const lucroBruto=fatTotal-cmvManual;
   const despesas=verifMensal+bancoSaidas; // tudo exceto compras
-  const lucroLiq=lucroBruto-t.taxas-despesas-t.cred;
+  const lucroLiq=lucroBruto-t.taxas-despesas-t.cred-t.perdas; // Perdas subtraídas separadamente
 
   // ── Saldo de recompra
   const disponivel=cmvManual-t.compras-t.perdas;
@@ -1647,6 +1647,7 @@ function renderDRE(){
       ${R('Lucro Bruto',lucroBruto,lucroBruto>=0?'pos':'neg',true)}
       ${R('(-) Taxas',-t.taxas,'neg')}
       ${R('(-) Despesas',-despesas,'neg')}
+      ${t.perdas>0?R('(-) Perdas',-t.perdas,'neg'):''}
       ${R('(-) Crediário Funcionário',-t.cred,'neg')}
       <div style="display:flex;justify-content:space-between;padding:12px 14px;background:var(--gold-bg);border-top:2px solid var(--gold)">
         <span style="font-family:'Syne',sans-serif;font-size:14px;font-weight:800;color:var(--text)">LUCRO LÍQUIDO</span>
@@ -2596,7 +2597,7 @@ function calcSaldoBancos(){
   const tgetnetB=t.en.reduce((s,r)=>s+(+r.tgetnet||0),0);
 
   // Saídas por banco (excluindo compras que ficam em pagbank por padrão)
-  const saiBanco=(bid)=>sa.filter(r=>(r.banco||'pagbank')===bid).reduce((s,r)=>s+(+r.val||0),0);
+  const saiBanco=(bid)=>sa.filter(r=>(r.banco||'pagbank')===bid&&r.cat!=='Perda').reduce((s,r)=>s+(+r.val||0),0);
 
   // Transferências
   const tIn=(bid)=>trans.filter(tr=>tr.para===bid).reduce((s,tr)=>s+(+tr.valor||0),0);
