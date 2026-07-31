@@ -1726,7 +1726,7 @@ function mkPizzaSVG(slices,colors){
   return out;
 }
 function mkColor(p){if(!p)return'var(--dim)';if(p>=1.05)return'#22c55e';if(p>=1.00)return'#4ade80';if(p>=0.95)return'#facc15';if(p>=0.90)return'#fb923c';return'var(--red)'}
-function mkBg(p){if(!p)return'transparent';if(p>=1.05)return'#052010';if(p>=1.00)return'#082A14';if(p>=0.95)return'#2A2000';if(p>=0.90)return'#2A1000';return'#2A0808'}
+function mkBg(p){if(!p)return'transparent';if(p>=1.05)return'#DCFCE7';if(p>=1.00)return'#F0FDF4';if(p>=0.95)return'#2A2000';if(p>=0.90)return'#2A1000';return'#2A0808'}
 function saveMkField(k,v){const d=mkCfg();d[k]=v;saveMkCfg(d)}
 
 function renderMarkup(){
