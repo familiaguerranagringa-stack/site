@@ -148,9 +148,13 @@ tr:hover td{background:var(--bg-hover)}
   <aside class="sidebar">
     <div class="sb-logo">
       <div class="sb-logo-eye">Família Guerra Holding</div>
-      <div class="sb-logo-name">IMÓVEIS</div>
-      <div class="sb-logo-sub">Gestão de Locações</div>
+      <select id="selectModulo" class="fi" style="font-family:'Syne',sans-serif;font-size:13px;font-weight:800;padding:6px 8px;margin:2px 0" onchange="trocarModulo(this.value)">
+        <option value="imoveis">IMÓVEIS (Gestão de Locações)</option>
+        <option value="pessoal">GUERRA PESSOAL (Finanças Pessoais)</option>
+      </select>
+      <div class="sb-logo-sub" id="sb-logo-sub">Gestão de Locações</div>
     </div>
+    <div id="menu-imoveis-only">
     <div class="sb-section">Visão Geral</div>
     <button class="sb-item active" data-tab="dashboard" onclick="setTab('dashboard',this)">📊 Dashboard</button>
     <div class="sb-section">Lançamentos</div>
@@ -163,6 +167,17 @@ tr:hover td{background:var(--bg-hover)}
     <button class="sb-item" data-tab="imoveis" onclick="setTab('imoveis',this)">🏢 Cadastro de Imóveis</button>
     <button class="sb-item" data-tab="pessoal" onclick="setTab('pessoal',this)">↪ Transferência p/ Pessoal</button>
     <button class="sb-item" data-tab="dre" onclick="setTab('dre',this)">📊 DRE</button>
+    </div>
+    <div id="menu-pessoal-only" style="display:none">
+    <div class="sb-section">Visão Geral</div>
+    <button class="sb-item" data-tab="gp_dashboard" onclick="setTab('gp_dashboard',this)">📊 Dashboard (Pessoal)</button>
+    <div class="sb-section">Lançamentos</div>
+    <button class="sb-item" data-tab="gp_entradas" onclick="setTab('gp_entradas',this)">💰 Entradas</button>
+    <button class="sb-item" data-tab="gp_contas" onclick="setTab('gp_contas',this)">📄 Contas</button>
+    <div class="sb-section">Gestão</div>
+    <button class="sb-item" data-tab="gp_cadastro" onclick="setTab('gp_cadastro',this)">📝 Cadastro</button>
+    <button class="sb-item" data-tab="gp_dre" onclick="setTab('gp_dre',this)">📈 DRE</button>
+    </div>
     <div class="sb-bottom">
       <button class="sb-item" id="btn-theme-toggle" onclick="alternarTema()" style="width:100%;margin:0 0 4px;color:var(--muted);display:flex;align-items:center;justify-content:space-between">
         <span id="theme-toggle-label">⚔️ Darkness</span>
@@ -208,7 +223,7 @@ const CREDS_EXTRA=[
 ];
 const MESES=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 const NOW=new Date();
-const ST={tab:'dashboard',mes:NOW.getMonth()+1,ano:NOW.getFullYear()};
+const ST={tab:'dashboard',modulo:'imoveis',mes:NOW.getMonth()+1,ano:NOW.getFullYear()};
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
 const fmt=n=>BRL.format(n||0);
 const vc=n=>n>0?'pos':n<0?'neg':'dim';
@@ -228,6 +243,8 @@ function notify(msg,type){
 // ── PERSISTÊNCIA LOCAL + CHAVES ──
 function pk(t){return `imoveisfg_${t}`}
 function pkPeriodo(t){return `imoveisfg_${t}_${ST.ano}_${pad2(ST.mes)}`}
+function ppk(t){return `pessoalfg_${t}`}
+function ppkPeriodo(t){return `pessoalfg_${t}_${ST.ano}_${pad2(ST.mes)}`}
 function load(k){try{return JSON.parse(localStorage.getItem(k)||'[]')}catch(e){return []}}
 function save(k,d){
   let localOk=true;
@@ -260,7 +277,7 @@ function _coletaDados(override){
   const d={_ts:Date.now()};
   for(let i=0;i<localStorage.length;i++){
     const k=localStorage.key(i);
-    if(k && k.startsWith('imoveisfg_')){
+    if(k && (k.startsWith('imoveisfg_')||k.startsWith('pessoalfg_'))){
       try{d[k]=JSON.parse(localStorage.getItem(k));}catch(e){d[k]=localStorage.getItem(k);}
     }
   }
@@ -283,7 +300,7 @@ function pushToFB(override){
 function aplicarDados(rec){
   if(!rec||typeof rec!=='object')return;
   Object.entries(rec).forEach(([k,v])=>{
-    if(k && k.startsWith('imoveisfg_')) localStorage.setItem(k,JSON.stringify(v));
+    if(k && (k.startsWith('imoveisfg_')||k.startsWith('pessoalfg_'))) localStorage.setItem(k,JSON.stringify(v));
   });
 }
 function syncFromFB(){
@@ -1842,10 +1859,17 @@ function renderPessoal(){
   </table></div>`;
 }
 function addTransferencia(){
+  const valor=+document.getElementById('ps-val').value||0;
+  const data=document.getElementById('ps-data').value;
+  const obs=document.getElementById('ps-obs').value.trim();
   const lst=load(pkPeriodo('transferencias'));
-  lst.push({id:uuid(),valor:+document.getElementById('ps-val').value||0,data:document.getElementById('ps-data').value,obs:document.getElementById('ps-obs').value.trim()});
+  lst.push({id:uuid(),valor,data,obs});
   save(pkPeriodo('transferencias'),lst);
-  notify('Transferência registrada','ok');render();
+  // Único ponto de integração: cria automaticamente uma Entrada no módulo Guerra Pessoal
+  const entradasPessoal=load(ppkPeriodo('entradas'));
+  entradasPessoal.push({id:uuid(),valor,data,obs:obs?`Repasse Imóveis — ${obs}`:'Repasse Imóveis',origem:'repasse'});
+  save(ppkPeriodo('entradas'),entradasPessoal);
+  notify('Transferência registrada — entrada criada automaticamente no Guerra Pessoal','ok');render();
 }
 
 // ── UTIL: excluir item genérico de listas do período ──
@@ -1967,7 +1991,302 @@ function renderDRE(){
 }
 
 // ── NAVEGAÇÃO ──
-const TITLES={dashboard:'Dashboard',alugueis:'Aluguéis',repasses:'Contas',despesas:'Despesas Diretas',condominio:'Condomínio Adiantado',rateio:'Contas Rateadas',imoveis:'Cadastro de Imóveis',pessoal:'Transferência para Pessoal',dre:'DRE — Resultado do Mês'};
+// ══════════════ MÓDULO GUERRA PESSOAL ══════════════
+function getCategoriasPessoal(){return load(ppk('categorias')).slice().sort((a,b)=>ordemNatural(a.nome,b.nome))}
+function categoriaNome(id){const c=getCategoriasPessoal().find(x=>x.id===id);return c?c.nome:'—'}
+function selectCategoriasPessoal(id){
+  const cats=getCategoriasPessoal();
+  if(!cats.length)return `<option value="">Cadastre uma categoria primeiro</option>`;
+  return cats.map(c=>`<option value="${c.id}"${c.id===id?' selected':''}>${c.nome}</option>`).join('');
+}
+function renderCadastroPessoal(){
+  const cats=getCategoriasPessoal();
+  return `
+  <div class="header-pagina" style="margin-bottom:0">
+    <button id="btnToggleCategoria" class="btn-toggle-aba" onclick="toggleJanela('btnToggleCategoria','painelNovaCategoria','+ Nova Categoria')">+ Nova Categoria</button>
+  </div>
+  <div id="painelNovaCategoria" class="painel-rateio-container">
+  <div class="sec-note">Categorias representam casas, pessoas, veículos ou qualquer grupo de gastos pessoais — totalmente separado do cadastro de imóveis.</div>
+  <div class="form-card">
+    <div class="sec-hdr"><h2>Nova Categoria</h2><div class="sec-line"></div></div>
+    <div class="fg">
+      <div class="fl"><label>Nome</label><input class="fi" id="pc-nome" placeholder="Ex: Casa Pontinha — James Mendonça"></div>
+      <div class="fl"><label>Tipo</label><select class="fi" id="pc-tipo"><option>Casa</option><option>Pessoa</option><option>Veículo</option><option>Outro</option></select></div>
+    </div>
+    <div class="rodape-acoes" style="justify-content:flex-end">
+      <button class="btn-submit-acao" onclick="addCategoriaPessoal()">+ ADICIONAR CATEGORIA</button>
+    </div>
+  </div>
+  </div>
+  <div class="sec-hdr"><h2>Categorias Cadastradas</h2><div class="sec-line"></div></div>
+  <div class="tbl-wrap"><table>
+    <thead><tr><th>Nome</th><th>Tipo</th><th></th></tr></thead>
+    <tbody>
+      ${cats.length?cats.map(c=>`<tr><td>${c.nome}</td><td>${c.tipo||'—'}</td><td><button class="btn-sm btn-ok" onclick="abrirEdicaoCategoriaPessoal('${c.id}')">editar</button> <button class="btn-sm" onclick="delCategoriaPessoal('${c.id}')">excluir</button></td></tr>`).join(''):`<tr><td colspan="3"><div class="empty">Nenhuma categoria cadastrada ainda.</div></td></tr>`}
+    </tbody>
+  </table></div>`;
+}
+function addCategoriaPessoal(){
+  const nome=document.getElementById('pc-nome').value.trim();
+  if(!nome){notify('Informe o nome da categoria','err');return;}
+  const cats=load(ppk('categorias'));
+  cats.push({id:uuid(),nome,tipo:document.getElementById('pc-tipo').value});
+  save(ppk('categorias'),cats);
+  notify('Categoria adicionada','ok');render();
+}
+function abrirEdicaoCategoriaPessoal(id){
+  const c=getCategoriasPessoal().find(x=>x.id===id);
+  if(!c)return;
+  document.getElementById('modal-root').innerHTML=`
+  <div class="modal-bg" onclick="if(event.target===this)fecharModal()">
+    <div class="modal">
+      <h2>Editar Categoria</h2>
+      <div class="fl" style="margin-bottom:12px"><label>Nome</label><input class="fi" id="ec-nome" value="${(c.nome||'').replace(/"/g,'&quot;')}"></div>
+      <div class="fl" style="margin-bottom:20px"><label>Tipo</label><select class="fi" id="ec-tipo">${['Casa','Pessoa','Veículo','Outro'].map(t=>`<option${c.tipo===t?' selected':''}>${t}</option>`).join('')}</select></div>
+      <div style="display:flex;gap:10px">
+        <button class="btn-gold" style="flex:1" onclick="salvarEdicaoCategoriaPessoal('${id}')">Salvar</button>
+        <button class="btn-ghost" onclick="fecharModal()">Cancelar</button>
+      </div>
+    </div>
+  </div>`;
+}
+function salvarEdicaoCategoriaPessoal(id){
+  const cats=load(ppk('categorias'));
+  const c=cats.find(x=>x.id===id);
+  if(!c)return;
+  c.nome=document.getElementById('ec-nome').value.trim()||c.nome;
+  c.tipo=document.getElementById('ec-tipo').value;
+  save(ppk('categorias'),cats);
+  fecharModal();
+  notify('Categoria atualizada','ok');render();
+}
+function delCategoriaPessoal(id){
+  if(!confirm('Excluir esta categoria?'))return;
+  save(ppk('categorias'),load(ppk('categorias')).filter(c=>c.id!==id));
+  render();
+}
+
+// ── ENTRADAS ──
+function renderEntradasPessoal(){
+  const lst=load(ppkPeriodo('entradas'));
+  const total=lst.reduce((s,r)=>s+(+r.valor||0),0);
+  return `
+  <div class="header-pagina" style="margin-bottom:0">
+    <button id="btnToggleEntrada" class="btn-toggle-aba" onclick="toggleJanela('btnToggleEntrada','painelNovaEntrada','+ Nova Entrada')">+ Nova Entrada</button>
+  </div>
+  <div id="painelNovaEntrada" class="painel-rateio-container">
+  <div class="sec-note">Entradas de dinheiro pessoal — inclui o repasse automático vindo da aba "Transferência p/ Pessoal" do módulo Imóveis, além de outras entradas manuais.</div>
+  <div class="form-card">
+    <div class="sec-hdr"><h2>Nova Entrada</h2><div class="sec-line"></div></div>
+    <div class="fg">
+      <div class="fl"><label>Valor</label><input class="fi" id="pe-val" type="number" step="0.01" placeholder="0,00"></div>
+      <div class="fl"><label>Data</label><input class="fi" id="pe-data" type="date" value="${today()}"></div>
+      <div class="fl"><label>Observação</label><input class="fi" id="pe-obs" placeholder="opcional"></div>
+    </div>
+    <div class="rodape-acoes">
+      <div class="grupo-anexo">
+        <label>Anexar Comprovante</label>
+        <input class="fi" type="file" id="pe-file" accept=".pdf,image/*">
+      </div>
+      <button class="btn-submit-acao" onclick="addEntradaPessoal()">+ REGISTRAR ENTRADA</button>
+    </div>
+  </div>
+  </div>
+  <div class="tbl-wrap"><table>
+    <thead><tr><th class="data-cel">Data</th><th>Valor</th><th>Origem</th><th>Observação</th><th>Comprovante</th><th></th></tr></thead>
+    <tbody>
+      ${lst.length?lst.map(r=>`<tr><td class="data-cel">${r.data?formatarDataBR(r.data):'—'}</td><td class="pos">${fmt(r.valor)}</td><td>${r.origem==='repasse'?'<span class="badge b-blue">Repasse Imóveis</span>':'Manual'}</td><td class="dim">${r.obs||'—'}</td><td>${comprovanteChipRotulo(r.comprovante,'📎 ANEXO')}</td><td><button class="btn-sm" onclick="delItemPessoal('entradas','${r.id}')">excluir</button></td></tr>`).join(''):`<tr><td colspan="6"><div class="empty">Nenhuma entrada neste mês.</div></td></tr>`}
+    </tbody>
+    <tfoot><tr class="tfoot"><td>Total Entradas</td><td class="pos">${fmt(total)}</td><td colspan="4"></td></tr></tfoot>
+  </table></div>`;
+}
+function addEntradaPessoal(){
+  const valor=+document.getElementById('pe-val').value||0;
+  if(valor<=0){notify('Informe o valor da entrada','err');return;}
+  const base={id:uuid(),valor,data:document.getElementById('pe-data').value,obs:document.getElementById('pe-obs').value.trim(),origem:'manual'};
+  const fComp=document.getElementById('pe-file');
+  lerArquivo(fComp,()=>nomeAutomatico('PESSOAL','ENTRADA'),(comp)=>{
+    base.comprovante=comp;
+    const lst=load(ppkPeriodo('entradas'));
+    lst.push(base);
+    save(ppkPeriodo('entradas'),lst);
+    notify('Entrada registrada','ok');render();
+  });
+}
+function delItemPessoal(tipo,id){
+  save(ppkPeriodo(tipo),load(ppkPeriodo(tipo)).filter(r=>r.id!==id));render();
+}
+
+// ── CONTAS (Pessoal) ──
+function renderContasPessoal(){
+  const cats=getCategoriasPessoal();
+  const lst=load(ppkPeriodo('contas')).sort((a,b)=>ordemNatural(categoriaNome(a.categoriaId),categoriaNome(b.categoriaId)));
+  return `
+  <div class="header-pagina" style="margin-bottom:0">
+    <button id="btnToggleContaPessoal" class="btn-toggle-aba" onclick="toggleJanela('btnToggleContaPessoal','painelNovaContaPessoal','+ Nova Conta')">+ Nova Conta</button>
+  </div>
+  <div id="painelNovaContaPessoal" class="painel-rateio-container">
+  <div class="sec-note">Contas e gastos pessoais — internet, luz, água, mesada, IPTU, manutenção, etc. — vinculados a uma categoria (casa, pessoa ou veículo).</div>
+  <div class="form-card">
+    <div class="sec-hdr"><h2>Nova Conta</h2><div class="sec-line"></div></div>
+    <div class="fg">
+      <div class="fl"><label>Categoria</label><select class="fi" id="pcn-cat">${selectCategoriasPessoal()}</select></div>
+      <div class="fl"><label>Especificação</label><input class="fi" id="pcn-desc" placeholder="Ex: Internet, Luz, Mesada..."></div>
+      <div class="fl"><label>Valor</label><input class="fi" id="pcn-val" type="number" step="0.01" placeholder="0,00"></div>
+      <div class="fl"><label>Forma de Pagamento</label><select class="fi" id="pcn-forma"><option>Boleto</option><option>Pix</option><option>Dinheiro</option><option>Contra Cheque</option><option>Cartão</option></select></div>
+      <div class="fl"><label>Data de Vencimento</label><input class="fi" id="pcn-venc" type="date" value="${today()}"></div>
+      <div class="fl"><label>Status</label><select class="fi" id="pcn-status" onchange="toggleComprovantePgtoPessoal()">${statusOptions('a_pagar')}</select></div>
+      <div class="fl"><label>Observações</label><input class="fi" id="pcn-obs" placeholder="opcional"></div>
+    </div>
+    <div id="pcn-comprovante-wrap" style="display:none;margin-bottom:14px">
+      <div class="fl"><label>Anexar Comprovante de Pagamento <span style="color:var(--red)">*obrigatório</span></label><input class="fi" id="pcn-comprovante" type="file" accept=".pdf,image/*"></div>
+    </div>
+    <div class="rodape-acoes">
+      <div class="grupo-anexo">
+        <label>Boleto</label>
+        <input class="fi" type="file" id="pcn-boleto" accept=".pdf,image/*" style="width:180px">
+      </div>
+      <button class="btn-submit-acao" onclick="addContaPessoal(this)">+ REGISTRAR</button>
+    </div>
+  </div>
+  </div>
+  <div class="tbl-wrap"><table style="table-layout:fixed;width:100%">
+    <colgroup><col style="width:16%"><col style="width:16%"><col style="width:8%"><col style="width:9%"><col style="width:9%"><col style="width:9%"><col style="width:9%"><col style="width:9%"><col style="width:8%"><col style="width:7%"></colgroup>
+    <thead><tr><th>Categoria</th><th>Especificação</th><th>Valor</th><th>Forma</th><th class="data-cel">Vencimento</th><th class="data-cel">Data Pagto</th><th>Status</th><th>Obs</th><th>Comprov.</th><th>Ações</th></tr></thead>
+    <tbody>
+      ${lst.length?lst.map(r=>`<tr><td>${categoriaNome(r.categoriaId)}</td><td>${r.desc}</td><td class="neg">${fmt(r.valor)}</td><td>${r.forma||'—'}</td><td class="data-cel">${r.vencimento?formatarDataBR(r.vencimento):'—'}</td><td class="data-cel">${r.dataPagamento?formatarDataBR(r.dataPagamento):'—'}</td><td>${statusBadge({status:r.status,envio:r.vencimento})}</td><td class="dim" title="${(r.obs||'').replace(/"/g,'&quot;')}" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.obs||'—'}</td><td>${comprovanteChipRotulo(r.comprovantePagamento,'🧾 COMPROV.')}</td><td style="white-space:nowrap">${r.status!=='pago'?`<button class="btn-sm btn-ok" onclick="marcarContaPessoalPaga('${r.id}')" title="marcar pago">✓</button> `:''}<button class="btn-sm" onclick="delItemPessoal('contas','${r.id}')">excluir</button></td></tr>`).join(''):`<tr><td colspan="10"><div class="empty">Nenhuma conta lançada neste mês.</div></td></tr>`}
+    </tbody>
+  </table></div>`;
+}
+function toggleComprovantePgtoPessoal(){
+  const status=document.getElementById('pcn-status').value;
+  const wrap=document.getElementById('pcn-comprovante-wrap');
+  const input=document.getElementById('pcn-comprovante');
+  if(!wrap)return;
+  if(status==='pago'){wrap.style.display='block';if(input)input.setAttribute('required','required');}
+  else{wrap.style.display='none';if(input){input.removeAttribute('required');input.value='';}}
+}
+function addContaPessoal(btn){
+  const categoriaId=document.getElementById('pcn-cat').value;
+  if(!categoriaId){notify('Cadastre e selecione uma categoria','err');return;}
+  const status=document.getElementById('pcn-status').value;
+  const fComp=document.getElementById('pcn-comprovante');
+  if(status==='pago' && (!fComp||!fComp.files[0])){
+    notify('Status "Pago" exige o comprovante de pagamento anexado','err');
+    return;
+  }
+  const base={id:uuid(),categoriaId,desc:document.getElementById('pcn-desc').value.trim()||'Despesa',valor:+document.getElementById('pcn-val').value||0,forma:document.getElementById('pcn-forma').value,vencimento:document.getElementById('pcn-venc').value,status,obs:document.getElementById('pcn-obs').value.trim(),dataPagamento:status==='pago'?today():null};
+  const fBoleto=document.getElementById('pcn-boleto');
+  const textoOriginal=btn?btn.textContent:null;
+  if(btn){btn.disabled=true;btn.textContent='Enviando...';btn.style.opacity='0.6';}
+  const restaurar=()=>{if(btn){btn.disabled=false;btn.textContent=textoOriginal;btn.style.opacity='1';}};
+  lerArquivo(fBoleto,()=>nomeAutomatico(categoriaNome(categoriaId),base.desc+'-BOLETO'),(boleto)=>{
+    base.boleto=boleto;
+    lerArquivo(fComp,()=>nomeAutomatico(categoriaNome(categoriaId),base.desc+'-COMPROVANTE'),(comp)=>{
+      base.comprovantePagamento=comp;
+      const lst=load(ppkPeriodo('contas'));
+      lst.push(base);
+      save(ppkPeriodo('contas'),lst);
+      restaurar();
+      notify('Conta registrada','ok');render();
+    });
+  });
+}
+function marcarContaPessoalPaga(id){
+  document.getElementById('modal-root').innerHTML=`
+  <div class="modal-bg" onclick="if(event.target===this)fecharModal()">
+    <div class="modal" style="width:400px">
+      <h2>Marcar como Pago</h2>
+      <p>Anexe o comprovante de pagamento (obrigatório).</p>
+      <div class="fl" style="margin-bottom:20px"><label>Comprovante de Pagamento <span style="color:var(--red)">*obrigatório</span></label><input class="fi" id="mpp-comp" type="file" accept=".pdf,image/*"></div>
+      <div style="display:flex;gap:10px">
+        <button class="btn-gold" style="flex:1" onclick="confirmarContaPessoalPaga('${id}')">Confirmar Pagamento</button>
+        <button class="btn-ghost" onclick="fecharModal()">Cancelar</button>
+      </div>
+    </div>
+  </div>`;
+}
+function confirmarContaPessoalPaga(id){
+  const lst=load(ppkPeriodo('contas'));
+  const it=lst.find(r=>r.id===id);
+  if(!it)return;
+  const fComp=document.getElementById('mpp-comp');
+  if(!fComp.files[0] && !it.comprovantePagamento){
+    notify('Anexe o comprovante de pagamento para marcar como pago','err');
+    return;
+  }
+  lerArquivo(fComp,()=>nomeAutomatico(categoriaNome(it.categoriaId),it.desc+'-COMPROVANTE'),(comp)=>{
+    if(comp)it.comprovantePagamento=comp;
+    it.status='pago';
+    it.dataPagamento=today();
+    save(ppkPeriodo('contas'),lst);
+    fecharModal();
+    notify('Marcado como pago','ok');render();
+    playSuccessSound();
+  });
+}
+
+// ── DASHBOARD (Pessoal) ──
+function calcMesPessoal(){
+  const entradas=load(ppkPeriodo('entradas'));
+  const contas=load(ppkPeriodo('contas'));
+  const totalEntradas=entradas.reduce((s,r)=>s+(+r.valor||0),0);
+  const gastosPago=contas.filter(c=>c.status==='pago').reduce((s,c)=>s+(+c.valor||0),0);
+  const gastosAPagar=contas.filter(c=>c.status!=='pago').reduce((s,c)=>s+(+c.valor||0),0);
+  return {totalEntradas,gastosPago,gastosAPagar,saldoLiquido:totalEntradas-gastosPago};
+}
+function renderDashPessoal(){
+  const c=calcMesPessoal();
+  const cats=getCategoriasPessoal();
+  const contas=load(ppkPeriodo('contas'));
+  const porCategoria=cats.map(cat=>{
+    const pago=contas.filter(x=>x.categoriaId===cat.id&&x.status==='pago').reduce((s,x)=>s+(+x.valor||0),0);
+    const aPagar=contas.filter(x=>x.categoriaId===cat.id&&x.status!=='pago').reduce((s,x)=>s+(+x.valor||0),0);
+    return {cat,pago,aPagar};
+  }).filter(p=>p.pago>0||p.aPagar>0);
+  return `
+  <div class="kpi-grid">
+    <div class="kpi"><div class="kpi-accent" style="background:var(--gold)"></div><div class="kpi-label">Total Entradas</div><div class="kpi-value pos">${fmt(c.totalEntradas)}</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--red)"></div><div class="kpi-label">Gastos Pessoais (Pago)</div><div class="kpi-value neg">${fmt(c.gastosPago)}</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--amber)"></div><div class="kpi-label">Gastos a Pagar</div><div class="kpi-value" style="color:var(--amber)">${fmt(c.gastosAPagar)}</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--blue)"></div><div class="kpi-label">Saldo Líquido Pessoal</div><div class="kpi-value ${vc(c.saldoLiquido)}">${fmt(c.saldoLiquido)}</div></div>
+  </div>
+  <div class="sec-hdr"><h2>Gastos por Categoria</h2><div class="sec-line"></div></div>
+  <div class="tbl-wrap"><table>
+    <thead><tr><th>Categoria</th><th>Pago</th><th>A Pagar</th></tr></thead>
+    <tbody>
+      ${porCategoria.length?porCategoria.map(p=>`<tr><td>${p.cat.nome}</td><td class="neg">${fmt(p.pago)}</td><td style="color:var(--amber)">${fmt(p.aPagar)}</td></tr>`).join(''):`<tr><td colspan="3"><div class="empty">Cadastre categorias e lance contas para ver o resultado aqui.</div></td></tr>`}
+    </tbody>
+  </table></div>`;
+}
+function renderDREPessoal(){
+  const c=calcMesPessoal();
+  const row=(l,v,cls)=>`<div class="dre-row"><div class="dre-l">${l}</div><div class="dre-v ${cls||''}">${fmt(v)}</div></div>`;
+  return `
+  <div class="dre-hdr"><div class="dre-row"><div class="dre-l">Entradas</div></div></div>
+  ${row('Total de Entradas',c.totalEntradas,'pos')}
+  <div class="dre-hdr"><div class="dre-row"><div class="dre-l">Gastos</div></div></div>
+  ${row('Gastos Pagos',c.gastosPago,'neg')}
+  ${row('Gastos a Pagar (não abate do saldo ainda)',c.gastosAPagar,'')}
+  <div class="dre-sub"><div class="dre-row"><div class="dre-l">Saldo Líquido Pessoal</div><div class="dre-v ${vc(c.saldoLiquido)}">${fmt(c.saldoLiquido)}</div></div></div>
+  <div class="sec-note" style="margin-top:20px">Saldo Líquido = Total de Entradas − Gastos já Pagos. Gastos "a pagar" ainda não saíram do seu caixa, por isso não abatem o saldo.</div>
+  `;
+}
+
+const TITLES={dashboard:'Dashboard',alugueis:'Aluguéis',repasses:'Contas',despesas:'Despesas Diretas',condominio:'Condomínio Adiantado',rateio:'Contas Rateadas',imoveis:'Cadastro de Imóveis',pessoal:'Transferência para Pessoal',dre:'DRE — Resultado do Mês',gp_dashboard:'Dashboard (Pessoal)',gp_entradas:'Entradas',gp_contas:'Contas',gp_cadastro:'Cadastro',gp_dre:'DRE — Guerra Pessoal'};
+function trocarModulo(modulo){
+  ST.modulo=modulo;
+  document.getElementById('menu-imoveis-only').style.display=modulo==='imoveis'?'block':'none';
+  document.getElementById('menu-pessoal-only').style.display=modulo==='pessoal'?'block':'none';
+  document.getElementById('sb-logo-sub').textContent=modulo==='pessoal'?'Finanças Pessoais':'Gestão de Locações';
+  document.body.classList.toggle('modulo-pessoal',modulo==='pessoal');
+  document.querySelectorAll('.sb-item[data-tab]').forEach(b=>b.classList.remove('active'));
+  const primeiroTab=modulo==='pessoal'?'gp_dashboard':'dashboard';
+  ST.tab=primeiroTab;
+  const btn=document.querySelector(`.sb-item[data-tab="${primeiroTab}"]`);
+  if(btn)btn.classList.add('active');
+  render();
+}
 function setTab(tab,btn){
   ST.tab=tab;
   document.querySelectorAll('.sb-item[data-tab]').forEach(b=>b.classList.remove('active'));
@@ -1976,7 +2295,7 @@ function setTab(tab,btn){
 }
 function render(){
   document.getElementById('tb-title').textContent=TITLES[ST.tab]||'';
-  const fns={dashboard:renderDash,alugueis:renderAlugueis,repasses:renderRepasses,despesas:renderDespesas,condominio:renderCondominio,rateio:renderRateio,imoveis:renderImoveis,pessoal:renderPessoal,dre:renderDRE};
+  const fns={dashboard:renderDash,alugueis:renderAlugueis,repasses:renderRepasses,despesas:renderDespesas,condominio:renderCondominio,rateio:renderRateio,imoveis:renderImoveis,pessoal:renderPessoal,dre:renderDRE,gp_dashboard:renderDashPessoal,gp_entradas:renderEntradasPessoal,gp_contas:renderContasPessoal,gp_cadastro:renderCadastroPessoal,gp_dre:renderDREPessoal};
   try{
     document.getElementById('content').innerHTML=(fns[ST.tab]||(()=>''))();
     if(ST.tab==='rateio' && document.getElementById('rt-linhas-container')){
