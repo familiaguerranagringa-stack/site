@@ -34,6 +34,14 @@ html,body{min-height:100vh;background:var(--bg);color:var(--text);font-family:'D
 .sb-logo-eye{font-family:'Syne',sans-serif;font-size:9px;font-weight:700;letter-spacing:.22em;color:var(--gold);text-transform:uppercase;margin-bottom:4px}
 .sb-logo-name{font-family:'Syne',sans-serif;font-size:15px;font-weight:800;color:var(--text);line-height:1.1}
 .sb-logo-sub{font-size:10px;color:var(--dim);margin-top:2px}
+.toggle-modulo-wrapper{margin-top:10px;display:flex;align-items:center;gap:8px}
+.switch-modulo{position:relative;display:inline-block;width:50px;height:26px;flex-shrink:0}
+.switch-modulo input{opacity:0;width:0;height:0}
+.switch-modulo .slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background-color:var(--bg);border:1.5px solid #10B981;box-shadow:0 0 8px rgba(16,185,129,.4);border-radius:34px;transition:all .3s ease-in-out}
+.switch-modulo .slider:before{position:absolute;content:"";height:18px;width:18px;left:3px;bottom:2.5px;background-color:#fff;border-radius:50%;transition:transform .3s ease-in-out;box-shadow:0 2px 4px rgba(0,0,0,.4)}
+.switch-modulo input:checked+.slider{border-color:#3B82F6;box-shadow:0 0 8px rgba(59,130,246,.5)}
+.switch-modulo input:checked+.slider:before{transform:translateX(23px)}
+.toggle-modulo-legenda{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
 .sb-section{padding:12px 18px 4px;font-size:9px;font-weight:700;letter-spacing:.18em;color:var(--dim);text-transform:uppercase}
 .sb-item{display:flex;align-items:center;gap:10px;padding:9px 14px;margin:1px 8px;border-radius:6px;cursor:pointer;transition:all .15s;color:var(--muted);font-size:12px;font-weight:500;border:none;background:none;width:calc(100% - 16px);text-align:left;font-family:'DM Sans',sans-serif}
 .sb-item:hover{background:var(--bg-hover);color:var(--text)}
@@ -148,11 +156,15 @@ tr:hover td{background:var(--bg-hover)}
   <aside class="sidebar">
     <div class="sb-logo">
       <div class="sb-logo-eye">Família Guerra Holding</div>
-      <select id="selectModulo" class="fi" style="font-family:'Syne',sans-serif;font-size:13px;font-weight:800;padding:6px 8px;margin:2px 0" onchange="trocarModulo(this.value)">
-        <option value="imoveis">IMÓVEIS (Gestão de Locações)</option>
-        <option value="pessoal">GUERRA PESSOAL (Finanças Pessoais)</option>
-      </select>
+      <div class="sb-logo-name" id="brandTitle">IMÓVEIS</div>
       <div class="sb-logo-sub" id="sb-logo-sub">Gestão de Locações</div>
+      <div class="toggle-modulo-wrapper">
+        <label class="switch-modulo">
+          <input type="checkbox" id="toggleModulo" onchange="alternarModulo(this.checked)">
+          <span class="slider"></span>
+        </label>
+        <span class="toggle-modulo-legenda" id="toggleModuloLegenda">Imóveis</span>
+      </div>
     </div>
     <div id="menu-imoveis-only">
     <div class="sb-section">Visão Geral</div>
@@ -1867,7 +1879,7 @@ function addTransferencia(){
   save(pkPeriodo('transferencias'),lst);
   // Único ponto de integração: cria automaticamente uma Entrada no módulo Guerra Pessoal
   const entradasPessoal=load(ppkPeriodo('entradas'));
-  entradasPessoal.push({id:uuid(),valor,data,obs:obs?`Repasse Imóveis — ${obs}`:'Repasse Imóveis',origem:'repasse'});
+  entradasPessoal.push({id:uuid(),valor,data,obs:obs||'',origem:'REPASSE IMÓVEIS'});
   save(ppkPeriodo('entradas'),entradasPessoal);
   notify('Transferência registrada — entrada criada automaticamente no Guerra Pessoal','ok');render();
 }
@@ -2070,6 +2082,11 @@ function delCategoriaPessoal(id){
 function renderEntradasPessoal(){
   const lst=load(ppkPeriodo('entradas'));
   const total=lst.reduce((s,r)=>s+(+r.valor||0),0);
+  const badgeOrigem=(origem)=>{
+    if(origem==='REPASSE IMÓVEIS')return `<span class="badge b-blue">${origem}</span>`;
+    if(!origem)return '<span class="dim">—</span>';
+    return `<span class="badge b-pend">${origem}</span>`;
+  };
   return `
   <div class="header-pagina" style="margin-bottom:0">
     <button id="btnToggleEntrada" class="btn-toggle-aba" onclick="toggleJanela('btnToggleEntrada','painelNovaEntrada','+ Nova Entrada')">+ Nova Entrada</button>
@@ -2079,6 +2096,7 @@ function renderEntradasPessoal(){
   <div class="form-card">
     <div class="sec-hdr"><h2>Nova Entrada</h2><div class="sec-line"></div></div>
     <div class="fg">
+      <div class="fl"><label>Origem</label><select class="fi" id="pe-origem"><option>REPASSE IMÓVEIS</option><option>ARENA</option><option>SOFTWARE</option><option>LEANDRO PESSOAL</option></select></div>
       <div class="fl"><label>Valor</label><input class="fi" id="pe-val" type="number" step="0.01" placeholder="0,00"></div>
       <div class="fl"><label>Data</label><input class="fi" id="pe-data" type="date" value="${today()}"></div>
       <div class="fl"><label>Observação</label><input class="fi" id="pe-obs" placeholder="opcional"></div>
@@ -2095,7 +2113,7 @@ function renderEntradasPessoal(){
   <div class="tbl-wrap"><table>
     <thead><tr><th class="data-cel">Data</th><th>Valor</th><th>Origem</th><th>Observação</th><th>Comprovante</th><th></th></tr></thead>
     <tbody>
-      ${lst.length?lst.map(r=>`<tr><td class="data-cel">${r.data?formatarDataBR(r.data):'—'}</td><td class="pos">${fmt(r.valor)}</td><td>${r.origem==='repasse'?'<span class="badge b-blue">Repasse Imóveis</span>':'Manual'}</td><td class="dim">${r.obs||'—'}</td><td>${comprovanteChipRotulo(r.comprovante,'📎 ANEXO')}</td><td><button class="btn-sm" onclick="delItemPessoal('entradas','${r.id}')">excluir</button></td></tr>`).join(''):`<tr><td colspan="6"><div class="empty">Nenhuma entrada neste mês.</div></td></tr>`}
+      ${lst.length?lst.map(r=>`<tr><td class="data-cel">${r.data?formatarDataBR(r.data):'—'}</td><td class="pos">${fmt(r.valor)}</td><td>${badgeOrigem(r.origem)}</td><td class="dim">${r.obs||'—'}</td><td>${comprovanteChipRotulo(r.comprovante,'📎 ANEXO')}</td><td><button class="btn-sm" onclick="delItemPessoal('entradas','${r.id}')">excluir</button></td></tr>`).join(''):`<tr><td colspan="6"><div class="empty">Nenhuma entrada neste mês.</div></td></tr>`}
     </tbody>
     <tfoot><tr class="tfoot"><td>Total Entradas</td><td class="pos">${fmt(total)}</td><td colspan="4"></td></tr></tfoot>
   </table></div>`;
@@ -2103,7 +2121,7 @@ function renderEntradasPessoal(){
 function addEntradaPessoal(){
   const valor=+document.getElementById('pe-val').value||0;
   if(valor<=0){notify('Informe o valor da entrada','err');return;}
-  const base={id:uuid(),valor,data:document.getElementById('pe-data').value,obs:document.getElementById('pe-obs').value.trim(),origem:'manual'};
+  const base={id:uuid(),valor,data:document.getElementById('pe-data').value,obs:document.getElementById('pe-obs').value.trim(),origem:document.getElementById('pe-origem').value};
   const fComp=document.getElementById('pe-file');
   lerArquivo(fComp,()=>nomeAutomatico('PESSOAL','ENTRADA'),(comp)=>{
     base.comprovante=comp;
@@ -2278,14 +2296,22 @@ function trocarModulo(modulo){
   ST.modulo=modulo;
   document.getElementById('menu-imoveis-only').style.display=modulo==='imoveis'?'block':'none';
   document.getElementById('menu-pessoal-only').style.display=modulo==='pessoal'?'block':'none';
+  document.getElementById('brandTitle').textContent=modulo==='pessoal'?'GUERRA PESSOAL':'IMÓVEIS';
   document.getElementById('sb-logo-sub').textContent=modulo==='pessoal'?'Finanças Pessoais':'Gestão de Locações';
+  document.getElementById('toggleModuloLegenda').textContent=modulo==='pessoal'?'Guerra Pessoal':'Imóveis';
+  const chk=document.getElementById('toggleModulo');
+  if(chk)chk.checked=modulo==='pessoal';
   document.body.classList.toggle('modulo-pessoal',modulo==='pessoal');
+  document.body.classList.toggle('tema-pessoal',modulo==='pessoal');
   document.querySelectorAll('.sb-item[data-tab]').forEach(b=>b.classList.remove('active'));
   const primeiroTab=modulo==='pessoal'?'gp_dashboard':'dashboard';
   ST.tab=primeiroTab;
   const btn=document.querySelector(`.sb-item[data-tab="${primeiroTab}"]`);
   if(btn)btn.classList.add('active');
   render();
+}
+function alternarModulo(isPessoal){
+  trocarModulo(isPessoal?'pessoal':'imoveis');
 }
 function setTab(tab,btn){
   ST.tab=tab;
