@@ -30,11 +30,12 @@ html,body{min-height:100vh;background:var(--bg);color:var(--text);font-family:'D
 .main{flex:1;display:flex;flex-direction:column;min-width:0}
 .topbar{height:56px;background:var(--bg-card);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 24px;gap:16px;flex-shrink:0;position:sticky;top:0;z-index:50}
 .content{flex:1;padding:28px 24px 80px;overflow-y:auto}
-.sb-logo{padding:20px 18px 14px;border-bottom:1px solid var(--border)}
+.sb-logo{padding:20px 18px 14px;border-bottom:1px solid var(--border);min-height:150px;box-sizing:border-box;display:flex;flex-direction:column}
+.sb-logo-name-wrap{height:38px;display:flex;align-items:center;margin:4px 0 2px}
 .sb-logo-eye{font-family:'Syne',sans-serif;font-size:9px;font-weight:700;letter-spacing:.22em;color:var(--gold);text-transform:uppercase;margin-bottom:4px}
 .sb-logo-name{font-family:'Syne',sans-serif;font-size:15px;font-weight:800;color:var(--text);line-height:1.1}
 .sb-logo-sub{font-size:10px;color:var(--dim);margin-top:2px}
-.toggle-modulo-wrapper{margin-top:10px;display:flex;align-items:center;gap:8px}
+.toggle-modulo-wrapper{margin-top:10px;display:flex;align-items:center;gap:8px;height:26px}
 .switch-modulo{position:relative;display:inline-block;width:50px;height:26px;flex-shrink:0}
 .switch-modulo input{opacity:0;width:0;height:0}
 .switch-modulo .slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background-color:var(--bg);border:1.5px solid #10B981;box-shadow:0 0 8px rgba(16,185,129,.4);border-radius:34px;transition:all .3s ease-in-out}
@@ -42,6 +43,9 @@ html,body{min-height:100vh;background:var(--bg);color:var(--text);font-family:'D
 .switch-modulo input:checked+.slider{border-color:#3B82F6;box-shadow:0 0 8px rgba(59,130,246,.5)}
 .switch-modulo input:checked+.slider:before{transform:translateX(23px)}
 .toggle-modulo-legenda{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.alerta-imovel-link{margin-top:6px;font-size:11px;display:flex;align-items:center;gap:6px;color:var(--muted)}
+.alerta-imovel-link a{color:var(--gold);text-decoration:underline;font-weight:600;cursor:pointer}
+.alerta-imovel-link a:hover{color:var(--gold-lt)}
 .sb-section{padding:12px 18px 4px;font-size:9px;font-weight:700;letter-spacing:.18em;color:var(--dim);text-transform:uppercase}
 .sb-item{display:flex;align-items:center;gap:10px;padding:9px 14px;margin:1px 8px;border-radius:6px;cursor:pointer;transition:all .15s;color:var(--muted);font-size:12px;font-weight:500;border:none;background:none;width:calc(100% - 16px);text-align:left;font-family:'DM Sans',sans-serif}
 .sb-item:hover{background:var(--bg-hover);color:var(--text)}
@@ -156,7 +160,7 @@ tr:hover td{background:var(--bg-hover)}
   <aside class="sidebar">
     <div class="sb-logo">
       <div class="sb-logo-eye">Família Guerra Holding</div>
-      <div class="sb-logo-name" id="brandTitle">IMÓVEIS</div>
+      <div class="sb-logo-name-wrap"><div class="sb-logo-name" id="brandTitle">IMÓVEIS</div></div>
       <div class="sb-logo-sub" id="sb-logo-sub">Gestão de Locações</div>
       <div class="toggle-modulo-wrapper">
         <label class="switch-modulo">
@@ -599,7 +603,11 @@ function renderAlugueis(){
     <div class="sec-hdr"><h2>Novo Recebimento (Manual ou Relatório)</h2><div class="sec-line"></div></div>
     <div id="al-import-status" style="font-size:12px;color:var(--dim);margin-bottom:10px"></div>
     <div class="fg">
-      <div class="fl"><label>Imóvel</label><select class="fi" id="al-im">${selectImoveis()}</select></div>
+      <div class="fl">
+        <label>Imóvel</label>
+        <select class="fi" id="al-im">${selectImoveis()}</select>
+        <div id="wrapperAvisoImovel" class="alerta-imovel-link"><a href="#" onclick="event.preventDefault();abrirCadastroImovelInline()">+ Cadastrar novo imóvel</a></div>
+      </div>
       <div class="fl"><label>Valor Boleto (bruto)</label><input class="fi" id="al-bruto" type="number" step="0.01" placeholder="0,00"></div>
       <div class="fl"><label>Valor Líquido Recebido</label><input class="fi" id="al-liquido" type="number" step="0.01" placeholder="0,00"></div>
       <div class="fl"><label>Data do Repasse</label><input class="fi" id="al-data" type="date" value="${today()}"></div>
@@ -772,6 +780,35 @@ function ddmmyyyy2iso(d){
 function isoParaBR(iso){
   return formatarDataBR(iso);
 }
+function abrirCadastroImovelInline(enderecoSugerido){
+  document.getElementById('modal-root').innerHTML=`
+  <div class="modal-bg" onclick="if(event.target===this)fecharModal()">
+    <div class="modal">
+      <h2>Cadastrar Novo Imóvel</h2>
+      <p>Cadastro rápido — depois você pode completar os outros dados em "Cadastro de Imóveis".</p>
+      <div class="fl" style="margin-bottom:12px"><label>Nome / Identificação</label><input class="fi" id="aci-nome" placeholder="Ex: Paul Harris — Loja 01" value="${enderecoSugerido?enderecoSugerido.split(',').slice(0,3).join(',').trim().replace(/"/g,'&quot;'):''}"></div>
+      <div class="fl" style="margin-bottom:20px"><label>Endereço</label><input class="fi" id="aci-end" value="${(enderecoSugerido||'').replace(/"/g,'&quot;')}"></div>
+      <div style="display:flex;gap:10px">
+        <button class="btn-gold" style="flex:1" onclick="confirmarCadastroImovelInline()">Cadastrar e Selecionar</button>
+        <button class="btn-ghost" onclick="fecharModal()">Cancelar</button>
+      </div>
+    </div>
+  </div>`;
+}
+function confirmarCadastroImovelInline(){
+  const nome=document.getElementById('aci-nome').value.trim();
+  if(!nome){notify('Informe o nome do imóvel','err');return;}
+  const ims=getImoveis();
+  const novo={id:uuid(),nome,endereco:document.getElementById('aci-end').value.trim(),inquilino:'',corretor:'',valor:0};
+  ims.push(novo);
+  save(pk('imoveis'),ims);
+  fecharModal();
+  notify('Imóvel cadastrado','ok');
+  const sel=document.getElementById('al-im');
+  if(sel){sel.innerHTML=selectImoveis(novo.id);}
+  const wrapperAviso=document.getElementById('wrapperAvisoImovel');
+  if(wrapperAviso)wrapperAviso.innerHTML=`<span style="color:var(--green)">✓ ${nome} cadastrado e selecionado.</span> <a href="#" onclick="event.preventDefault();abrirCadastroImovelInline()">+ Cadastrar outro</a>`;
+}
 function handleAluguelAnexo(input){
   const f=input.files[0];
   if(!f)return;
@@ -794,7 +831,16 @@ function handleAluguelAnexo(input){
       }
       const parsed=parseRelatorioAlude(fullText);
       const match=matchImovel(parsed.imovelAddr);
-      if(match){const sel=document.getElementById('al-im');if(sel)sel.value=match.id;}
+      const wrapperAviso=document.getElementById('wrapperAvisoImovel');
+      if(match){
+        const sel=document.getElementById('al-im');
+        if(sel)sel.value=match.id;
+        if(wrapperAviso)wrapperAviso.innerHTML=`<span style="color:var(--green)">✓ Imóvel identificado: ${match.nome}</span> — <a href="#" onclick="event.preventDefault();abrirCadastroImovelInline('${(parsed.imovelAddr||'').replace(/'/g,"&apos;")}')">Não é este? Cadastrar novo</a>`;
+      }else if(parsed.imovelAddr){
+        const sel=document.getElementById('al-im');
+        if(sel)sel.value='';
+        if(wrapperAviso)wrapperAviso.innerHTML=`<span style="color:var(--red)">⚠️ Imóvel do relatório não encontrado no cadastro.</span> <a href="#" onclick="event.preventDefault();abrirCadastroImovelInline('${parsed.imovelAddr.replace(/'/g,"&apos;")}')">+ Cadastrar "${parsed.imovelAddr}" agora</a>`;
+      }
       if(parsed.totalCobrado)document.getElementById('al-bruto').value=parsed.totalCobrado;
       if(parsed.valorRepassado)document.getElementById('al-liquido').value=parsed.valorRepassado;
       if(parsed.dataRepasse)document.getElementById('al-data').value=ddmmyyyy2iso(parsed.dataRepasse);
