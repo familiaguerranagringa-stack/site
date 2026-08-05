@@ -43,8 +43,8 @@ html,body{min-height:100vh;background:var(--bg);color:var(--text);font-family:'D
 .switch-modulo input:checked+.slider{border-color:#3B82F6;box-shadow:0 0 8px rgba(59,130,246,.5)}
 .switch-modulo input:checked+.slider:before{transform:translateX(23px)}
 .toggle-modulo-legenda{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
-.alerta-imovel-link{margin-top:6px;font-size:11px;display:flex;align-items:center;gap:6px;color:var(--muted)}
-.alerta-imovel-link a{color:var(--gold);text-decoration:underline;font-weight:600;cursor:pointer}
+.alerta-imovel-link{margin-top:6px;font-size:11px;display:flex;align-items:center;gap:6px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.alerta-imovel-link a{white-space:nowrap;flex-shrink:0;color:var(--gold);text-decoration:underline;font-weight:600;cursor:pointer}
 .alerta-imovel-link a:hover{color:var(--gold-lt)}
 .sb-section{padding:12px 18px 4px;font-size:9px;font-weight:700;letter-spacing:.18em;color:var(--dim);text-transform:uppercase}
 .sb-item{display:flex;align-items:center;gap:10px;padding:9px 14px;margin:1px 8px;border-radius:6px;cursor:pointer;transition:all .15s;color:var(--muted);font-size:12px;font-weight:500;border:none;background:none;width:calc(100% - 16px);text-align:left;font-family:'DM Sans',sans-serif}
@@ -103,6 +103,7 @@ tr:hover td{background:var(--bg-hover)}
 .fl{display:flex;flex-direction:column;gap:5px}
 .fl label{font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
 .fi{background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;padding:8px 11px;outline:none;transition:border-color .15s;width:100%}
+.input-uppercase{text-transform:uppercase}
 .fi:focus{border-color:var(--gold)}
 .fi::placeholder{color:var(--dim)}
 .badge{display:inline-flex;align-items:center;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;padding:3px 8px;border-radius:4px;white-space:nowrap}
@@ -783,23 +784,37 @@ function isoParaBR(iso){
 function abrirCadastroImovelInline(enderecoSugerido){
   document.getElementById('modal-root').innerHTML=`
   <div class="modal-bg" onclick="if(event.target===this)fecharModal()">
-    <div class="modal">
-      <h2>Cadastrar Novo Imóvel</h2>
-      <p>Cadastro rápido — depois você pode completar os outros dados em "Cadastro de Imóveis".</p>
-      <div class="fl" style="margin-bottom:12px"><label>Nome / Identificação</label><input class="fi" id="aci-nome" placeholder="Ex: Paul Harris — Loja 01" value="${enderecoSugerido?enderecoSugerido.split(',').slice(0,3).join(',').trim().replace(/"/g,'&quot;'):''}"></div>
-      <div class="fl" style="margin-bottom:20px"><label>Endereço</label><input class="fi" id="aci-end" value="${(enderecoSugerido||'').replace(/"/g,'&quot;')}"></div>
+    <div class="modal" style="max-width:560px;width:92vw">
+      <h2>Cadastro Completo de Imóvel</h2>
+      <p>Preencha os dados essenciais — depois você pode completar o resto em "Cadastro de Imóveis".</p>
+      <div class="fg" style="grid-template-columns:1fr 1fr">
+        <div class="fl" style="margin-bottom:12px"><label>Grupo / Empreendimento</label><input class="fi input-uppercase" id="aci-grupo" placeholder="Ex: Engracia da Silva Araújo"></div>
+        <div class="fl" style="margin-bottom:12px"><label>Nome / Identificação do Imóvel</label><input class="fi input-uppercase" id="aci-nome" placeholder="Ex: Av Getúlio Vargas, 221, Sala 603" value="${enderecoSugerido?enderecoSugerido.split(',').slice(0,3).join(',').trim().replace(/"/g,'&quot;'):''}"></div>
+        <div class="fl" style="margin-bottom:12px"><label>Inquilino / Locatário</label><input class="fi input-uppercase" id="aci-inquilino" placeholder="Nome do inquilino"></div>
+        <div class="fl" style="margin-bottom:12px"><label>Valor do Aluguel (R$)</label><input class="fi" id="aci-valor" type="number" step="0.01" placeholder="0,00"></div>
+        <div class="fl" style="margin-bottom:12px;grid-column:1/-1"><label>Endereço Completo</label><input class="fi input-uppercase" id="aci-end" placeholder="Endereço, bairro, cidade - UF" value="${(enderecoSugerido||'').replace(/"/g,'&quot;')}"></div>
+        <div class="fl" style="margin-bottom:20px"><label>Dia de Vencimento</label><input class="fi" id="aci-vencimento" type="number" min="1" max="31" placeholder="Ex: 05"></div>
+      </div>
       <div style="display:flex;gap:10px">
-        <button class="btn-gold" style="flex:1" onclick="confirmarCadastroImovelInline()">Cadastrar e Selecionar</button>
         <button class="btn-ghost" onclick="fecharModal()">Cancelar</button>
+        <button class="btn-gold" style="flex:1" onclick="confirmarCadastroImovelInline()">+ SALVAR E SELECIONAR</button>
       </div>
     </div>
   </div>`;
 }
 function confirmarCadastroImovelInline(){
-  const nome=document.getElementById('aci-nome').value.trim();
+  const nome=document.getElementById('aci-nome').value.trim().toUpperCase();
   if(!nome){notify('Informe o nome do imóvel','err');return;}
   const ims=getImoveis();
-  const novo={id:uuid(),nome,endereco:document.getElementById('aci-end').value.trim(),inquilino:'',corretor:'',valor:0};
+  const novo={
+    id:uuid(),nome,
+    grupo:document.getElementById('aci-grupo').value.trim().toUpperCase(),
+    endereco:document.getElementById('aci-end').value.trim().toUpperCase(),
+    inquilino:document.getElementById('aci-inquilino').value.trim().toUpperCase(),
+    corretor:'',
+    valor:+document.getElementById('aci-valor').value||0,
+    diaVencimento:document.getElementById('aci-vencimento').value.trim()
+  };
   ims.push(novo);
   save(pk('imoveis'),ims);
   fecharModal();
