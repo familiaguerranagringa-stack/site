@@ -207,8 +207,7 @@ function pushToFB(){
     });
   },250);
 }
-function seedGuerraFamilyEmpire(){
-  return {
+function seedGuerraFamilyEmpire(){  return {
     id:uuid(),
     legalName:'GUERRA FAMILY EMPIRE LLC',
     dba:'',
@@ -231,6 +230,30 @@ function seedGuerraFamilyEmpire(){
   };
 }
 
+// ── DEDUPE: funde empresas com o mesmo nome (evita duplicatas de cadastro manual + seed automático) ──
+function dedupeEntities(){
+  const groups={};
+  DATA.entities.forEach(e=>{
+    const key=(e.legalName||'').trim().toUpperCase();
+    if(!key) return;
+    (groups[key]=groups[key]||[]).push(e);
+  });
+  let changed=false;
+  Object.values(groups).forEach(list=>{
+    if(list.length>1){
+      list.sort((a,b)=>(Object.values(b).filter(Boolean).length)-(Object.values(a).filter(Boolean).length));
+      const keep=list[0];
+      list.slice(1).forEach(r=>{
+        DATA.accounts.forEach(a=>{if(a.entityId===r.id)a.entityId=keep.id;});
+        DATA.transactions.forEach(t=>{if(t.entityId===r.id)t.entityId=keep.id;});
+        DATA.entities=DATA.entities.filter(e=>e.id!==r.id);
+      });
+      changed=true;
+    }
+  });
+  return changed;
+}
+
 function syncFromFB(){
   setSyncStatus('⟳ Carregando...','var(--amber)');
   return _dbRef.once('value').then(snap=>{
@@ -249,6 +272,8 @@ function syncFromFB(){
       DATA.rules=load('finusa_rules');
       setSyncStatus('• Online (vazio)','var(--green)');
     }
+    // Funde duplicatas de empresas com o mesmo nome (ex: cadastro manual vazio + seed automático)
+    if(dedupeEntities()) saveAndSync();
     // Seed automático: se ainda não existe nenhuma empresa, já entra com a GUERRA FAMILY EMPIRE LLC preenchida
     let gfe=DATA.entities.find(e=>(e.legalName||'').toUpperCase().includes('GUERRA FAMILY EMPIRE'));
     if(!gfe){
@@ -271,6 +296,7 @@ function syncFromFB(){
   }).catch(e=>{
     DATA.entities=load('finusa_entities');
     DATA.accounts=load('finusa_accounts');
+    dedupeEntities();
     let gfe=DATA.entities.find(e=>(e.legalName||'').toUpperCase().includes('GUERRA FAMILY EMPIRE'));
     if(!gfe){
       DATA.entities.push(seedGuerraFamilyEmpire());
