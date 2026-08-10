@@ -43,7 +43,7 @@ html,body{min-height:100vh;background:var(--bg);color:var(--text);font-family:'D
 .switch-modulo input:checked+.slider{border-color:#3B82F6;box-shadow:0 0 8px rgba(59,130,246,.5)}
 .switch-modulo input:checked+.slider:before{transform:translateX(23px)}
 .toggle-modulo-legenda{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
-.alerta-imovel-link{margin-top:6px;font-size:11px;display:flex;align-items:center;gap:6px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.alerta-imovel-link{margin-top:6px;font-size:11px;display:flex;align-items:center;flex-wrap:wrap;gap:6px;color:var(--muted);white-space:normal;overflow:visible;width:100%;word-break:break-word}
 #al-im{cursor:pointer!important;opacity:1!important;pointer-events:auto!important}
 .alerta-imovel-link a{white-space:nowrap;flex-shrink:0;color:var(--gold);text-decoration:underline;font-weight:600;cursor:pointer}
 .alerta-imovel-link a:hover{color:var(--gold-lt)}
