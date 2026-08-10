@@ -235,7 +235,7 @@ function seedMMGuerraEmpreendimentos(){
     id:uuid(),
     legalName:'MM GUERRA EMPREENDIMENTOS LLC',
     dba:'',
-    ein:'',
+    ein:'38-4304423',
     state:'Florida',
     stateRegNumber:'',
     formationDate:'2024-01-31',
@@ -249,7 +249,7 @@ function seedMMGuerraEmpreendimentos(){
     entityType:'LLC',
     taxClassification:'Partnership',
     principalActivity:'Real Estate Development — construção de imóveis residenciais (casas); possui imóvel já construído e atualmente alugado',
-    cpa:'',
+    cpa:'All7 Service — Diego — (407) 970-8143 — diego@all7service.com',
     notes:'Subsidiária 99% da Guerra Family Empire LLC (holding). EIN, State Registration Number e CPA ainda pendentes de confirmação. Imóvel já construído e alugado será cadastrado futuramente no módulo Properties.'
   };
 }
@@ -308,9 +308,15 @@ function syncFromFB(){
       saveAndSync();
     }
     // Seed automático: MM Guerra Empreendimentos LLC (subsidiária confirmada da GFE)
-    if(!DATA.entities.some(e=>(e.legalName||'').toUpperCase().includes('MM GUERRA EMPREENDIMENTOS'))){
+    let mmg=DATA.entities.find(e=>(e.legalName||'').toUpperCase().includes('MM GUERRA EMPREENDIMENTOS'));
+    if(!mmg){
       DATA.entities.push(seedMMGuerraEmpreendimentos());
       saveAndSync();
+    } else {
+      let mmgChanged=false;
+      if(!mmg.ein){ mmg.ein='38-4304423'; mmgChanged=true; }
+      if(!mmg.cpa){ mmg.cpa='All7 Service — Diego — (407) 970-8143 — diego@all7service.com'; mmgChanged=true; }
+      if(mmgChanged) saveAndSync();
     }
     if(gfe && (gfe.notes||'').includes('vence 06/11/2026') && !(gfe.notes||'').includes('APY')){
       gfe.notes=gfe.notes.replace(
