@@ -119,6 +119,9 @@ tr:hover td{background:var(--bg-hover)}
     <button class="sb-item" data-nav="home" onclick="goTab('home')">🏠 Home</button>
     <button class="sb-item" data-nav="entities" onclick="goTab('entities')">🏢 Business — Empresas</button>
     <button class="sb-item" data-nav="accounts" onclick="goTab('accounts')">💳 Business — Contas</button>
+    <button class="sb-item" data-nav="import" onclick="goTab('import')">📥 Business — Import</button>
+    <button class="sb-item" data-nav="review" onclick="goTab('review')">⚡ Business — Quick Review</button>
+    <button class="sb-item" data-nav="ledger" onclick="goTab('ledger')">📒 Business — Transações</button>
     <button class="sb-item" data-nav="personal" onclick="goTab('personal')">👤 Personal</button>
     <button class="sb-item" data-nav="properties" onclick="goTab('properties')">🏘️ Properties</button>
     <button class="sb-item" data-nav="wealth" onclick="goTab('wealth')">📊 Wealth</button>
@@ -138,6 +141,7 @@ tr:hover td{background:var(--bg-hover)}
 
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 // ── LOGIN — mesma base de usuários do sistema Família Guerra ──
 const CREDS={u:'Guerra',p:'Resiliencia2023@'};
@@ -173,14 +177,18 @@ function setSyncStatus(msg,cor){
 
 // ── ESTADO / DADOS ──
 const DATA={
-  entities:[],   // empresas
-  accounts:[]    // contas por empresa
+  entities:[],    // empresas
+  accounts:[],    // contas por empresa
+  transactions:[],// transações importadas
+  rules:[]        // regras aprendidas (merchant normalizado -> categoria)
 };
 
 function load(k){try{return JSON.parse(localStorage.getItem(k)||'[]')}catch(e){return []}}
 function saveLocal(){
   localStorage.setItem('finusa_entities',JSON.stringify(DATA.entities));
   localStorage.setItem('finusa_accounts',JSON.stringify(DATA.accounts));
+  localStorage.setItem('finusa_transactions',JSON.stringify(DATA.transactions));
+  localStorage.setItem('finusa_rules',JSON.stringify(DATA.rules));
 }
 function saveAndSync(){
   saveLocal();
@@ -190,7 +198,7 @@ function pushToFB(){
   clearTimeout(_syncTimer);
   _syncTimer=setTimeout(()=>{
     setSyncStatus('⟳ Salvando...','var(--amber)');
-    _dbRef.set({entities:DATA.entities,accounts:DATA.accounts,_ts:Date.now()}).then(()=>{
+    _dbRef.set({entities:DATA.entities,accounts:DATA.accounts,transactions:DATA.transactions,rules:DATA.rules,_ts:Date.now()}).then(()=>{
       setSyncStatus('✓ Salvo','var(--green)');
       setTimeout(()=>setSyncStatus('• Online','var(--green)'),2000);
     }).catch(e=>{
@@ -230,11 +238,15 @@ function syncFromFB(){
     if(rec){
       DATA.entities=rec.entities||[];
       DATA.accounts=rec.accounts||[];
+      DATA.transactions=rec.transactions||[];
+      DATA.rules=rec.rules||[];
       saveLocal();
       setSyncStatus('✓ Sincronizado','var(--green)');
     } else {
       DATA.entities=load('finusa_entities');
       DATA.accounts=load('finusa_accounts');
+      DATA.transactions=load('finusa_transactions');
+      DATA.rules=load('finusa_rules');
       setSyncStatus('• Online (vazio)','var(--green)');
     }
     // Seed automático: se ainda não existe nenhuma empresa, já entra com a GUERRA FAMILY EMPIRE LLC preenchida
@@ -306,7 +318,7 @@ document.getElementById('l-user').addEventListener('keydown',e=>{if(e.key==='Ent
 
 // ── NAVEGAÇÃO ──
 const ST={tab:'home'};
-const TITLES={home:'Home',entities:'Business — Empresas',accounts:'Business — Contas',personal:'Personal',properties:'Properties',wealth:'Wealth'};
+const TITLES={home:'Home',entities:'Business — Empresas',accounts:'Business — Contas',import:'Business — Import',review:'Business — Quick Review',ledger:'Business — Transações',personal:'Personal',properties:'Properties',wealth:'Wealth'};
 function goTab(tab){
   ST.tab=tab;
   document.querySelectorAll('.sb-item').forEach(b=>b.classList.toggle('active',b.dataset.nav===tab));
@@ -323,6 +335,9 @@ function render(){
   if(ST.tab==='home') return renderHome(c);
   if(ST.tab==='entities') return renderEntities(c);
   if(ST.tab==='accounts') return renderAccounts(c);
+  if(ST.tab==='import') return renderImport(c);
+  if(ST.tab==='review') return renderReview(c);
+  if(ST.tab==='ledger') return renderLedger(c);
   if(ST.tab==='personal') return renderPlaceholder(c,'Personal','Módulo de Finanças Pessoais — Income, Spending Sources (Bank/Card/KAST/Cash), Budget e Real Spending. Chega na próxima fase do MVP.');
   if(ST.tab==='properties') return renderPlaceholder(c,'Properties','Módulo de Imóveis de Aluguel (EUA) — Property Profile, Rental Income, Expenses, Mortgage Split, Performance. Chega na próxima fase do MVP.');
   if(ST.tab==='wealth') return renderPlaceholder(c,'Wealth','Módulo de Patrimônio Consolidado (Net Worth) — reservado para Phase 4.');
@@ -332,13 +347,15 @@ function render(){
 function renderHome(c){
   const nEnt=DATA.entities.length;
   const nAcc=DATA.accounts.length;
+  const nTx=DATA.transactions.length;
+  const nPending=pendingQueue().length;
   c.innerHTML=`
     <div class="sec-hdr"><h2>Financial Control Center</h2><div class="sec-line"></div></div>
     <div class="mod-grid">
       <div class="card-modulo" onclick="goTab('entities')">
         <div class="card-modulo-icon">🏢</div>
         <div class="card-modulo-title">Business</div>
-        <div class="card-modulo-sub">${nEnt} empresa(s) cadastrada(s) · ${nAcc} conta(s)</div>
+        <div class="card-modulo-sub">${nEnt} empresa(s) · ${nAcc} conta(s) · ${nTx} transações</div>
       </div>
       <div class="card-modulo" onclick="goTab('personal')">
         <div class="card-modulo-icon">👤</div>
@@ -359,8 +376,9 @@ function renderHome(c){
 
     <div class="sec-hdr"><h2>Tasks / Needs Attention</h2><div class="sec-line"></div></div>
     <div class="kpi-grid">
-      <div class="kpi"><div class="kpi-accent" style="background:var(--gold)"></div><div class="kpi-label">Empresas sem dados</div><div class="kpi-value">${DATA.entities.filter(e=>!e.legalName).length}</div><div class="kpi-sub">Preencher cadastro</div></div>
-      <div class="kpi"><div class="kpi-accent" style="background:var(--amber)"></div><div class="kpi-label">Contas cadastradas</div><div class="kpi-value">${nAcc}</div><div class="kpi-sub">Nenhuma transação importada ainda</div></div>
+      <div class="kpi" onclick="goTab('review')"><div class="kpi-accent" style="background:${nPending?'var(--amber)':'var(--green)'}"></div><div class="kpi-label">Transações a revisar</div><div class="kpi-value">${nPending}</div><div class="kpi-sub">${nPending?'Ir para Quick Review':'Tudo revisado'}</div></div>
+      <div class="kpi" onclick="goTab('entities')"><div class="kpi-accent" style="background:var(--gold)"></div><div class="kpi-label">Empresas sem dados</div><div class="kpi-value">${DATA.entities.filter(e=>!e.legalName).length}</div><div class="kpi-sub">Preencher cadastro</div></div>
+      <div class="kpi" onclick="goTab('ledger')"><div class="kpi-accent" style="background:var(--blue)"></div><div class="kpi-label">Total de transações</div><div class="kpi-value">${nTx}</div><div class="kpi-sub">Ver todas</div></div>
     </div>
   `;
 }
@@ -499,6 +517,290 @@ function renderAccounts(c){
 }
 
 function esc(s){return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+// ── CATEGORIAS DE NEGÓCIO (User Category) — conforme definido no projeto ──
+const CAT_BUSINESS=['Income','Expense','Transfer','Owner Contribution','Owner Distribution','Member Contribution','Member Distribution','Loan Received','Loan Payment','Intercompany Transfer','Reimbursement','Payroll','Contractor Payment','Tax Payment','Refund','Fixed Asset','Asset Sale','Investment','Interest Income','Interest Expense','Business Expense Paid Personally','Personal Expense Paid by Business','Uncategorized','CPA Review'];
+// Sugestões rápidas mais comuns (aparecem como botão direto no Quick Review)
+const CAT_QUICK=['Member Contribution','Transfer','Intercompany Transfer','Reimbursement','Owner Distribution','Expense','Income','CPA Review'];
+
+// ── NORMALIZAÇÃO DE MERCHANT — para aprendizado de regras ──
+function normalizeMerchant(desc){
+  return (desc||'')
+    .toUpperCase()
+    .replace(/CONF(IRMATION)?#\s*\S+/g,'')
+    .replace(/TRN:\S+/g,'')
+    .replace(/SEQ:\S+/g,'')
+    .replace(/ID:\S+/g,'')
+    .replace(/DATE:\s*\d+/g,'')
+    .replace(/TIME:\S+/g,'')
+    .replace(/[0-9]/g,'')
+    .replace(/\s+/g,' ')
+    .trim()
+    .slice(0,50);
+}
+
+function findRule(entityId,desc){
+  const key=normalizeMerchant(desc);
+  return DATA.rules.find(r=>r.entityId===entityId && key.includes(r.key));
+}
+function learnRule(entityId,desc,category,cpaCategory){
+  const key=normalizeMerchant(desc);
+  if(!key) return;
+  let r=DATA.rules.find(r=>r.entityId===entityId && r.key===key);
+  if(r){ r.category=category; r.cpaCategory=cpaCategory; }
+  else { DATA.rules.push({id:uuid(),entityId,key,category,cpaCategory:cpaCategory||''}); }
+}
+
+// ── IMPORT STATE ──
+const IMP={entityId:null,accountId:null,pendingRows:null,fileName:''};
+
+function renderImport(c){
+  if(!DATA.entities.length){
+    c.innerHTML=`<div class="empty"><div style="font-size:28px">📥</div><div>Cadastre uma empresa em <b>Business — Empresas</b> antes de importar extratos.</div></div>`;
+    return;
+  }
+  if(!IMP.entityId) IMP.entityId=DATA.entities[0].id;
+  const accForEntity=DATA.accounts.filter(a=>a.entityId===IMP.entityId);
+  if(!IMP.accountId || !accForEntity.some(a=>a.id===IMP.accountId)) IMP.accountId=accForEntity[0]?accForEntity[0].id:null;
+
+  c.innerHTML=`
+    <div class="sec-hdr"><h2>Transaction Import</h2><div class="sec-line"></div></div>
+    <div class="sec-note">Aceita CSV ou Excel (XLS/XLSX). O sistema identifica automaticamente Data, Descrição, Valor e Saldo — e pula linhas de resumo do banco. Duplicatas são detectadas e nunca importadas duas vezes.</div>
+    <div class="form-card">
+      <div class="fg">
+        <div class="fl"><label>Empresa</label>
+          <select class="fi" onchange="IMP.entityId=this.value;IMP.accountId=null;render()">
+            ${DATA.entities.map(e=>`<option value="${e.id}" ${e.id===IMP.entityId?'selected':''}>${esc(e.legalName)||'(sem nome)'}</option>`).join('')}
+          </select>
+        </div>
+        <div class="fl"><label>Conta</label>
+          <select class="fi" id="imp-acc" onchange="IMP.accountId=this.value">
+            ${accForEntity.length ? accForEntity.map(a=>`<option value="${a.id}" ${a.id===IMP.accountId?'selected':''}>${esc(a.name)}</option>`).join('') : '<option value="">Nenhuma conta — cadastre uma primeiro</option>'}
+          </select>
+        </div>
+      </div>
+      <div class="fl" style="margin-top:6px">
+        <label>Arquivo (CSV / XLS / XLSX)</label>
+        <input class="fi" type="file" id="imp-file" accept=".csv,.xls,.xlsx" onchange="handleImportFile(this)">
+      </div>
+      <div id="imp-result" style="margin-top:14px"></div>
+    </div>
+  `;
+}
+
+function handleImportFile(input){
+  const file=input.files[0];
+  if(!file || !IMP.accountId){notify('Selecione uma conta antes de importar.','err');return;}
+  IMP.fileName=file.name;
+  const reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      const wb=XLSX.read(e.target.result,{type:'binary'});
+      const sheet=wb.Sheets[wb.SheetNames[0]];
+      const rows=XLSX.utils.sheet_to_json(sheet,{header:1,raw:false,defval:''});
+      processImportRows(rows);
+    }catch(err){
+      notify('Erro ao ler arquivo: '+err.message,'err');
+    }
+  };
+  reader.readAsBinaryString(file);
+}
+
+function processImportRows(rows){
+  // localizar a linha de cabeçalho real: procura por uma linha que contenha "Date" e "Description"
+  let headerIdx=-1;
+  for(let i=0;i<rows.length;i++){
+    const rowStr=rows[i].map(x=>(x||'').toString().toLowerCase());
+    if(rowStr.some(x=>x.includes('date')) && rowStr.some(x=>x.includes('description'))){
+      headerIdx=i; break;
+    }
+  }
+  if(headerIdx===-1){notify('Não consegui localizar a tabela de transações no arquivo.','err');return;}
+
+  const header=rows[headerIdx].map(x=>(x||'').toString().toLowerCase());
+  const dateIdx=header.findIndex(x=>x.includes('date'));
+  const descIdx=header.findIndex(x=>x.includes('description'));
+  const amtIdx=header.findIndex(x=>x.includes('amount'));
+  const balIdx=header.findIndex(x=>x.includes('bal'));
+
+  const parsed=[];
+  for(let i=headerIdx+1;i<rows.length;i++){
+    const r=rows[i];
+    if(!r || !r[dateIdx]) continue;
+    const desc=(r[descIdx]||'').toString().trim();
+    const amtRaw=(r[amtIdx]||'').toString().replace(/,/g,'').replace(/"/g,'').trim();
+    const amt=parseFloat(amtRaw);
+    if(desc.toLowerCase().startsWith('beginning balance')) continue; // não é transação
+    if(isNaN(amt) || amt===0) continue; // ignora linhas sem valor (ex: fee waiver $0.00)
+    parsed.push({
+      date:(r[dateIdx]||'').toString().trim(),
+      description:desc,
+      amount:amt,
+      balance:balIdx>=0?(r[balIdx]||'').toString().trim():''
+    });
+  }
+
+  if(!parsed.length){notify('Nenhuma transação válida encontrada no arquivo.','err');return;}
+
+  // Detectar duplicatas (mesma conta + data + valor + descrição)
+  const existing=new Set(DATA.transactions.filter(t=>t.accountId===IMP.accountId).map(t=>t.accountId+'|'+t.date+'|'+t.amount+'|'+t.originalDescription));
+  let novas=0,duplicadas=0;
+  const toAdd=[];
+  parsed.forEach(p=>{
+    const key=IMP.accountId+'|'+p.date+'|'+p.amount+'|'+p.description;
+    if(existing.has(key)){ duplicadas++; return; }
+    existing.add(key);
+    const rule=findRule(IMP.entityId,p.description);
+    toAdd.push({
+      id:uuid(),
+      entityId:IMP.entityId,
+      accountId:IMP.accountId,
+      date:p.date,
+      originalDescription:p.description,
+      userDescription:'',
+      amount:p.amount,
+      balance:p.balance,
+      category:rule?rule.category:'',
+      cpaCategory:rule?rule.cpaCategory:'',
+      status:rule?'AI_SUGGESTED':'UNREVIEWED'
+    });
+    novas++;
+  });
+
+  DATA.transactions=DATA.transactions.concat(toAdd);
+  saveAndSync();
+
+  document.getElementById('imp-result').innerHTML=`
+    <div class="badge b-info">✓ ${novas} nova(s) transação(ões) importada(s)</div>
+    ${duplicadas?`<div class="badge b-pend" style="margin-left:8px">${duplicadas} duplicata(s) ignorada(s)</div>`:''}
+    <div style="margin-top:10px"><button class="btn-gold" onclick="goTab('review')">Ir para Quick Review →</button></div>
+  `;
+  notify(`${novas} transações importadas`,'ok');
+}
+
+// ── QUICK REVIEW ──
+function pendingQueue(){
+  return DATA.transactions.filter(t=>t.status==='UNREVIEWED'||t.status==='AI_SUGGESTED');
+}
+
+function renderReview(c){
+  const queue=pendingQueue();
+  if(!queue.length){
+    c.innerHTML=`<div class="empty"><div style="font-size:28px">✅</div><div>Tudo revisado! Nenhuma transação pendente.</div></div>`;
+    return;
+  }
+  const t=queue[0];
+  const ent=DATA.entities.find(e=>e.id===t.entityId);
+  const acc=DATA.accounts.find(a=>a.id===t.accountId);
+  const isCredit=t.amount>0;
+
+  c.innerHTML=`
+    <div class="sec-hdr"><h2>Quick Review</h2><div class="sec-line"></div><div style="font-size:11px;color:var(--dim)">${queue.length} pendente(s)</div></div>
+    <div class="form-card" style="max-width:620px">
+      <div style="font-size:11px;color:var(--dim);margin-bottom:4px">${esc(ent?ent.legalName:'')} · ${esc(acc?acc.name:'')} · ${esc(t.date)}</div>
+      <div style="font-family:'Syne',sans-serif;font-size:22px;font-weight:800;color:${isCredit?'var(--green)':'var(--red)'};margin-bottom:6px">${isCredit?'+':''}$${Math.abs(t.amount).toLocaleString('en-US',{minimumFractionDigits:2})}</div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:14px;padding:10px;background:var(--bg-section);border-radius:6px">${esc(t.originalDescription)}</div>
+
+      ${t.status==='AI_SUGGESTED' ? `
+        <div style="background:var(--gold-bg);border:1px solid var(--gold-dim);border-radius:8px;padding:12px;margin-bottom:14px">
+          <div style="font-size:10px;font-weight:700;letter-spacing:.1em;color:var(--gold);text-transform:uppercase;margin-bottom:4px">Suggested Category (aprendido)</div>
+          <div style="font-weight:700;margin-bottom:8px">${esc(t.category)}${t.cpaCategory?' · '+esc(t.cpaCategory):''}</div>
+          <button class="btn-gold" onclick="approveReview('${t.id}')">✓ Approve</button>
+          <button class="btn-ghost" style="margin-left:8px" onclick="clearSuggestion('${t.id}')">Change</button>
+        </div>
+      ` : `
+        <div class="fl" style="margin-bottom:10px">
+          <label>What was this? (User Category)</label>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">
+            ${CAT_QUICK.map(cat=>`<button class="btn-sm ok" style="padding:6px 12px" onclick="selectQuickCat('${t.id}','${cat}')">${cat}</button>`).join('')}
+          </div>
+          <select class="fi" id="rev-cat-${t.id}">
+            <option value="">Outra categoria...</option>
+            ${CAT_BUSINESS.map(cat=>`<option value="${cat}">${cat}</option>`).join('')}
+          </select>
+        </div>
+        <div class="fg" style="grid-template-columns:1fr 1fr">
+          <div class="fl"><label>CPA / Accounting Category</label><input class="fi" id="rev-cpa-${t.id}" placeholder="Ex: Member Equity - Contribution"></div>
+          <div class="fl"><label>User Description (nota)</label><input class="fi" id="rev-note-${t.id}" placeholder="Observação livre"></div>
+        </div>
+        <button class="btn-gold" style="margin-top:12px" onclick="saveReviewFull('${t.id}')">SAVE & NEXT</button>
+      `}
+    </div>
+  `;
+}
+
+function selectQuickCat(id,cat){
+  const t=DATA.transactions.find(t=>t.id===id);
+  if(!t)return;
+  t.category=cat;
+  t.cpaCategory=document.getElementById('rev-cpa-'+id)?document.getElementById('rev-cpa-'+id).value:'';
+  t.userDescription=document.getElementById('rev-note-'+id)?document.getElementById('rev-note-'+id).value:'';
+  t.status='REVIEWED';
+  learnRule(t.entityId,t.originalDescription,t.category,t.cpaCategory);
+  saveAndSync();
+  render();
+}
+function saveReviewFull(id){
+  const t=DATA.transactions.find(t=>t.id===id);
+  if(!t)return;
+  const cat=document.getElementById('rev-cat-'+id).value;
+  if(!cat){notify('Selecione uma categoria.','err');return;}
+  t.category=cat;
+  t.cpaCategory=document.getElementById('rev-cpa-'+id).value;
+  t.userDescription=document.getElementById('rev-note-'+id).value;
+  t.status='REVIEWED';
+  learnRule(t.entityId,t.originalDescription,t.category,t.cpaCategory);
+  saveAndSync();
+  render();
+}
+function approveReview(id){
+  const t=DATA.transactions.find(t=>t.id===id);
+  if(!t)return;
+  t.status='REVIEWED';
+  learnRule(t.entityId,t.originalDescription,t.category,t.cpaCategory);
+  saveAndSync();
+  render();
+}
+function clearSuggestion(id){
+  const t=DATA.transactions.find(t=>t.id===id);
+  if(!t)return;
+  t.status='UNREVIEWED';
+  render();
+}
+
+// ── LEDGER (todas as transações) ──
+function renderLedger(c){
+  if(!DATA.transactions.length){
+    c.innerHTML=`<div class="empty"><div style="font-size:28px">📒</div><div>Nenhuma transação importada ainda.</div></div>`;
+    return;
+  }
+  const sorted=[...DATA.transactions].sort((a,b)=>new Date(b.date)-new Date(a.date));
+  const rows=sorted.map(t=>{
+    const ent=DATA.entities.find(e=>e.id===t.entityId);
+    const acc=DATA.accounts.find(a=>a.id===t.accountId);
+    const statusBadge=t.status==='REVIEWED'?'<span class="badge b-info">Reviewed</span>':t.status==='AI_SUGGESTED'?'<span class="badge b-pend">AI Suggested</span>':'<span class="badge" style="background:var(--bg-section);color:var(--dim);border:1px solid var(--border)">Unreviewed</span>';
+    return `<tr>
+      <td>${esc(t.date)}</td>
+      <td>${esc(ent?ent.legalName:'')}</td>
+      <td>${esc(acc?acc.name:'')}</td>
+      <td style="max-width:280px;white-space:normal">${esc(t.originalDescription)}</td>
+      <td style="text-align:right;color:${t.amount>0?'var(--green)':'var(--red)'};font-variant-numeric:tabular-nums">${t.amount>0?'+':''}$${Math.abs(t.amount).toLocaleString('en-US',{minimumFractionDigits:2})}</td>
+      <td>${esc(t.category)||'<span class="dim">—</span>'}</td>
+      <td>${esc(t.cpaCategory)||'<span class="dim">—</span>'}</td>
+      <td>${statusBadge}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('content').innerHTML=`
+    <div class="sec-hdr"><h2>Transações</h2><div class="sec-line"></div><div style="font-size:11px;color:var(--dim)">${DATA.transactions.length} total</div></div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Data</th><th>Empresa</th><th>Conta</th><th>Descrição</th><th style="text-align:right">Valor</th><th>Categoria</th><th>CPA Category</th><th>Status</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  `;
+}
 
 // ── BOOT ──
 if(sessionStorage.getItem('finusa_auth')==='1'){
