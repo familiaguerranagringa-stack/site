@@ -44,6 +44,7 @@ html,body{min-height:100vh;background:var(--bg);color:var(--text);font-family:'D
 .switch-modulo input:checked+.slider:before{transform:translateX(23px)}
 .toggle-modulo-legenda{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
 .alerta-imovel-link{margin-top:6px;font-size:11px;display:flex;align-items:center;gap:6px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+#al-im{cursor:pointer!important;opacity:1!important;pointer-events:auto!important}
 .alerta-imovel-link a{white-space:nowrap;flex-shrink:0;color:var(--gold);text-decoration:underline;font-weight:600;cursor:pointer}
 .alerta-imovel-link a:hover{color:var(--gold-lt)}
 .sb-section{padding:12px 18px 4px;font-size:9px;font-weight:700;letter-spacing:.18em;color:var(--dim);text-transform:uppercase}
@@ -847,14 +848,14 @@ function handleAluguelAnexo(input){
       const parsed=parseRelatorioAlude(fullText);
       const match=matchImovel(parsed.imovelAddr);
       const wrapperAviso=document.getElementById('wrapperAvisoImovel');
+      const sel=document.getElementById('al-im');
+      if(sel){sel.disabled=false;sel.style.pointerEvents='auto';}
       if(match){
-        const sel=document.getElementById('al-im');
         if(sel)sel.value=match.id;
-        if(wrapperAviso)wrapperAviso.innerHTML=`<span style="color:var(--green)">✓ Imóvel identificado: ${match.nome}</span> — <a href="#" onclick="event.preventDefault();abrirCadastroImovelInline('${(parsed.imovelAddr||'').replace(/'/g,"&apos;")}')">Não é este? Cadastrar novo</a>`;
+        if(wrapperAviso)wrapperAviso.innerHTML=`<span style="color:var(--green)">✓ Imóvel identificado: <strong>${match.nome}</strong></span><span style="color:var(--dim)">—</span><a href="#" onclick="event.preventDefault();abrirCadastroImovelInline('${(parsed.imovelAddr||'').replace(/'/g,"&apos;")}')">Não é este? Cadastrar novo</a>`;
       }else if(parsed.imovelAddr){
-        const sel=document.getElementById('al-im');
         if(sel)sel.value='';
-        if(wrapperAviso)wrapperAviso.innerHTML=`<span style="color:var(--red)">⚠️ Imóvel do relatório não encontrado no cadastro.</span> <a href="#" onclick="event.preventDefault();abrirCadastroImovelInline('${parsed.imovelAddr.replace(/'/g,"&apos;")}')">+ Cadastrar "${parsed.imovelAddr}" agora</a>`;
+        if(wrapperAviso)wrapperAviso.innerHTML=`<span style="color:var(--red)">⚠️ Não encontramos "${parsed.imovelAddr}". Selecione na lista ou:</span><a href="#" onclick="event.preventDefault();abrirCadastroImovelInline('${parsed.imovelAddr.replace(/'/g,"&apos;")}')">+ Cadastrar este imóvel</a>`;
       }
       if(parsed.totalCobrado)document.getElementById('al-bruto').value=parsed.totalCobrado;
       if(parsed.valorRepassado)document.getElementById('al-liquido').value=parsed.valorRepassado;
