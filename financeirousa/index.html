@@ -326,6 +326,23 @@ function syncFromFB(){
       txJul.status='REVIEWED';
       saveAndSync();
     }
+    // Zelle p/ Familia Guerra Holding LLC e MM Guerra Empreendimentos LLC = aporte da holding pras subsidiárias — confirmado pelo usuário
+    let txFGH=DATA.transactions.find(t=>(t.originalDescription||'').includes('j3bujvyf0'));
+    if(txFGH && (!txFGH.category || txFGH.category==='CPA Review')){
+      txFGH.category='Intercompany Transfer';
+      txFGH.cpaCategory='Intercompany Contribution — to Subsidiary';
+      txFGH.userDescription='Aporte de capital da holding (Guerra Family Empire LLC) para Familia Guerra Holding LLC — capitalização de subsidiária';
+      txFGH.status='REVIEWED';
+      saveAndSync();
+    }
+    let txMM=DATA.transactions.find(t=>(t.originalDescription||'').includes('mwnz8wior'));
+    if(txMM && (!txMM.category || txMM.category==='CPA Review')){
+      txMM.category='Intercompany Transfer';
+      txMM.cpaCategory='Intercompany Contribution — to Subsidiary';
+      txMM.userDescription='Aporte de capital da holding (Guerra Family Empire LLC) para MM Guerra Empreendimentos LLC — capitalização de subsidiária';
+      txMM.status='REVIEWED';
+      saveAndSync();
+    }
     setTimeout(()=>setSyncStatus('• Online','var(--green)'),2500);
   }).catch(e=>{
     DATA.entities=load('finusa_entities');
@@ -611,7 +628,18 @@ function learnRule(entityId,desc,category,cpaCategory){
   else { DATA.rules.push({id:uuid(),entityId,key,category,cpaCategory:cpaCategory||''}); }
 }
 
-// ── DETECÇÃO AUTOMÁTICA: Zelle para membros da família (retirada pessoal = Member Distribution) ──
+// ── DETECÇÃO AUTOMÁTICA: transferências para outras empresas do grupo (Intercompany Contribution) ──
+const GRUPO_EMPRESAS=['FAMILIA GUERRA HOLDING LLC','MM GUERRA EMPREENDIMENTOS LLC'];
+function detectIntercompanyContribution(desc){
+  const d=(desc||'').toUpperCase();
+  const dest=GRUPO_EMPRESAS.find(nome=>d.includes(nome));
+  if(!dest) return null;
+  return {
+    category:'Intercompany Transfer',
+    cpaCategory:'Intercompany Contribution — to Subsidiary',
+    userDescription:`Aporte de capital da holding (Guerra Family Empire LLC) para ${dest.charAt(0)+dest.slice(1).toLowerCase()} — capitalização de subsidiária`
+  };
+}
 function detectMemberDistribution(desc){
   const d=(desc||'').toUpperCase();
   if(!d.includes('ZELLE PAYMENT TO')) return null;
@@ -744,7 +772,8 @@ function processImportRows(rows){
     const rule=findRule(IMP.entityId,p.description);
     const wireGuess=!rule?detectWireContributionFromBrazil(p.description):null;
     const distGuess=(!rule && !wireGuess)?detectMemberDistribution(p.description):null;
-    const guess=wireGuess||distGuess;
+    const intercoGuess=(!rule && !wireGuess && !distGuess)?detectIntercompanyContribution(p.description):null;
+    const guess=wireGuess||distGuess||intercoGuess;
     toAdd.push({
       id:uuid(),
       entityId:IMP.entityId,
