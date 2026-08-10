@@ -447,7 +447,7 @@ function syncFromFB(){
     let retro=false;
     DATA.transactions.forEach(t=>{
       if(t.status==='UNREVIEWED' && !t.category){
-        const guess=detectWireContributionFromBrazil(t.originalDescription)||detectMemberDistribution(t.originalDescription)||detectIntercompanyContribution(t.originalDescription)||detectPropertyPatterns(t.originalDescription);
+        const guess=detectWireContributionFromBrazil(t.originalDescription)||detectMemberDistribution(t.originalDescription)||detectIntercompanyContribution(t.originalDescription)||detectPropertyPatterns(t.originalDescription)||detectBofaMaintenanceFee(t.originalDescription,t.amount);
         if(guess){
           t.category=guess.category;
           t.cpaCategory=guess.cpaCategory;
@@ -458,7 +458,7 @@ function syncFromFB(){
       }
       // Recupera transações marcadas como CPA Review que na verdade batem com um padrão conhecido (ex: Duke Energy)
       if(t.status==='CPA_REVIEW'){
-        const guess2=detectPropertyPatterns(t.originalDescription);
+        const guess2=detectPropertyPatterns(t.originalDescription)||detectBofaMaintenanceFee(t.originalDescription,t.amount);
         if(guess2){
           t.category=guess2.category;
           t.cpaCategory=guess2.cpaCategory;
@@ -469,6 +469,20 @@ function syncFromFB(){
       }
     });
     if(retro) saveAndSync();
+    // Migração retroativa específica: reclassifica QUALQUER lançamento já existente que bata com o padrão da tarifa do BofA
+    // (mesmo que já tenha sido categorizado errado antes, ex: como Utilities), conforme pedido do usuário
+    let bofaFix=false;
+    DATA.transactions.forEach(t=>{
+      const bofaGuess=detectBofaMaintenanceFee(t.originalDescription,t.amount);
+      if(bofaGuess && t.cpaCategory!==bofaGuess.cpaCategory){
+        t.category=bofaGuess.category;
+        t.cpaCategory=bofaGuess.cpaCategory;
+        if(!t.userDescription || t.status!=='REVIEWED') t.userDescription=bofaGuess.userDescription;
+        if(t.status!=='REVIEWED') t.status='AI_SUGGESTED';
+        bofaFix=true;
+      }
+    });
+    if(bofaFix) saveAndSync();
     // Saque de $940 para cheque administrativo (LPT Realty — 50% do aluguel + taxa do banco), conforme explicado pelo usuário
     let tx940=DATA.transactions.find(t=>(t.originalDescription||'').includes('WITHDRWL 7968') && Math.abs(t.amount+940)<0.01);
     if(tx940 && !tx940.category){
@@ -804,6 +818,20 @@ function detectPropertyPatterns(desc){
   }
   return null;
 }
+// ── DETECÇÃO AUTOMÁTICA: tarifa de manutenção mensal do Bank of America (Business Advantage Fundamentals — $16) ──
+function detectBofaMaintenanceFee(desc,amount){
+  const d=(desc||'').toUpperCase();
+  const compact=d.replace(/[^A-Z]/g,'');
+  const isFeeText = compact.includes('MAINTENANCEFEE') || compact.includes('MOMAINTFEE') || compact.includes('MONTHLYMAINTENANCEFEE') || compact.includes('ACCTMAINTFEE');
+  // fallback: se o texto não bater com os padrões conhecidos de descrição, mas o valor for exatamente $16 num débito do BofA, sinaliza mesmo assim
+  const isBofaSixteen = Math.abs(Math.abs(amount||0)-16)<0.005 && (compact.includes('BKOFAMERICA')||compact.includes('BANKOFAMERICA'));
+  if(!isFeeText && !isBofaSixteen) return null;
+  return {
+    category:'Expense',
+    cpaCategory:'Bank Fees — Account Maintenance (BofA)',
+    userDescription:'Taxa de manutenção mensal — conta Business Advantage Fundamentals (Bank of America), cobrada quando o saldo/gastos ficam abaixo do mínimo exigido no ciclo do extrato. Saldo mantido acima de $5.000 a partir de agosto/2026 para evitar a cobrança.'
+  };
+}
 const GRUPO_EMPRESAS=['GUERRA FAMILY EMPIRE LLC','FAMILIA GUERRA HOLDING LLC','MM GUERRA EMPREENDIMENTOS LLC','FAMILIA GUERRA INVESTING LLC'];
 function detectIntercompanyContribution(desc){
   const d=(desc||'').toUpperCase();
@@ -950,7 +978,8 @@ function processImportRows(rows){
     const distGuess=(!rule && !wireGuess)?detectMemberDistribution(p.description):null;
     const intercoGuess=(!rule && !wireGuess && !distGuess)?detectIntercompanyContribution(p.description):null;
     const propGuess=(!rule && !wireGuess && !distGuess && !intercoGuess)?detectPropertyPatterns(p.description):null;
-    const guess=wireGuess||distGuess||intercoGuess||propGuess;
+    const bofaGuess=(!rule && !wireGuess && !distGuess && !intercoGuess && !propGuess)?detectBofaMaintenanceFee(p.description,p.amount):null;
+    const guess=wireGuess||distGuess||intercoGuess||propGuess||bofaGuess;
     toAdd.push({
       id:uuid(),
       entityId:IMP.entityId,
