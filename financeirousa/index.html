@@ -237,10 +237,10 @@ function seedMMGuerraEmpreendimentos(){
     dba:'',
     ein:'38-4304423',
     state:'Florida',
-    stateRegNumber:'',
+    stateRegNumber:'L24000057852',
     formationDate:'2024-01-31',
     address:'8554 Abbotsbury Drive, Windermere, FL 34786',
-    registeredAgent:'Registered Agents Inc — 8554 Abbotsbury Drive, Windermere, FL 34786',
+    registeredAgent:'ALL7 Service LLC — 2295 Hiawasse Rd #104, Orlando, FL 32835 (atualizado em 04/09/2026; anteriormente Registered Agents Inc)',
     members:'Guerra Family Empire LLC (99%, $990), Leandro Guerra M Fiuza de Castro (1%, $10)',
     managers:'Guerra Family Empire LLC (AMBR/Signer) e Leandro Guerra M Fiuza de Castro (AMBR)',
     ownershipPercentage:'Guerra Family Empire LLC 99% / Leandro Guerra 1%',
@@ -316,6 +316,15 @@ function syncFromFB(){
       let mmgChanged=false;
       if(!mmg.ein){ mmg.ein='38-4304423'; mmgChanged=true; }
       if(!mmg.cpa){ mmg.cpa='All7 Service — Diego — (407) 970-8143 — diego@all7service.com'; mmgChanged=true; }
+      if(!mmg.stateRegNumber){ mmg.stateRegNumber='L24000057852'; mmgChanged=true; }
+      if((mmg.registeredAgent||'').includes('Registered Agents Inc')){
+        mmg.registeredAgent='ALL7 Service LLC — 2295 Hiawasse Rd #104, Orlando, FL 32835 (atualizado em 04/09/2026; anteriormente Registered Agents Inc)';
+        mmgChanged=true;
+      }
+      if(!(mmg.notes||'').includes('Annual Report')){
+        mmg.notes=(mmg.notes||'')+' | Florida Annual Report em dia: 2025 (25/02/2025) e 2026 (09/04/2026) já filed. Status: ACTIVE no Sunbiz.';
+        mmgChanged=true;
+      }
       if(mmgChanged) saveAndSync();
     }
     if(gfe && (gfe.notes||'').includes('vence 06/11/2026') && !(gfe.notes||'').includes('APY')){
