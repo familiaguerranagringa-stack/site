@@ -748,8 +748,19 @@ function matchImovel(addr){
   // 1) match exato/quase exato pelo campo Endereço (o mais confiável — é o texto cru do relatório)
   const exato=ims.find(im=>im.endereco && normTxt(im.endereco).replace(/[^A-Z0-9]+/g,' ').trim()===na);
   if(exato)return exato;
-  // 2) match por maioria das palavras do endereço (caso o endereço cadastrado esteja levemente diferente)
   const palavrasAddr=na.split(' ').filter(w=>w.length>2);
+  // 2) match por TODAS as palavras-chave presentes (inclusive número da unidade — ex: "105"),
+  //    evitando confundir "Casa 101" com "Casa 105" só porque a rua bate
+  const candidatosCompletos=ims.filter(im=>{
+    const alvo=normTxt(im.nome+' '+(im.endereco||'')).replace(/[^A-Z0-9]+/g,' ');
+    return palavrasAddr.every(w=>alvo.includes(w));
+  });
+  if(candidatosCompletos.length===1)return candidatosCompletos[0];
+  if(candidatosCompletos.length>1){
+    // mais de um bate todas as palavras — escolhe o de nome mais curto/específico (menos ambíguo)
+    return candidatosCompletos.sort((a,b)=>(a.nome+a.endereco).length-(b.nome+b.endereco).length)[0];
+  }
+  // 3) match por maioria das palavras do endereço (caso o endereço cadastrado esteja levemente diferente)
   let best=null,bestScore=0;
   ims.forEach(im=>{
     if(!im.endereco)return;
@@ -758,7 +769,7 @@ function matchImovel(addr){
     if(score>bestScore){bestScore=score;best=im;}
   });
   if(best && bestScore>=0.7)return best;
-  // 3) fallback: nome + endereço combinados, contagem simples de palavras em comum
+  // 4) fallback: nome + endereço combinados, contagem simples de palavras em comum
   best=null;bestScore=0;
   ims.forEach(im=>{
     const alvo=normTxt(im.nome+' '+(im.endereco||''));
@@ -851,10 +862,10 @@ function handleAluguelAnexo(input){
       const sel=document.getElementById('al-im');
       if(sel){sel.disabled=false;sel.style.pointerEvents='auto';}
       if(match){
-        if(sel)sel.value=match.id;
+        if(sel){sel.value=match.id;sel.dispatchEvent(new Event('change'));}
         if(wrapperAviso)wrapperAviso.innerHTML=`<span style="color:var(--green)">✓ Imóvel identificado: <strong>${match.nome}</strong></span><span style="color:var(--dim)">—</span><a href="#" onclick="event.preventDefault();abrirCadastroImovelInline('${(parsed.imovelAddr||'').replace(/'/g,"&apos;")}')">Não é este? Cadastrar novo</a>`;
       }else if(parsed.imovelAddr){
-        if(sel)sel.value='';
+        if(sel){sel.value='';sel.dispatchEvent(new Event('change'));}
         if(wrapperAviso)wrapperAviso.innerHTML=`<span style="color:var(--red)">⚠️ Não encontramos "${parsed.imovelAddr}". Selecione na lista ou:</span><a href="#" onclick="event.preventDefault();abrirCadastroImovelInline('${parsed.imovelAddr.replace(/'/g,"&apos;")}')">+ Cadastrar este imóvel</a>`;
       }
       if(parsed.totalCobrado)document.getElementById('al-bruto').value=parsed.totalCobrado;
