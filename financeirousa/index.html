@@ -246,6 +246,15 @@ function syncFromFB(){
       gfe.principalActivity='Holding Company — centraliza participações societárias das demais empresas do grupo';
       saveAndSync();
     }
+    // Seed automático da conta bancária (Bank of America) vinculada à GFE, se ainda não existir
+    if(gfe && !DATA.accounts.some(a=>a.entityId===gfe.id && (a.name||'').includes('3191'))){
+      DATA.accounts.push({
+        id:uuid(), entityId:gfe.id,
+        name:'Bank of America — Business Advantage Relationship •3191',
+        type:'Checking', currency:'USD'
+      });
+      saveAndSync();
+    }
     setTimeout(()=>setSyncStatus('• Online','var(--green)'),2500);
   }).catch(e=>{
     DATA.entities=load('finusa_entities');
@@ -256,6 +265,14 @@ function syncFromFB(){
       saveLocal();
     } else if(!gfe.principalActivity){
       gfe.principalActivity='Holding Company — centraliza participações societárias das demais empresas do grupo';
+      saveLocal();
+    }
+    if(gfe && !DATA.accounts.some(a=>a.entityId===gfe.id && (a.name||'').includes('3191'))){
+      DATA.accounts.push({
+        id:uuid(), entityId:gfe.id,
+        name:'Bank of America — Business Advantage Relationship •3191',
+        type:'Checking', currency:'USD'
+      });
       saveLocal();
     }
     setSyncStatus('• Local','var(--dim)');
