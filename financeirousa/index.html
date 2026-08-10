@@ -375,6 +375,15 @@ function syncFromFB(){
       tx301k.userDescription='Transferência recebida da Familia Guerra Investing LLC — usada para aplicar $500.000 em CD (renda fixa, equivalente a Selic no Brasil)';
       saveAndSync();
     }
+    // Transferência de $500.000 da Checking para o CD (mesma empresa, apenas troca de conta)
+    let tx500k=DATA.transactions.find(t=>(t.originalDescription||'').includes('4049230953'));
+    if(tx500k && (!tx500k.category || tx500k.category==='')){
+      tx500k.category='Transfer';
+      tx500k.cpaCategory='Internal Transfer — Checking to Investment (CD)';
+      tx500k.userDescription='Aplicação de $500.000 no CD 9478 (7 Month Featured CD, 3,90% APY) — transferência entre contas da própria empresa, não é despesa';
+      tx500k.status='REVIEWED';
+      saveAndSync();
+    }
     setTimeout(()=>setSyncStatus('• Online','var(--green)'),2500);
   }).catch(e=>{
     DATA.entities=load('finusa_entities');
