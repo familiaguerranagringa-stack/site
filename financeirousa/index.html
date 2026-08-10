@@ -230,6 +230,30 @@ function seedGuerraFamilyEmpire(){  return {
   };
 }
 
+function seedMMGuerraEmpreendimentos(){
+  return {
+    id:uuid(),
+    legalName:'MM GUERRA EMPREENDIMENTOS LLC',
+    dba:'',
+    ein:'',
+    state:'Florida',
+    stateRegNumber:'',
+    formationDate:'2024-01-31',
+    address:'8554 Abbotsbury Drive, Windermere, FL 34786',
+    registeredAgent:'Registered Agents Inc — 8554 Abbotsbury Drive, Windermere, FL 34786',
+    members:'Guerra Family Empire LLC (99%, $990), Leandro Guerra M Fiuza de Castro (1%, $10)',
+    managers:'Guerra Family Empire LLC (AMBR/Signer) e Leandro Guerra M Fiuza de Castro (AMBR)',
+    ownershipPercentage:'Guerra Family Empire LLC 99% / Leandro Guerra 1%',
+    fiscalYear:'Calendar Year (Jan-Dez)',
+    currency:'USD',
+    entityType:'LLC',
+    taxClassification:'Partnership',
+    principalActivity:'Real Estate Development — construção de imóveis residenciais (casas); possui imóvel já construído e atualmente alugado',
+    cpa:'',
+    notes:'Subsidiária 99% da Guerra Family Empire LLC (holding). EIN, State Registration Number e CPA ainda pendentes de confirmação. Imóvel já construído e alugado será cadastrado futuramente no módulo Properties.'
+  };
+}
+
 // ── DEDUPE: funde empresas com o mesmo nome (evita duplicatas de cadastro manual + seed automático) ──
 function dedupeEntities(){
   const groups={};
@@ -281,6 +305,11 @@ function syncFromFB(){
       saveAndSync();
     } else if(!gfe.principalActivity){
       gfe.principalActivity='Holding Company — centraliza participações societárias das demais empresas do grupo';
+      saveAndSync();
+    }
+    // Seed automático: MM Guerra Empreendimentos LLC (subsidiária confirmada da GFE)
+    if(!DATA.entities.some(e=>(e.legalName||'').toUpperCase().includes('MM GUERRA EMPREENDIMENTOS'))){
+      DATA.entities.push(seedMMGuerraEmpreendimentos());
       saveAndSync();
     }
     if(gfe && (gfe.notes||'').includes('vence 06/11/2026') && !(gfe.notes||'').includes('APY')){
