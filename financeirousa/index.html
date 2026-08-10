@@ -283,8 +283,14 @@ function syncFromFB(){
       gfe.principalActivity='Holding Company — centraliza participações societárias das demais empresas do grupo';
       saveAndSync();
     }
-    if(gfe && !(gfe.notes||'').includes('CD 7 Month')){
-      gfe.notes=(gfe.notes||'')+(gfe.notes?' | ':'')+'CD 7 Month Featured •9478: aberto 06/04/2026, vence 06/11/2026 ($500k principal, ~$506,4k valor atual) — rendimento vira transação só no vencimento.';
+    if(gfe && (gfe.notes||'').includes('vence 06/11/2026') && !(gfe.notes||'').includes('APY')){
+      gfe.notes=gfe.notes.replace(
+        'CD 7 Month Featured •9478: aberto 06/04/2026, vence 06/11/2026 ($500k principal, ~$506,4k valor atual) — rendimento vira transação só no vencimento.',
+        'CD 7 Month Featured •9478: aberto 06/04/2026, vence 06/11/2026 ($500k principal, taxa fixa 3,83%/APY 3,90% — faixa $100k-$999k) — rendimento vira transação só no vencimento.'
+      );
+      saveAndSync();
+    } else if(gfe && !(gfe.notes||'').includes('CD 7 Month')){
+      gfe.notes=(gfe.notes||'')+(gfe.notes?' | ':'')+'CD 7 Month Featured •9478: aberto 06/04/2026, vence 06/11/2026 ($500k principal, taxa fixa 3,83%/APY 3,90% — faixa $100k-$999k) — rendimento vira transação só no vencimento.';
       saveAndSync();
     }
     // Seed automático da conta bancária (Bank of America) vinculada à GFE, se ainda não existir
