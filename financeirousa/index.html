@@ -307,8 +307,14 @@ function syncFromFB(){
       DATA.accounts.push({
         id:uuid(), entityId:gfe.id,
         name:'Bank of America — 7 Month Featured CD •9478 (vence 06/11/2026)',
-        type:'Investment Account', currency:'USD'
+        type:'Investment Account', currency:'USD', maturityDate:'2026-11-06'
       });
+      saveAndSync();
+    }
+    // Garante que a conta do CD já criada anteriormente também tenha a data de vencimento (para o alerta funcionar)
+    let cdAcc=DATA.accounts.find(a=>(a.name||'').includes('9478'));
+    if(cdAcc && !cdAcc.maturityDate){
+      cdAcc.maturityDate='2026-11-06';
       saveAndSync();
     }
     // Corrige nota com placeholder não substituído (TRN:2026012600570834 = wire $22.418,43 via Bank of NY Mellon)
@@ -452,7 +458,22 @@ function renderHome(c){
   const nAcc=DATA.accounts.length;
   const nTx=DATA.transactions.length;
   const nPending=pendingQueue().length;
+  const maturities=upcomingMaturities(10);
   c.innerHTML=`
+    ${maturities.length ? `
+    <div class="sec-hdr"><h2>⚠️ Vencimentos Próximos</h2><div class="sec-line"></div></div>
+    <div class="kpi-grid">
+      ${maturities.map(m=>{
+        const ent=DATA.entities.find(e=>e.id===m.account.entityId);
+        return `<div class="kpi" onclick="goTab('accounts')" style="border-color:${m.daysLeft<=3?'var(--red)':'var(--amber)'}">
+          <div class="kpi-accent" style="background:${m.daysLeft<=3?'var(--red)':'var(--amber)'}"></div>
+          <div class="kpi-label">${esc(m.account.name)}</div>
+          <div class="kpi-value" style="color:${m.daysLeft<=3?'var(--red)':'var(--amber)'}">${m.daysLeft===0?'VENCE HOJE':'Vence em '+m.daysLeft+' dia(s)'}</div>
+          <div class="kpi-sub">${esc(ent?ent.legalName:'')} · Renovar antes de ${new Date(m.account.maturityDate+'T00:00:00').toLocaleDateString('pt-BR')} para não cair em taxa automática menor</div>
+        </div>`;
+      }).join('')}
+    </div>
+    ` : ''}
     <div class="sec-hdr"><h2>Financial Control Center</h2><div class="sec-line"></div></div>
     <div class="mod-grid">
       <div class="card-modulo" onclick="goTab('entities')">
@@ -572,7 +593,7 @@ const ACC_TYPES=['Checking','Savings','Credit Card','Loan','Line of Credit','Inv
 
 function addAccount(){
   if(!DATA.entities.length){notify('Cadastre uma empresa antes de adicionar contas.','err');return;}
-  DATA.accounts.push({id:uuid(),entityId:DATA.entities[0].id,name:'',type:'Checking',currency:'USD'});
+  DATA.accounts.push({id:uuid(),entityId:DATA.entities[0].id,name:'',type:'Checking',currency:'USD',maturityDate:''});
   saveAndSync();
   render();
 }
@@ -585,6 +606,16 @@ function updAccount(id,field,val){
   const a=DATA.accounts.find(a=>a.id===id);
   if(a){a[field]=val;saveAndSync();}
   if(field==='entityId')render();
+}
+
+// Retorna contas com vencimento nos próximos N dias (alerta de renovação — CD, investimentos, etc.)
+function upcomingMaturities(days){
+  const today=new Date(); today.setHours(0,0,0,0);
+  return DATA.accounts.filter(a=>a.maturityDate).map(a=>{
+    const mat=new Date(a.maturityDate+'T00:00:00');
+    const diff=Math.round((mat-today)/86400000);
+    return {account:a,daysLeft:diff};
+  }).filter(x=>x.daysLeft>=0 && x.daysLeft<=days).sort((a,b)=>a.daysLeft-b.daysLeft);
 }
 
 function renderAccounts(c){
@@ -603,17 +634,18 @@ function renderAccounts(c){
         ${ACC_TYPES.map(t=>`<option ${a.type===t?'selected':''}>${t}</option>`).join('')}
       </select></td>
       <td><input class="fi" value="${esc(a.currency)}" onchange="updAccount('${a.id}','currency',this.value)" style="width:80px"></td>
+      <td><input class="fi" type="date" value="${esc(a.maturityDate||'')}" onchange="updAccount('${a.id}','maturityDate',this.value)" style="width:150px" title="Vencimento (CD, investimento, contrato) — opcional"></td>
       <td><button class="btn-sm" onclick="removeAccount('${a.id}')">Remover</button></td>
     </tr>`;
   }).join('');
 
   document.getElementById('content').innerHTML=`
     <div class="sec-hdr"><h2>Financial Accounts</h2><div class="sec-line"></div><button class="btn-gold" onclick="addAccount()">+ Nova Conta</button></div>
-    <div class="sec-note">Cada conta pertence a uma única empresa. Contas de empresas diferentes nunca são somadas automaticamente.</div>
+    <div class="sec-note">Cada conta pertence a uma única empresa. Contas de empresas diferentes nunca são somadas automaticamente. Preencha "Vencimento" em CDs/investimentos para receber alerta automático de renovação.</div>
     <div class="tbl-wrap">
       <table>
-        <thead><tr><th>Empresa</th><th>Nome da Conta</th><th>Tipo</th><th>Moeda</th><th></th></tr></thead>
-        <tbody>${rows||'<tr><td colspan="5" class="dim" style="text-align:center;padding:24px">Nenhuma conta cadastrada ainda.</td></tr>'}</tbody>
+        <thead><tr><th>Empresa</th><th>Nome da Conta</th><th>Tipo</th><th>Moeda</th><th>Vencimento</th><th></th></tr></thead>
+        <tbody>${rows||'<tr><td colspan="6" class="dim" style="text-align:center;padding:24px">Nenhuma conta cadastrada ainda.</td></tr>'}</tbody>
       </table>
     </div>
   `;
