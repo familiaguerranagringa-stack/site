@@ -794,22 +794,67 @@ function clearSuggestion(id){
   render();
 }
 
-// ── LEDGER (todas as transações) ──
+// ── LEDGER (todas as transações) — com edição inline ──
+let EDIT_TX_ID=null;
+function openEditTx(id){ EDIT_TX_ID=id; render(); }
+function cancelEditTx(){ EDIT_TX_ID=null; render(); }
+function saveEditTx(id){
+  const t=DATA.transactions.find(t=>t.id===id);
+  if(!t) return;
+  t.category=document.getElementById('edit-cat-'+id).value;
+  t.cpaCategory=document.getElementById('edit-cpa-'+id).value;
+  t.userDescription=document.getElementById('edit-note-'+id).value;
+  learnRule(t.entityId,t.originalDescription,t.category,t.cpaCategory);
+  saveAndSync();
+  EDIT_TX_ID=null;
+  notify('Transação atualizada','ok');
+  render();
+}
+
 function renderLedger(c){
   if(!DATA.transactions.length){
     c.innerHTML=`<div class="empty"><div style="font-size:28px">📒</div><div>Nenhuma transação importada ainda.</div></div>`;
     return;
   }
   const sorted=[...DATA.transactions].sort((a,b)=>new Date(b.date)-new Date(a.date));
+
+  let editBox='';
+  if(EDIT_TX_ID){
+    const t=DATA.transactions.find(t=>t.id===EDIT_TX_ID);
+    if(t){
+      const ent=DATA.entities.find(e=>e.id===t.entityId);
+      editBox=`
+        <div class="form-card" style="border-color:var(--gold)">
+          <div style="font-size:11px;color:var(--dim);margin-bottom:4px">Editando transação · ${esc(ent?ent.legalName:'')} · ${esc(t.date)}</div>
+          <div style="font-family:'Syne',sans-serif;font-size:16px;font-weight:800;margin-bottom:6px;color:${t.amount>0?'var(--green)':'var(--red)'}">${t.amount>0?'+':''}$${Math.abs(t.amount).toLocaleString('en-US',{minimumFractionDigits:2})}</div>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:12px">${esc(t.originalDescription)}</div>
+          <div class="fg" style="grid-template-columns:1fr 1fr">
+            <div class="fl"><label>User Category</label>
+              <select class="fi" id="edit-cat-${t.id}">
+                ${CAT_BUSINESS.map(cat=>`<option value="${cat}" ${t.category===cat?'selected':''}>${cat}</option>`).join('')}
+              </select>
+            </div>
+            <div class="fl"><label>CPA / Accounting Category</label><input class="fi" id="edit-cpa-${t.id}" value="${esc(t.cpaCategory)}"></div>
+          </div>
+          <div class="fl" style="margin-top:10px"><label>User Description (nota)</label><input class="fi" id="edit-note-${t.id}" value="${esc(t.userDescription)}"></div>
+          <div style="margin-top:12px">
+            <button class="btn-gold" onclick="saveEditTx('${t.id}')">Salvar</button>
+            <button class="btn-ghost" style="margin-left:8px" onclick="cancelEditTx()">Cancelar</button>
+          </div>
+        </div>
+      `;
+    }
+  }
+
   const rows=sorted.map(t=>{
     const ent=DATA.entities.find(e=>e.id===t.entityId);
     const acc=DATA.accounts.find(a=>a.id===t.accountId);
     const statusBadge=t.status==='REVIEWED'?'<span class="badge b-info">Reviewed</span>':t.status==='AI_SUGGESTED'?'<span class="badge b-pend">AI Suggested</span>':'<span class="badge" style="background:var(--bg-section);color:var(--dim);border:1px solid var(--border)">Unreviewed</span>';
-    return `<tr>
+    return `<tr style="cursor:pointer" onclick="openEditTx('${t.id}')" title="Clique para editar">
       <td>${esc(t.date)}</td>
       <td>${esc(ent?ent.legalName:'')}</td>
       <td>${esc(acc?acc.name:'')}</td>
-      <td style="max-width:280px;white-space:normal">${esc(t.originalDescription)}</td>
+      <td style="max-width:280px;white-space:normal">${esc(t.originalDescription)}${t.userDescription?`<div style="color:var(--dim);font-size:11px;margin-top:2px">📝 ${esc(t.userDescription)}</div>`:''}</td>
       <td style="text-align:right;color:${t.amount>0?'var(--green)':'var(--red)'};font-variant-numeric:tabular-nums">${t.amount>0?'+':''}$${Math.abs(t.amount).toLocaleString('en-US',{minimumFractionDigits:2})}</td>
       <td>${esc(t.category)||'<span class="dim">—</span>'}</td>
       <td>${esc(t.cpaCategory)||'<span class="dim">—</span>'}</td>
@@ -818,7 +863,8 @@ function renderLedger(c){
   }).join('');
 
   document.getElementById('content').innerHTML=`
-    <div class="sec-hdr"><h2>Transações</h2><div class="sec-line"></div><div style="font-size:11px;color:var(--dim)">${DATA.transactions.length} total</div></div>
+    <div class="sec-hdr"><h2>Transações</h2><div class="sec-line"></div><div style="font-size:11px;color:var(--dim)">${DATA.transactions.length} total · clique em uma linha para editar</div></div>
+    ${editBox}
     <div class="tbl-wrap">
       <table>
         <thead><tr><th>Data</th><th>Empresa</th><th>Conta</th><th>Descrição</th><th style="text-align:right">Valor</th><th>Categoria</th><th>CPA Category</th><th>Status</th></tr></thead>
