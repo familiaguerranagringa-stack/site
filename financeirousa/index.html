@@ -226,7 +226,7 @@ function seedGuerraFamilyEmpire(){  return {
     taxClassification:'Partnership',
     principalActivity:'Holding Company — centraliza participações societárias das demais empresas do grupo',
     cpa:'All7 Service — Diego — (407) 970-8143 — diego@all7service.com',
-    notes:'Form 1065 (Partnership Entity). Annual Report Delaware: Jan-30/Mar. Business Tax Return: até 15/Abr (extensão até 15/Out via Form 7004).'
+    notes:'Form 1065 (Partnership Entity). Annual Report Delaware: Jan-30/Mar. Business Tax Return: até 15/Abr (extensão até 15/Out via Form 7004). CD 7 Month Featured •9478: aberto 06/04/2026, vence 06/11/2026 ($500k principal, ~$506,4k valor atual) — rendimento vira transação só no vencimento.'
   };
 }
 
@@ -283,12 +283,25 @@ function syncFromFB(){
       gfe.principalActivity='Holding Company — centraliza participações societárias das demais empresas do grupo';
       saveAndSync();
     }
+    if(gfe && !(gfe.notes||'').includes('CD 7 Month')){
+      gfe.notes=(gfe.notes||'')+(gfe.notes?' | ':'')+'CD 7 Month Featured •9478: aberto 06/04/2026, vence 06/11/2026 ($500k principal, ~$506,4k valor atual) — rendimento vira transação só no vencimento.';
+      saveAndSync();
+    }
     // Seed automático da conta bancária (Bank of America) vinculada à GFE, se ainda não existir
     if(gfe && !DATA.accounts.some(a=>a.entityId===gfe.id && (a.name||'').includes('3191'))){
       DATA.accounts.push({
         id:uuid(), entityId:gfe.id,
         name:'Bank of America — Business Advantage Relationship •3191',
         type:'Checking', currency:'USD'
+      });
+      saveAndSync();
+    }
+    // CD (Certificate of Deposit) — 7 Month Featured CD, aberto 06/04/2026, vencimento 06/11/2026
+    if(gfe && !DATA.accounts.some(a=>a.entityId===gfe.id && (a.name||'').includes('9478'))){
+      DATA.accounts.push({
+        id:uuid(), entityId:gfe.id,
+        name:'Bank of America — 7 Month Featured CD •9478 (vence 06/11/2026)',
+        type:'Investment Account', currency:'USD'
       });
       saveAndSync();
     }
