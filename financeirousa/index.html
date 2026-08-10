@@ -458,6 +458,15 @@ function syncFromFB(){
       }
     });
     if(retro) saveAndSync();
+    // Saque de $940 para cheque administrativo (LPT Realty — 50% do aluguel + taxa do banco), conforme explicado pelo usuário
+    let tx940=DATA.transactions.find(t=>(t.originalDescription||'').includes('WITHDRWL 7968') && Math.abs(t.amount+940)<0.01);
+    if(tx940 && !tx940.category){
+      tx940.category='Contractor Payment';
+      tx940.cpaCategory='Leasing Commission — Real Estate Broker (LPT Realty) + Banking Fee';
+      tx940.userDescription='Cashiers Check no 6034504717 - $925,00 para LPT Realty LLC (50% do aluguel combinado com a corretora) + $15,00 de taxa bancaria do cheque administrativo';
+      tx940.status='REVIEWED';
+      saveAndSync();
+    }
     setTimeout(()=>setSyncStatus('• Online','var(--green)'),2500);
   }).catch(e=>{
     DATA.entities=load('finusa_entities');
