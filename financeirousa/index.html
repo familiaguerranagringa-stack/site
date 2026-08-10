@@ -298,6 +298,19 @@ function syncFromFB(){
       txFix.userDescription=txFix.userDescription.replace('[Bank of NY Mellon / Standard Chartered]','Bank of NY Mellon');
       saveAndSync();
     }
+    // Padroniza descrição dos demais aportes de capital vindos do Brasil (mesmo padrão)
+    let tx20k=DATA.transactions.find(t=>(t.originalDescription||'').includes('2026020600517123'));
+    if(tx20k && !tx20k.userDescription){
+      tx20k.userDescription='Aporte de capital - Leandro Guerra - Wire internacional do Brasil via Bank of NY Mellon - Ref: APORTE';
+      if(!tx20k.category){tx20k.category='Member Contribution';tx20k.cpaCategory='Member Equity – Capital Contribution';tx20k.status='REVIEWED';}
+      saveAndSync();
+    }
+    let tx35k=DATA.transactions.find(t=>(t.originalDescription||'').includes('2026031000387069'));
+    if(tx35k && !tx35k.userDescription){
+      tx35k.userDescription='Aporte de capital - Leandro Guerra - Wire internacional do Brasil via Standard Chartered Bank - Ref: APORTE INVESTIMENTO BRASILEIRO NO EXTERIOR';
+      if(!tx35k.category){tx35k.category='Member Contribution';tx35k.cpaCategory='Member Equity – Capital Contribution';tx35k.status='REVIEWED';}
+      saveAndSync();
+    }
     setTimeout(()=>setSyncStatus('• Online','var(--green)'),2500);
   }).catch(e=>{
     DATA.entities=load('finusa_entities');
