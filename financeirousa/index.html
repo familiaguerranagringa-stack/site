@@ -384,6 +384,12 @@ function syncFromFB(){
       tx500k.status='REVIEWED';
       saveAndSync();
     }
+    // Migração: transações classificadas como "CPA Review" que ficaram marcadas como REVIEWED por engano — corrige para status próprio CPA_REVIEW (pendente)
+    let migrated=false;
+    DATA.transactions.forEach(t=>{
+      if(t.category==='CPA Review' && t.status==='REVIEWED'){ t.status='CPA_REVIEW'; migrated=true; }
+    });
+    if(migrated) saveAndSync();
     setTimeout(()=>setSyncStatus('• Online','var(--green)'),2500);
   }).catch(e=>{
     DATA.entities=load('finusa_entities');
@@ -466,7 +472,7 @@ function renderHome(c){
   const nEnt=DATA.entities.length;
   const nAcc=DATA.accounts.length;
   const nTx=DATA.transactions.length;
-  const nPending=pendingQueue().length;
+  const nPending=needsAttentionCount();
   const maturities=upcomingMaturities(10);
   c.innerHTML=`
     ${maturities.length ? `
@@ -872,11 +878,25 @@ function processImportRows(rows){
 function pendingQueue(){
   return DATA.transactions.filter(t=>t.status==='UNREVIEWED'||t.status==='AI_SUGGESTED');
 }
+function cpaReviewQueue(){
+  return DATA.transactions.filter(t=>t.status==='CPA_REVIEW');
+}
+function needsAttentionCount(){
+  return pendingQueue().length + cpaReviewQueue().length;
+}
 
 function renderReview(c){
   const queue=pendingQueue();
   if(!queue.length){
-    c.innerHTML=`<div class="empty"><div style="font-size:28px">✅</div><div>Tudo revisado! Nenhuma transação pendente.</div></div>`;
+    const cpaQ=cpaReviewQueue();
+    c.innerHTML=cpaQ.length ? `
+      <div class="empty">
+        <div style="font-size:28px">✅</div>
+        <div>Fila de classificação zerada!</div>
+        <div style="margin-top:10px;font-size:12px">Mas ainda há <b>${cpaQ.length} transação(ões)</b> marcada(s) como <b>CPA Review</b>, aguardando o contador decidir. Elas não bloqueiam seu fluxo, mas seguem pendentes.</div>
+        <button class="btn-gold" style="margin-top:14px" onclick="goTab('ledger')">Ver em Transações →</button>
+      </div>
+    ` : `<div class="empty"><div style="font-size:28px">✅</div><div>Tudo revisado! Nenhuma transação pendente.</div></div>`;
     return;
   }
   const t=queue[0];
@@ -926,8 +946,12 @@ function selectQuickCat(id,cat){
   t.category=cat;
   t.cpaCategory=document.getElementById('rev-cpa-'+id)?document.getElementById('rev-cpa-'+id).value:'';
   t.userDescription=document.getElementById('rev-note-'+id)?document.getElementById('rev-note-'+id).value:'';
-  t.status='REVIEWED';
-  learnRule(t.entityId,t.originalDescription,t.category,t.cpaCategory);
+  if(cat==='CPA Review'){
+    t.status='CPA_REVIEW'; // não conta como revisado — fica pendente até o contador decidir
+  } else {
+    t.status='REVIEWED';
+    learnRule(t.entityId,t.originalDescription,t.category,t.cpaCategory);
+  }
   saveAndSync();
   render();
 }
@@ -939,8 +963,12 @@ function saveReviewFull(id){
   t.category=cat;
   t.cpaCategory=document.getElementById('rev-cpa-'+id).value;
   t.userDescription=document.getElementById('rev-note-'+id).value;
-  t.status='REVIEWED';
-  learnRule(t.entityId,t.originalDescription,t.category,t.cpaCategory);
+  if(cat==='CPA Review'){
+    t.status='CPA_REVIEW';
+  } else {
+    t.status='REVIEWED';
+    learnRule(t.entityId,t.originalDescription,t.category,t.cpaCategory);
+  }
   saveAndSync();
   render();
 }
@@ -969,7 +997,12 @@ function saveEditTx(id){
   t.category=document.getElementById('edit-cat-'+id).value;
   t.cpaCategory=document.getElementById('edit-cpa-'+id).value;
   t.userDescription=document.getElementById('edit-note-'+id).value;
-  learnRule(t.entityId,t.originalDescription,t.category,t.cpaCategory);
+  if(t.category==='CPA Review'){
+    t.status='CPA_REVIEW';
+  } else {
+    t.status='REVIEWED';
+    learnRule(t.entityId,t.originalDescription,t.category,t.cpaCategory);
+  }
   saveAndSync();
   EDIT_TX_ID=null;
   notify('Transação atualizada','ok');
@@ -1014,7 +1047,7 @@ function renderLedger(c){
   const rows=sorted.map(t=>{
     const ent=DATA.entities.find(e=>e.id===t.entityId);
     const acc=DATA.accounts.find(a=>a.id===t.accountId);
-    const statusBadge=t.status==='REVIEWED'?'<span class="badge b-info">Reviewed</span>':t.status==='AI_SUGGESTED'?'<span class="badge b-pend">AI Suggested</span>':'<span class="badge" style="background:var(--bg-section);color:var(--dim);border:1px solid var(--border)">Unreviewed</span>';
+    const statusBadge=t.status==='REVIEWED'?'<span class="badge b-info">Reviewed</span>':t.status==='AI_SUGGESTED'?'<span class="badge b-pend">AI Suggested</span>':t.status==='CPA_REVIEW'?'<span class="badge" style="background:#FDEAEA;color:var(--red);border:1px solid #F3C6C6">CPA Review (pendente)</span>':'<span class="badge" style="background:var(--bg-section);color:var(--dim);border:1px solid var(--border)">Unreviewed</span>';
     return `<tr style="cursor:pointer" onclick="openEditTx('${t.id}')" title="Clique para editar">
       <td>${esc(t.date)}</td>
       <td>${esc(ent?ent.legalName:'')}</td>
