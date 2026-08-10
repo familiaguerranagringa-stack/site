@@ -754,7 +754,20 @@ function learnRule(entityId,desc,category,cpaCategory){
   else { DATA.rules.push({id:uuid(),entityId,key,category,cpaCategory:cpaCategory||''}); }
 }
 
-// ── DETECÇÃO AUTOMÁTICA: transferências para outras empresas do grupo (Intercompany Contribution) ──
+// ── DETECÇÃO AUTOMÁTICA: padrões recorrentes do imóvel da MM Guerra Empreendimentos (utilities + aluguel) ──
+function detectPropertyPatterns(desc){
+  const d=(desc||'').toUpperCase();
+  if(d.includes('DUKE ENERGY')){
+    return {category:'Expense',cpaCategory:'Utilities - Electricity',userDescription:'Conta de energia elétrica da casa (Duke Energy)'};
+  }
+  if(d.includes('TURBOTENANT')){
+    return {category:'Income',cpaCategory:'Rental Income',userDescription:'Recebimento de aluguel via TurboTenant'};
+  }
+  if(d.includes('MARION COUNTY')){
+    return {category:'Expense',cpaCategory:'Utilities - Water/Sewer',userDescription:'Conta de água/esgoto — Marion County FL'};
+  }
+  return null;
+}
 const GRUPO_EMPRESAS=['FAMILIA GUERRA HOLDING LLC','MM GUERRA EMPREENDIMENTOS LLC','FAMILIA GUERRA INVESTING LLC'];
 function detectIntercompanyContribution(desc){
   const d=(desc||'').toUpperCase();
@@ -899,7 +912,8 @@ function processImportRows(rows){
     const wireGuess=!rule?detectWireContributionFromBrazil(p.description):null;
     const distGuess=(!rule && !wireGuess)?detectMemberDistribution(p.description):null;
     const intercoGuess=(!rule && !wireGuess && !distGuess)?detectIntercompanyContribution(p.description):null;
-    const guess=wireGuess||distGuess||intercoGuess;
+    const propGuess=(!rule && !wireGuess && !distGuess && !intercoGuess)?detectPropertyPatterns(p.description):null;
+    const guess=wireGuess||distGuess||intercoGuess||propGuess;
     toAdd.push({
       id:uuid(),
       entityId:IMP.entityId,
@@ -1040,8 +1054,9 @@ function clearSuggestion(id){
   render();
 }
 
-// ── LEDGER (todas as transações) — com edição inline ──
+// ── LEDGER (todas as transações) — com edição inline e filtro por empresa ──
 let EDIT_TX_ID=null;
+let LEDGER_FILTER_ENTITY='';
 function openEditTx(id){ EDIT_TX_ID=id; render(); }
 function cancelEditTx(){ EDIT_TX_ID=null; render(); }
 function saveEditTx(id){
@@ -1067,7 +1082,8 @@ function renderLedger(c){
     c.innerHTML=`<div class="empty"><div style="font-size:28px">📒</div><div>Nenhuma transação importada ainda.</div></div>`;
     return;
   }
-  const sorted=[...DATA.transactions].sort((a,b)=>new Date(b.date)-new Date(a.date));
+  const filtered=LEDGER_FILTER_ENTITY?DATA.transactions.filter(t=>t.entityId===LEDGER_FILTER_ENTITY):DATA.transactions;
+  const sorted=[...filtered].sort((a,b)=>new Date(b.date)-new Date(a.date));
 
   let editBox='';
   if(EDIT_TX_ID){
@@ -1114,7 +1130,13 @@ function renderLedger(c){
   }).join('');
 
   document.getElementById('content').innerHTML=`
-    <div class="sec-hdr"><h2>Transações</h2><div class="sec-line"></div><div style="font-size:11px;color:var(--dim)">${DATA.transactions.length} total · clique em uma linha para editar</div></div>
+    <div class="sec-hdr"><h2>Transações</h2><div class="sec-line"></div>
+      <select class="fi" style="width:260px" onchange="LEDGER_FILTER_ENTITY=this.value;render()">
+        <option value="">Todas as empresas (${DATA.transactions.length})</option>
+        ${DATA.entities.map(e=>`<option value="${e.id}" ${LEDGER_FILTER_ENTITY===e.id?'selected':''}>${esc(e.legalName)||'(sem nome)'} (${DATA.transactions.filter(t=>t.entityId===e.id).length})</option>`).join('')}
+      </select>
+      <div style="font-size:11px;color:var(--dim);margin-left:12px">${filtered.length} transação(ões) · clique em uma linha para editar</div>
+    </div>
     ${editBox}
     <div class="tbl-wrap">
       <table>
