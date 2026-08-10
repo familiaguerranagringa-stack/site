@@ -217,7 +217,7 @@ function seedGuerraFamilyEmpire(){
     currency:'USD',
     entityType:'LLC',
     taxClassification:'Partnership',
-    principalActivity:'',
+    principalActivity:'Holding Company — centraliza participações societárias das demais empresas do grupo',
     cpa:'All7 Service — Diego — (407) 970-8143 — diego@all7service.com',
     notes:'Form 1065 (Partnership Entity). Annual Report Delaware: Jan-30/Mar. Business Tax Return: até 15/Abr (extensão até 15/Out via Form 7004).'
   };
@@ -238,16 +238,24 @@ function syncFromFB(){
       setSyncStatus('• Online (vazio)','var(--green)');
     }
     // Seed automático: se ainda não existe nenhuma empresa, já entra com a GUERRA FAMILY EMPIRE LLC preenchida
-    if(!DATA.entities.some(e=>(e.legalName||'').toUpperCase().includes('GUERRA FAMILY EMPIRE'))){
+    let gfe=DATA.entities.find(e=>(e.legalName||'').toUpperCase().includes('GUERRA FAMILY EMPIRE'));
+    if(!gfe){
       DATA.entities.push(seedGuerraFamilyEmpire());
+      saveAndSync();
+    } else if(!gfe.principalActivity){
+      gfe.principalActivity='Holding Company — centraliza participações societárias das demais empresas do grupo';
       saveAndSync();
     }
     setTimeout(()=>setSyncStatus('• Online','var(--green)'),2500);
   }).catch(e=>{
     DATA.entities=load('finusa_entities');
     DATA.accounts=load('finusa_accounts');
-    if(!DATA.entities.some(e=>(e.legalName||'').toUpperCase().includes('GUERRA FAMILY EMPIRE'))){
+    let gfe=DATA.entities.find(e=>(e.legalName||'').toUpperCase().includes('GUERRA FAMILY EMPIRE'));
+    if(!gfe){
       DATA.entities.push(seedGuerraFamilyEmpire());
+      saveLocal();
+    } else if(!gfe.principalActivity){
+      gfe.principalActivity='Holding Company — centraliza participações societárias das demais empresas do grupo';
       saveLocal();
     }
     setSyncStatus('• Local','var(--dim)');
