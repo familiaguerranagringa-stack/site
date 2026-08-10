@@ -768,15 +768,16 @@ function detectPropertyPatterns(desc){
   }
   return null;
 }
-const GRUPO_EMPRESAS=['FAMILIA GUERRA HOLDING LLC','MM GUERRA EMPREENDIMENTOS LLC','FAMILIA GUERRA INVESTING LLC'];
+const GRUPO_EMPRESAS=['GUERRA FAMILY EMPIRE LLC','FAMILIA GUERRA HOLDING LLC','MM GUERRA EMPREENDIMENTOS LLC','FAMILIA GUERRA INVESTING LLC'];
 function detectIntercompanyContribution(desc){
   const d=(desc||'').toUpperCase();
   const dest=GRUPO_EMPRESAS.find(nome=>d.includes(nome));
   if(!dest) return null;
+  const nomeFormatado=dest.charAt(0)+dest.slice(1).toLowerCase();
   return {
     category:'Intercompany Transfer',
-    cpaCategory:'Intercompany Contribution — to Subsidiary',
-    userDescription:`Aporte de capital da holding (Guerra Family Empire LLC) para ${dest.charAt(0)+dest.slice(1).toLowerCase()} — capitalização de subsidiária`
+    cpaCategory:'Intercompany Transfer — with '+nomeFormatado,
+    userDescription:`Movimentação entre empresas do grupo com ${nomeFormatado} — confirmar direção (aporte, empréstimo ou reembolso) e ajustar nota se necessário`
   };
 }
 function detectMemberDistribution(desc){
