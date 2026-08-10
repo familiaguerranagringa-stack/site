@@ -199,6 +199,30 @@ function pushToFB(){
     });
   },250);
 }
+function seedGuerraFamilyEmpire(){
+  return {
+    id:uuid(),
+    legalName:'GUERRA FAMILY EMPIRE LLC',
+    dba:'',
+    ein:'33-3837978',
+    state:'Delaware',
+    stateRegNumber:'10090869',
+    formationDate:'2025-02-05',
+    address:'8554 Abbotsbury Drive, Windermere, FL 34786',
+    registeredAgent:'Harvard Business Services, Inc. — 16192 Coastal Highway, Lewes, DE 19958 — (302) 645-7400',
+    members:'Leandro Guerra Marino Fiuza de Castro (49%), Julyana Soares Silva Guerra (49%), Miguel Guerra Soares Fiuza de Castro (1%), Maya Guerra Soares Fiuza de Castro (1%)',
+    managers:'Todos os Members são Authorized Member/Manager (AMBR) — gestão pelos próprios membros',
+    ownershipPercentage:'Leandro 49% / Julyana 49% / Miguel 1% / Maya 1%',
+    fiscalYear:'Calendar Year (Jan-Dez)',
+    currency:'USD',
+    entityType:'LLC',
+    taxClassification:'Partnership',
+    principalActivity:'',
+    cpa:'All7 Service — Diego — (407) 970-8143 — diego@all7service.com',
+    notes:'Form 1065 (Partnership Entity). Annual Report Delaware: Jan-30/Mar. Business Tax Return: até 15/Abr (extensão até 15/Out via Form 7004).'
+  };
+}
+
 function syncFromFB(){
   setSyncStatus('⟳ Carregando...','var(--amber)');
   return _dbRef.once('value').then(snap=>{
@@ -213,10 +237,19 @@ function syncFromFB(){
       DATA.accounts=load('finusa_accounts');
       setSyncStatus('• Online (vazio)','var(--green)');
     }
+    // Seed automático: se ainda não existe nenhuma empresa, já entra com a GUERRA FAMILY EMPIRE LLC preenchida
+    if(!DATA.entities.some(e=>(e.legalName||'').toUpperCase().includes('GUERRA FAMILY EMPIRE'))){
+      DATA.entities.push(seedGuerraFamilyEmpire());
+      saveAndSync();
+    }
     setTimeout(()=>setSyncStatus('• Online','var(--green)'),2500);
   }).catch(e=>{
     DATA.entities=load('finusa_entities');
     DATA.accounts=load('finusa_accounts');
+    if(!DATA.entities.some(e=>(e.legalName||'').toUpperCase().includes('GUERRA FAMILY EMPIRE'))){
+      DATA.entities.push(seedGuerraFamilyEmpire());
+      saveLocal();
+    }
     setSyncStatus('• Local','var(--dim)');
   });
 }
