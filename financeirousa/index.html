@@ -456,6 +456,17 @@ function syncFromFB(){
           retro=true;
         }
       }
+      // Recupera transações marcadas como CPA Review que na verdade batem com um padrão conhecido (ex: Duke Energy)
+      if(t.status==='CPA_REVIEW'){
+        const guess2=detectPropertyPatterns(t.originalDescription);
+        if(guess2){
+          t.category=guess2.category;
+          t.cpaCategory=guess2.cpaCategory;
+          if(!t.userDescription || t.userDescription.includes('confirmar')) t.userDescription=guess2.userDescription;
+          t.status='AI_SUGGESTED';
+          retro=true;
+        }
+      }
     });
     if(retro) saveAndSync();
     // Saque de $940 para cheque administrativo (LPT Realty — 50% do aluguel + taxa do banco), conforme explicado pelo usuário
@@ -781,13 +792,14 @@ function learnRule(entityId,desc,category,cpaCategory){
 // ── DETECÇÃO AUTOMÁTICA: padrões recorrentes do imóvel da MM Guerra Empreendimentos (utilities + aluguel) ──
 function detectPropertyPatterns(desc){
   const d=(desc||'').toUpperCase();
-  if(d.includes('DUKE ENERGY')){
+  const compact=d.replace(/[^A-Z]/g,''); // remove espaços, hífens, números — para pegar DUKE-ENERGY, DUKEENERGY, etc
+  if(compact.includes('DUKEENERGY')){
     return {category:'Expense',cpaCategory:'Utilities - Electricity',userDescription:'Conta de energia elétrica da casa (Duke Energy)'};
   }
-  if(d.includes('TURBOTENANT')){
+  if(compact.includes('TURBOTENANT')){
     return {category:'Income',cpaCategory:'Rental Income',userDescription:'Recebimento de aluguel via TurboTenant'};
   }
-  if(d.includes('MARION COUNTY')){
+  if(compact.includes('MARIONCOUNTY')){
     return {category:'Expense',cpaCategory:'Utilities - Water/Sewer',userDescription:'Conta de água/esgoto — Marion County FL'};
   }
   return null;
