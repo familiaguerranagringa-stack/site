@@ -443,6 +443,21 @@ function syncFromFB(){
       if(t.category==='CPA Review' && t.status==='REVIEWED'){ t.status='CPA_REVIEW'; migrated=true; }
     });
     if(migrated) saveAndSync();
+    // Migração retroativa: aplica as regras de detecção automática em transações já importadas antes de essas regras existirem
+    let retro=false;
+    DATA.transactions.forEach(t=>{
+      if(t.status==='UNREVIEWED' && !t.category){
+        const guess=detectWireContributionFromBrazil(t.originalDescription)||detectMemberDistribution(t.originalDescription)||detectIntercompanyContribution(t.originalDescription)||detectPropertyPatterns(t.originalDescription);
+        if(guess){
+          t.category=guess.category;
+          t.cpaCategory=guess.cpaCategory;
+          if(!t.userDescription) t.userDescription=guess.userDescription;
+          t.status='AI_SUGGESTED';
+          retro=true;
+        }
+      }
+    });
+    if(retro) saveAndSync();
     setTimeout(()=>setSyncStatus('• Online','var(--green)'),2500);
   }).catch(e=>{
     DATA.entities=load('finusa_entities');
