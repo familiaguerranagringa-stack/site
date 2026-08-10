@@ -447,7 +447,7 @@ function syncFromFB(){
     let retro=false;
     DATA.transactions.forEach(t=>{
       if(t.status==='UNREVIEWED' && !t.category){
-        const guess=detectWireContributionFromBrazil(t.originalDescription)||detectMemberDistribution(t.originalDescription)||detectIntercompanyContribution(t.originalDescription)||detectPropertyPatterns(t.originalDescription)||detectBofaMaintenanceFee(t.originalDescription,t.amount);
+        const guess=detectWireContributionFromBrazil(t.originalDescription)||detectMemberDistribution(t.originalDescription)||detectIntercompanyContribution(t.originalDescription)||detectPropertyPatterns(t.originalDescription)||detectSecurityFirstInsurance(t.originalDescription)||detectBofaMaintenanceFee(t.originalDescription,t.amount);
         if(guess){
           t.category=guess.category;
           t.cpaCategory=guess.cpaCategory;
@@ -458,7 +458,7 @@ function syncFromFB(){
       }
       // Recupera transações marcadas como CPA Review que na verdade batem com um padrão conhecido (ex: Duke Energy)
       if(t.status==='CPA_REVIEW'){
-        const guess2=detectPropertyPatterns(t.originalDescription)||detectBofaMaintenanceFee(t.originalDescription,t.amount);
+        const guess2=detectPropertyPatterns(t.originalDescription)||detectSecurityFirstInsurance(t.originalDescription)||detectBofaMaintenanceFee(t.originalDescription,t.amount);
         if(guess2){
           t.category=guess2.category;
           t.cpaCategory=guess2.cpaCategory;
@@ -469,10 +469,18 @@ function syncFromFB(){
       }
     });
     if(retro) saveAndSync();
-    // Migração retroativa específica: reclassifica QUALQUER lançamento já existente que bata com o padrão da tarifa do BofA
-    // (mesmo que já tenha sido categorizado errado antes, ex: como Utilities), conforme pedido do usuário
+    // Migração retroativa específica: reclassifica QUALQUER lançamento já existente que bata com os padrões
+    // do seguro Security First e da tarifa do BofA (mesmo que já tenha sido categorizado errado antes)
     let bofaFix=false;
     DATA.transactions.forEach(t=>{
+      const secGuess=detectSecurityFirstInsurance(t.originalDescription);
+      if(secGuess && t.cpaCategory!==secGuess.cpaCategory){
+        t.category=secGuess.category;
+        t.cpaCategory=secGuess.cpaCategory;
+        if(!t.userDescription || t.status!=='REVIEWED') t.userDescription=secGuess.userDescription;
+        if(t.status!=='REVIEWED') t.status='AI_SUGGESTED';
+        bofaFix=true;
+      }
       const bofaGuess=detectBofaMaintenanceFee(t.originalDescription,t.amount);
       if(bofaGuess && t.cpaCategory!==bofaGuess.cpaCategory){
         t.category=bofaGuess.category;
@@ -818,7 +826,18 @@ function detectPropertyPatterns(desc){
   }
   return null;
 }
-// ── DETECÇÃO AUTOMÁTICA: tarifa de manutenção mensal do Bank of America (Business Advantage Fundamentals — $16) ──
+// ── DETECÇÃO AUTOMÁTICA: seguro da casa de Ocala (Security First Insurance, apólice FL00185503-01) ──
+// Plano parcelado da corretora: 1ª parcela $109,10 + 10x de $73,99 = $849,00/ano (07/15/2026 a 07/15/2027)
+function detectSecurityFirstInsurance(desc){
+  const d=(desc||'').toUpperCase();
+  const compact=d.replace(/[^A-Z]/g,'');
+  if(!compact.includes('SECURITYFIRST')) return null;
+  return {
+    category:'Expense',
+    cpaCategory:'Insurance — Property (Security First, Policy FL00185503-01)',
+    userDescription:'Seguro dwelling do imóvel de Ocala (6671 SW 151st Loop) — Security First Insurance, apólice FL00185503-01, vigência 07/15/2026 a 07/15/2027. Plano parcelado: 1ª parcela $109,10 + 10x de $73,99 = $849,00/ano.'
+  };
+}
 function detectBofaMaintenanceFee(desc,amount){
   const d=(desc||'').toUpperCase();
   const compact=d.replace(/[^A-Z]/g,'');
@@ -978,8 +997,9 @@ function processImportRows(rows){
     const distGuess=(!rule && !wireGuess)?detectMemberDistribution(p.description):null;
     const intercoGuess=(!rule && !wireGuess && !distGuess)?detectIntercompanyContribution(p.description):null;
     const propGuess=(!rule && !wireGuess && !distGuess && !intercoGuess)?detectPropertyPatterns(p.description):null;
-    const bofaGuess=(!rule && !wireGuess && !distGuess && !intercoGuess && !propGuess)?detectBofaMaintenanceFee(p.description,p.amount):null;
-    const guess=wireGuess||distGuess||intercoGuess||propGuess||bofaGuess;
+    const secGuess=(!rule && !wireGuess && !distGuess && !intercoGuess && !propGuess)?detectSecurityFirstInsurance(p.description):null;
+    const bofaGuess=(!rule && !wireGuess && !distGuess && !intercoGuess && !propGuess && !secGuess)?detectBofaMaintenanceFee(p.description,p.amount):null;
+    const guess=wireGuess||distGuess||intercoGuess||propGuess||secGuess||bofaGuess;
     toAdd.push({
       id:uuid(),
       entityId:IMP.entityId,
