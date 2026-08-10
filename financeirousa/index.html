@@ -317,6 +317,15 @@ function syncFromFB(){
       if(!tx28k.category){tx28k.category='Member Contribution';tx28k.cpaCategory='Member Equity – Capital Contribution';tx28k.status='REVIEWED';}
       saveAndSync();
     }
+    // Zelle p/ Julyana = retirada pessoal (Member Distribution) — confirmado pelo usuário
+    let txJul=DATA.transactions.find(t=>(t.originalDescription||'').includes('n0m3y7xkp'));
+    if(txJul && (!txJul.category || txJul.category==='CPA Review')){
+      txJul.category='Member Distribution';
+      txJul.cpaCategory='Member Equity – Distribution';
+      txJul.userDescription='Retirada de lucro/capital - Julyana Soares Silva Guerra - uso pessoal (confirmar tratamento fiscal com contador)';
+      txJul.status='REVIEWED';
+      saveAndSync();
+    }
     setTimeout(()=>setSyncStatus('• Online','var(--green)'),2500);
   }).catch(e=>{
     DATA.entities=load('finusa_entities');
@@ -602,7 +611,20 @@ function learnRule(entityId,desc,category,cpaCategory){
   else { DATA.rules.push({id:uuid(),entityId,key,category,cpaCategory:cpaCategory||''}); }
 }
 
-// ── DETECÇÃO AUTOMÁTICA: aporte de capital internacional (wire do Brasil, origem Leandro Guerra) ──
+// ── DETECÇÃO AUTOMÁTICA: Zelle para membros da família (retirada pessoal = Member Distribution) ──
+function detectMemberDistribution(desc){
+  const d=(desc||'').toUpperCase();
+  if(!d.includes('ZELLE PAYMENT TO')) return null;
+  let member=null;
+  if(d.includes('JULYANA')) member='Julyana Soares Silva Guerra';
+  else if(d.includes('LEANDRO GUERRA')) member='Leandro Guerra Marino Fiuza de Castro';
+  if(!member) return null;
+  return {
+    category:'Member Distribution',
+    cpaCategory:'Member Equity – Distribution',
+    userDescription:`Retirada de lucro/capital - ${member} - uso pessoal (confirmar tratamento fiscal com contador)`
+  };
+}
 function detectWireContributionFromBrazil(desc){
   const d=(desc||'').toUpperCase();
   if(!d.includes('WIRE TYPE:WIRE IN')) return null;
@@ -721,18 +743,20 @@ function processImportRows(rows){
     existing.add(key);
     const rule=findRule(IMP.entityId,p.description);
     const wireGuess=!rule?detectWireContributionFromBrazil(p.description):null;
+    const distGuess=(!rule && !wireGuess)?detectMemberDistribution(p.description):null;
+    const guess=wireGuess||distGuess;
     toAdd.push({
       id:uuid(),
       entityId:IMP.entityId,
       accountId:IMP.accountId,
       date:p.date,
       originalDescription:p.description,
-      userDescription:rule?'':(wireGuess?wireGuess.userDescription:''),
+      userDescription:rule?'':(guess?guess.userDescription:''),
       amount:p.amount,
       balance:p.balance,
-      category:rule?rule.category:(wireGuess?wireGuess.category:''),
-      cpaCategory:rule?rule.cpaCategory:(wireGuess?wireGuess.cpaCategory:''),
-      status:(rule||wireGuess)?'AI_SUGGESTED':'UNREVIEWED'
+      category:rule?rule.category:(guess?guess.category:''),
+      cpaCategory:rule?rule.cpaCategory:(guess?guess.cpaCategory:''),
+      status:(rule||guess)?'AI_SUGGESTED':'UNREVIEWED'
     });
     novas++;
   });
