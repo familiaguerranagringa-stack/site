@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FINANCEIRO USA — Família Guerra</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#F6F6F3;--bg-card:#FFFFFF;--bg-hover:#F0F1EE;--bg-section:#F1F2EE;--bg-sub:#F4F5F1;
+  --border:#E1E2DC;--border-lite:#EAEBE6;
+  --gold:#2F6F5E;--gold-lt:#255A4C;--gold-dim:#BFDFD5;--gold-bg:#EAF5F1;
+  --text:#1B1D1B;--muted:#5C5E58;--dim:#94958E;
+  --green:#1D8348;--red:#C0392B;--blue:#1F6B85;--amber:#B4740E;
+}
+.dark-mode{
+  --bg:#1A1D20;--bg-card:#22272B;--bg-hover:#282E33;--bg-section:#262B2F;--bg-sub:#262B2F;
+  --border:#333A3F;--border-lite:#2C3236;
+  --gold:#4FAE94;--gold-lt:#63C4A9;--gold-dim:#3A5A50;--gold-bg:#1E2C28;
+  --text:#E0E6ED;--muted:#90A4AE;--dim:#697680;
+  --green:#4ADE80;--red:#F87171;--blue:#5DADE2;--amber:#F5B041;
+}
+html,body,*{transition:background-color .2s ease,border-color .2s ease,color .2s ease}
+html,body{min-height:100vh;background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+#app{display:flex;min-height:100vh}
+.sidebar{width:230px;min-width:230px;background:var(--bg-card);border-right:1px solid var(--border);display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto;box-shadow:1px 0 3px rgba(20,20,20,.03)}
+.main{flex:1;display:flex;flex-direction:column;min-width:0}
+.topbar{height:56px;background:var(--bg-card);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 24px;gap:16px;flex-shrink:0;position:sticky;top:0;z-index:50}
+.content{flex:1;padding:28px 24px 80px;overflow-y:auto}
+.sb-logo{padding:20px 18px 14px;border-bottom:1px solid var(--border);min-height:110px;box-sizing:border-box;display:flex;flex-direction:column}
+.sb-logo-eye{font-family:'Syne',sans-serif;font-size:9px;font-weight:700;letter-spacing:.22em;color:var(--gold);text-transform:uppercase;margin-bottom:4px}
+.sb-logo-name{font-family:'Syne',sans-serif;font-size:15px;font-weight:800;color:var(--text);line-height:1.1}
+.sb-logo-sub{font-size:10px;color:var(--dim);margin-top:2px}
+.sb-section{padding:12px 18px 4px;font-size:9px;font-weight:700;letter-spacing:.18em;color:var(--dim);text-transform:uppercase}
+.sb-item{display:flex;align-items:center;gap:10px;padding:9px 14px;margin:1px 8px;border-radius:6px;cursor:pointer;transition:all .15s;color:var(--muted);font-size:12px;font-weight:500;border:none;background:none;width:calc(100% - 16px);text-align:left;font-family:'DM Sans',sans-serif}
+.sb-item:hover{background:var(--bg-hover);color:var(--text)}
+.sb-item.active{background:var(--gold-bg);color:var(--gold);border:1px solid var(--gold-dim)}
+.sb-bottom{margin-top:auto;padding:14px 10px;border-top:1px solid var(--border)}
+.tb-title{font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:var(--text);letter-spacing:.04em;flex:1}
+.btn-ghost{background:transparent;border:1px solid var(--border);color:var(--muted);font-family:'DM Sans',sans-serif;font-size:12px;padding:6px 14px;border-radius:5px;cursor:pointer;transition:all .15s}
+.btn-ghost:hover{border-color:var(--gold);color:var(--gold)}
+.btn-gold{background:var(--gold);color:#fff;font-family:'Syne',sans-serif;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;border:none;border-radius:6px;padding:9px 18px;cursor:pointer;transition:background .15s}
+.btn-gold:hover{background:var(--gold-lt)}
+.btn-sm{background:transparent;border:1px solid var(--border);color:var(--dim);font-family:'DM Sans',sans-serif;font-size:11px;padding:4px 10px;border-radius:4px;cursor:pointer;transition:all .15s}
+.btn-sm:hover{border-color:var(--red);color:var(--red)}
+.btn-sm.ok:hover{border-color:var(--green);color:var(--green)}
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(235px,1fr));gap:14px;margin-bottom:28px}
+.kpi{background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:18px 20px;position:relative;overflow:hidden;transition:border-color .2s,transform .15s;box-shadow:0 1px 3px rgba(20,20,20,.05);cursor:pointer}
+.kpi:hover{border-color:var(--gold-dim);transform:translateY(-2px)}
+.kpi-accent{position:absolute;top:0;left:0;right:0;height:2px}
+.kpi-label{font-size:10px;font-weight:600;letter-spacing:.16em;color:var(--muted);text-transform:uppercase;margin-bottom:8px}
+.kpi-value{font-family:'Syne',sans-serif;font-size:17px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.2}
+.kpi-sub{font-size:11px;color:var(--dim);margin-top:5px}
+.sec-hdr{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+.sec-hdr h2{font-family:'Syne',sans-serif;font-size:10px;font-weight:700;letter-spacing:.2em;color:var(--gold);text-transform:uppercase;white-space:nowrap}
+.sec-line{flex:1;height:1px;background:var(--border)}
+.sec-note{font-size:11px;color:var(--dim);margin:-8px 0 16px;line-height:1.6}
+.tbl-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:8px;margin-bottom:24px;background:var(--bg-card);box-shadow:0 1px 3px rgba(20,20,20,.04)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{background:var(--bg-section);padding:9px 14px;text-align:left;font-size:9px;font-weight:700;letter-spacing:.14em;color:var(--muted);text-transform:uppercase;border-bottom:1px solid var(--border);white-space:nowrap}
+td{padding:8px 14px;border-bottom:1px solid var(--border-lite);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:var(--bg-hover)}
+.dim{color:var(--dim)}.gold{color:var(--gold)}
+.form-card{background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:20px;margin-bottom:22px;box-shadow:0 1px 3px rgba(20,20,20,.04)}
+.fg{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:14px;margin-bottom:14px}
+.fl{display:flex;flex-direction:column;gap:5px}
+.fl label{font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.fi,select.fi,textarea.fi{background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;padding:8px 11px;outline:none;transition:border-color .15s;width:100%}
+.fi:focus{border-color:var(--gold)}
+.fi::placeholder{color:var(--dim)}
+.badge{display:inline-flex;align-items:center;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;padding:3px 8px;border-radius:4px;white-space:nowrap}
+.b-info{background:var(--gold-bg);color:var(--gold);border:1px solid var(--gold-dim)}
+.b-pend{background:#FCF1DD;color:var(--amber);border:1px solid #F0D9A6}
+.empty{display:flex;flex-direction:column;align-items:center;padding:50px 20px;color:var(--dim);gap:10px;text-align:center;font-size:13px}
+#notif{position:fixed;top:18px;right:18px;z-index:500;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+.ni{background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:11px 15px;font-size:12px;display:flex;align-items:center;gap:8px;min-width:240px;pointer-events:all;animation:sli .2s ease}
+.ni.ok{border-left:3px solid var(--green)}.ni.err{border-left:3px solid var(--red)}.ni.info{border-left:3px solid var(--gold)}
+@keyframes sli{from{opacity:0;transform:translateX(16px)}to{opacity:1;transform:translateX(0)}}
+#login-screen{position:fixed;inset:0;background:var(--bg);z-index:1000;display:flex;align-items:center;justify-content:center}
+.card-modulo{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:26px;cursor:pointer;transition:all .15s;display:flex;flex-direction:column;gap:6px;position:relative;overflow:hidden}
+.card-modulo:hover{border-color:var(--gold-dim);transform:translateY(-2px);box-shadow:0 4px 14px rgba(20,20,20,.06)}
+.card-modulo.disabled{opacity:.55;cursor:not-allowed}
+.card-modulo.disabled:hover{transform:none;border-color:var(--border)}
+.card-modulo-icon{font-size:22px;margin-bottom:4px}
+.card-modulo-title{font-family:'Syne',sans-serif;font-size:15px;font-weight:800}
+.card-modulo-sub{font-size:11px;color:var(--dim);line-height:1.5}
+.mod-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px;margin-bottom:30px}
+#sync-status{font-size:11px;color:var(--dim)}
+</style>
+</head>
+<body>
+
+<div id="notif"></div>
+
+<div id="login-screen">
+  <div style="width:340px;background:var(--bg-card);border:1px solid var(--border);border-top:3px solid var(--gold);border-radius:12px;padding:40px 32px 32px">
+    <div style="font-family:'Syne',sans-serif;font-size:9px;font-weight:700;letter-spacing:.22em;color:var(--gold);text-transform:uppercase;margin-bottom:6px">Família Guerra</div>
+    <div style="font-family:'Syne',sans-serif;font-size:24px;font-weight:800;margin-bottom:4px">FINANCEIRO USA</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:28px">Financial Control Center</div>
+    <div class="fl" style="margin-bottom:12px"><label>Usuário</label><input class="fi" type="text" id="l-user" placeholder="usuário" autocomplete="username"></div>
+    <div class="fl" style="margin-bottom:18px"><label>Senha</label><input class="fi" type="password" id="l-pass" placeholder="••••••••" autocomplete="current-password"></div>
+    <div id="l-err" style="font-size:12px;color:var(--red);margin-bottom:10px;display:none">Usuário ou senha incorretos.</div>
+    <button class="btn-gold" style="width:100%" onclick="doLogin()">Entrar</button>
+  </div>
+</div>
+
+<div id="app" style="display:none">
+  <div class="sidebar">
+    <div class="sb-logo">
+      <div class="sb-logo-eye">Família Guerra</div>
+      <div class="sb-logo-name">Financeiro USA</div>
+      <div class="sb-logo-sub">Financial Control Center</div>
+    </div>
+    <div class="sb-section">Navegação</div>
+    <button class="sb-item" data-nav="home" onclick="goTab('home')">🏠 Home</button>
+    <button class="sb-item" data-nav="entities" onclick="goTab('entities')">🏢 Business — Empresas</button>
+    <button class="sb-item" data-nav="accounts" onclick="goTab('accounts')">💳 Business — Contas</button>
+    <button class="sb-item" data-nav="personal" onclick="goTab('personal')">👤 Personal</button>
+    <button class="sb-item" data-nav="properties" onclick="goTab('properties')">🏘️ Properties</button>
+    <button class="sb-item" data-nav="wealth" onclick="goTab('wealth')">📊 Wealth</button>
+    <div class="sb-bottom">
+      <div id="sync-status">• Online</div>
+      <button class="btn-ghost" style="width:100%;margin-top:8px" onclick="doLogout()">Sair</button>
+    </div>
+  </div>
+  <div class="main">
+    <div class="topbar">
+      <div class="tb-title" id="tb-title">Home</div>
+      <div id="tb-user" style="font-size:12px;color:var(--dim)"></div>
+    </div>
+    <div class="content" id="content"></div>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+<script>
+// ── LOGIN — mesma base de usuários do sistema Família Guerra ──
+const CREDS={u:'Guerra',p:'Resiliencia2023@'};
+const CREDS_EXTRA=[
+  {u:'Julyana',p:'Resiliencia2023@',nome:'Julyana'},
+  {u:'Paiva',p:'Resiliencia2023@',nome:'Paiva'},
+];
+
+function notify(msg,type){
+  const box=document.getElementById('notif');
+  const el=document.createElement('div');
+  el.className='ni '+(type||'info');
+  el.textContent=msg;
+  box.appendChild(el);
+  setTimeout(()=>el.remove(),3200);
+}
+const uuid=()=>Math.random().toString(36).slice(2,9);
+
+// ── FIREBASE — mesmo projeto Família Guerra, caminho separado (financeirousa) ──
+firebase.initializeApp({
+  apiKey:'AIzaSyBdp0xbPdybkjI8D-mp-_uI57qUHxhDXvg',
+  databaseURL:'https://grupofamiliaguerra-9d13e-default-rtdb.firebaseio.com',
+  projectId:'grupofamiliaguerra-9d13e'
+});
+const _db=firebase.database();
+const _dbRef=_db.ref('financeirousa');
+let _syncTimer=null;
+
+function setSyncStatus(msg,cor){
+  const el=document.getElementById('sync-status');
+  if(el){el.textContent=msg;el.style.color=cor||'var(--muted)';}
+}
+
+// ── ESTADO / DADOS ──
+const DATA={
+  entities:[],   // empresas
+  accounts:[]    // contas por empresa
+};
+
+function load(k){try{return JSON.parse(localStorage.getItem(k)||'[]')}catch(e){return []}}
+function saveLocal(){
+  localStorage.setItem('finusa_entities',JSON.stringify(DATA.entities));
+  localStorage.setItem('finusa_accounts',JSON.stringify(DATA.accounts));
+}
+function saveAndSync(){
+  saveLocal();
+  pushToFB();
+}
+function pushToFB(){
+  clearTimeout(_syncTimer);
+  _syncTimer=setTimeout(()=>{
+    setSyncStatus('⟳ Salvando...','var(--amber)');
+    _dbRef.set({entities:DATA.entities,accounts:DATA.accounts,_ts:Date.now()}).then(()=>{
+      setSyncStatus('✓ Salvo','var(--green)');
+      setTimeout(()=>setSyncStatus('• Online','var(--green)'),2000);
+    }).catch(e=>{
+      setSyncStatus('⚠ '+e.message,'var(--red)');
+      notify('Erro ao salvar: '+e.message,'err');
+    });
+  },250);
+}
+function syncFromFB(){
+  setSyncStatus('⟳ Carregando...','var(--amber)');
+  return _dbRef.once('value').then(snap=>{
+    const rec=snap.val();
+    if(rec){
+      DATA.entities=rec.entities||[];
+      DATA.accounts=rec.accounts||[];
+      saveLocal();
+      setSyncStatus('✓ Sincronizado','var(--green)');
+    } else {
+      DATA.entities=load('finusa_entities');
+      DATA.accounts=load('finusa_accounts');
+      setSyncStatus('• Online (vazio)','var(--green)');
+    }
+    setTimeout(()=>setSyncStatus('• Online','var(--green)'),2500);
+  }).catch(e=>{
+    DATA.entities=load('finusa_entities');
+    DATA.accounts=load('finusa_accounts');
+    setSyncStatus('• Local','var(--dim)');
+  });
+}
+
+// ── LOGIN ──
+function doLogin(){
+  const u=document.getElementById('l-user').value.trim();
+  const p=document.getElementById('l-pass').value;
+  const extra=CREDS_EXTRA.find(c=>c.u.toLowerCase()===u.toLowerCase() && c.p===p);
+  if((u.toLowerCase()===CREDS.u.toLowerCase() && p===CREDS.p) || extra){
+    const nome=extra?extra.nome:CREDS.u;
+    sessionStorage.setItem('finusa_auth','1');
+    sessionStorage.setItem('finusa_user',nome);
+    document.getElementById('login-screen').style.display='none';
+    document.getElementById('app').style.display='flex';
+    document.getElementById('tb-user').textContent=nome;
+    initApp();
+  } else {
+    document.getElementById('l-err').style.display='block';
+  }
+}
+function doLogout(){
+  sessionStorage.removeItem('finusa_auth');
+  document.getElementById('app').style.display='none';
+  document.getElementById('login-screen').style.display='flex';
+}
+document.getElementById('l-pass').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+document.getElementById('l-user').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+
+// ── NAVEGAÇÃO ──
+const ST={tab:'home'};
+const TITLES={home:'Home',entities:'Business — Empresas',accounts:'Business — Contas',personal:'Personal',properties:'Properties',wealth:'Wealth'};
+function goTab(tab){
+  ST.tab=tab;
+  document.querySelectorAll('.sb-item').forEach(b=>b.classList.toggle('active',b.dataset.nav===tab));
+  document.getElementById('tb-title').textContent=TITLES[tab];
+  render();
+}
+
+function initApp(){
+  syncFromFB().then(render);
+}
+
+function render(){
+  const c=document.getElementById('content');
+  if(ST.tab==='home') return renderHome(c);
+  if(ST.tab==='entities') return renderEntities(c);
+  if(ST.tab==='accounts') return renderAccounts(c);
+  if(ST.tab==='personal') return renderPlaceholder(c,'Personal','Módulo de Finanças Pessoais — Income, Spending Sources (Bank/Card/KAST/Cash), Budget e Real Spending. Chega na próxima fase do MVP.');
+  if(ST.tab==='properties') return renderPlaceholder(c,'Properties','Módulo de Imóveis de Aluguel (EUA) — Property Profile, Rental Income, Expenses, Mortgage Split, Performance. Chega na próxima fase do MVP.');
+  if(ST.tab==='wealth') return renderPlaceholder(c,'Wealth','Módulo de Patrimônio Consolidado (Net Worth) — reservado para Phase 4.');
+}
+
+// ── HOME ──
+function renderHome(c){
+  const nEnt=DATA.entities.length;
+  const nAcc=DATA.accounts.length;
+  c.innerHTML=`
+    <div class="sec-hdr"><h2>Financial Control Center</h2><div class="sec-line"></div></div>
+    <div class="mod-grid">
+      <div class="card-modulo" onclick="goTab('entities')">
+        <div class="card-modulo-icon">🏢</div>
+        <div class="card-modulo-title">Business</div>
+        <div class="card-modulo-sub">${nEnt} empresa(s) cadastrada(s) · ${nAcc} conta(s)</div>
+      </div>
+      <div class="card-modulo" onclick="goTab('personal')">
+        <div class="card-modulo-icon">👤</div>
+        <div class="card-modulo-title">Personal</div>
+        <div class="card-modulo-sub">Em construção — próxima fase</div>
+      </div>
+      <div class="card-modulo" onclick="goTab('properties')">
+        <div class="card-modulo-icon">🏘️</div>
+        <div class="card-modulo-title">Properties</div>
+        <div class="card-modulo-sub">Em construção — próxima fase</div>
+      </div>
+      <div class="card-modulo disabled" onclick="goTab('wealth')">
+        <div class="card-modulo-icon">📊</div>
+        <div class="card-modulo-title">Wealth</div>
+        <div class="card-modulo-sub">Reservado — Phase 4</div>
+      </div>
+    </div>
+
+    <div class="sec-hdr"><h2>Tasks / Needs Attention</h2><div class="sec-line"></div></div>
+    <div class="kpi-grid">
+      <div class="kpi"><div class="kpi-accent" style="background:var(--gold)"></div><div class="kpi-label">Empresas sem dados</div><div class="kpi-value">${DATA.entities.filter(e=>!e.legalName).length}</div><div class="kpi-sub">Preencher cadastro</div></div>
+      <div class="kpi"><div class="kpi-accent" style="background:var(--amber)"></div><div class="kpi-label">Contas cadastradas</div><div class="kpi-value">${nAcc}</div><div class="kpi-sub">Nenhuma transação importada ainda</div></div>
+    </div>
+  `;
+}
+
+function renderPlaceholder(c,titulo,texto){
+  c.innerHTML=`<div class="empty" style="padding:80px 20px"><div style="font-size:32px">🚧</div><div style="font-family:'Syne',sans-serif;font-weight:800;font-size:16px;color:var(--text)">${titulo}</div><div>${texto}</div></div>`;
+}
+
+// ── ENTITIES (EMPRESAS) ──
+const ENTITY_TYPES=['LLC','Corporation','Partnership','Other'];
+const TAX_CLASS=['CPA Review','Single Member / Disregarded Entity','Partnership','S Corporation','C Corporation','Other'];
+
+function addEntity(){
+  DATA.entities.push({
+    id:uuid(),legalName:'',dba:'',ein:'',state:'',stateRegNumber:'',formationDate:'',
+    address:'',registeredAgent:'',members:'',managers:'',ownershipPercentage:'',
+    fiscalYear:'',currency:'USD',entityType:'LLC',taxClassification:'CPA Review',
+    principalActivity:'',cpa:'',notes:''
+  });
+  saveAndSync();
+  render();
+}
+function removeEntity(id){
+  if(!confirm('Remover esta empresa? As contas vinculadas a ela também podem ficar órfãs.'))return;
+  DATA.entities=DATA.entities.filter(e=>e.id!==id);
+  DATA.accounts=DATA.accounts.filter(a=>a.entityId!==id);
+  saveAndSync();
+  render();
+}
+function updEntity(id,field,val){
+  const e=DATA.entities.find(e=>e.id===id);
+  if(e){e[field]=val;saveAndSync();}
+}
+
+function renderEntities(c){
+  let rows=DATA.entities.map(e=>`
+    <div class="form-card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+        <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:14px">${e.legalName||'<span class="dim">Empresa sem nome ainda</span>'}</div>
+        <button class="btn-sm" onclick="removeEntity('${e.id}')">Remover</button>
+      </div>
+      <div class="fg">
+        <div class="fl"><label>Legal Name</label><input class="fi" value="${esc(e.legalName)}" onchange="updEntity('${e.id}','legalName',this.value)"></div>
+        <div class="fl"><label>DBA / Nome Fantasia</label><input class="fi" value="${esc(e.dba)}" onchange="updEntity('${e.id}','dba',this.value)"></div>
+        <div class="fl"><label>EIN</label><input class="fi" value="${esc(e.ein)}" onchange="updEntity('${e.id}','ein',this.value)"></div>
+        <div class="fl"><label>State</label><input class="fi" value="${esc(e.state)}" onchange="updEntity('${e.id}','state',this.value)"></div>
+        <div class="fl"><label>State Reg. Number</label><input class="fi" value="${esc(e.stateRegNumber)}" onchange="updEntity('${e.id}','stateRegNumber',this.value)"></div>
+        <div class="fl"><label>Formation Date</label><input type="date" class="fi" value="${esc(e.formationDate)}" onchange="updEntity('${e.id}','formationDate',this.value)"></div>
+        <div class="fl"><label>Registered Agent</label><input class="fi" value="${esc(e.registeredAgent)}" onchange="updEntity('${e.id}','registeredAgent',this.value)"></div>
+        <div class="fl"><label>Fiscal Year</label><input class="fi" placeholder="Ex: Jan-Dez" value="${esc(e.fiscalYear)}" onchange="updEntity('${e.id}','fiscalYear',this.value)"></div>
+        <div class="fl"><label>Currency</label><input class="fi" value="${esc(e.currency)}" onchange="updEntity('${e.id}','currency',this.value)"></div>
+        <div class="fl"><label>Entity Type</label>
+          <select class="fi" onchange="updEntity('${e.id}','entityType',this.value)">
+            ${ENTITY_TYPES.map(t=>`<option ${e.entityType===t?'selected':''}>${t}</option>`).join('')}
+          </select>
+        </div>
+        <div class="fl"><label>Tax Classification</label>
+          <select class="fi" onchange="updEntity('${e.id}','taxClassification',this.value)">
+            ${TAX_CLASS.map(t=>`<option ${e.taxClassification===t?'selected':''}>${t}</option>`).join('')}
+          </select>
+        </div>
+        <div class="fl"><label>Ownership %</label><input class="fi" value="${esc(e.ownershipPercentage)}" onchange="updEntity('${e.id}','ownershipPercentage',this.value)"></div>
+        <div class="fl"><label>CPA</label><input class="fi" value="${esc(e.cpa)}" onchange="updEntity('${e.id}','cpa',this.value)"></div>
+      </div>
+      <div class="fg" style="grid-template-columns:1fr 1fr">
+        <div class="fl"><label>Address</label><input class="fi" value="${esc(e.address)}" onchange="updEntity('${e.id}','address',this.value)"></div>
+        <div class="fl"><label>Principal Activity</label><input class="fi" value="${esc(e.principalActivity)}" onchange="updEntity('${e.id}','principalActivity',this.value)"></div>
+        <div class="fl"><label>Members</label><input class="fi" value="${esc(e.members)}" onchange="updEntity('${e.id}','members',this.value)"></div>
+        <div class="fl"><label>Managers</label><input class="fi" value="${esc(e.managers)}" onchange="updEntity('${e.id}','managers',this.value)"></div>
+      </div>
+      <div class="fl"><label>Notes</label><textarea class="fi" rows="2" onchange="updEntity('${e.id}','notes',this.value)">${esc(e.notes)}</textarea></div>
+    </div>
+  `).join('');
+
+  if(!DATA.entities.length){
+    rows=`<div class="empty"><div style="font-size:28px">🏢</div><div>Nenhuma empresa cadastrada ainda.</div></div>`;
+  }
+
+  document.getElementById('content').innerHTML=`
+    <div class="sec-hdr"><h2>Entities / Empresas</h2><div class="sec-line"></div><button class="btn-gold" onclick="addEntity()">+ Nova Empresa</button></div>
+    <div class="sec-note">Cadastro conforme os campos definidos no projeto. Deixe em branco o que não souber — nunca presumimos classificação tributária.</div>
+    ${rows}
+  `;
+}
+
+// ── ACCOUNTS (CONTAS) ──
+const ACC_TYPES=['Checking','Savings','Credit Card','Loan','Line of Credit','Investment Account','Cash','Mortgage','Other'];
+
+function addAccount(){
+  if(!DATA.entities.length){notify('Cadastre uma empresa antes de adicionar contas.','err');return;}
+  DATA.accounts.push({id:uuid(),entityId:DATA.entities[0].id,name:'',type:'Checking',currency:'USD'});
+  saveAndSync();
+  render();
+}
+function removeAccount(id){
+  DATA.accounts=DATA.accounts.filter(a=>a.id!==id);
+  saveAndSync();
+  render();
+}
+function updAccount(id,field,val){
+  const a=DATA.accounts.find(a=>a.id===id);
+  if(a){a[field]=val;saveAndSync();}
+  if(field==='entityId')render();
+}
+
+function renderAccounts(c){
+  if(!DATA.entities.length){
+    c.innerHTML=`<div class="empty"><div style="font-size:28px">💳</div><div>Cadastre pelo menos uma empresa em <b>Business — Empresas</b> antes de criar contas.</div></div>`;
+    return;
+  }
+  let rows=DATA.accounts.map(a=>{
+    const ent=DATA.entities.find(e=>e.id===a.entityId);
+    return `<tr>
+      <td><select class="fi" onchange="updAccount('${a.id}','entityId',this.value)">
+        ${DATA.entities.map(e=>`<option value="${e.id}" ${e.id===a.entityId?'selected':''}>${esc(e.legalName)||'(sem nome)'}</option>`).join('')}
+      </select></td>
+      <td><input class="fi" value="${esc(a.name)}" placeholder="Nome da conta" onchange="updAccount('${a.id}','name',this.value)"></td>
+      <td><select class="fi" onchange="updAccount('${a.id}','type',this.value)">
+        ${ACC_TYPES.map(t=>`<option ${a.type===t?'selected':''}>${t}</option>`).join('')}
+      </select></td>
+      <td><input class="fi" value="${esc(a.currency)}" onchange="updAccount('${a.id}','currency',this.value)" style="width:80px"></td>
+      <td><button class="btn-sm" onclick="removeAccount('${a.id}')">Remover</button></td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('content').innerHTML=`
+    <div class="sec-hdr"><h2>Financial Accounts</h2><div class="sec-line"></div><button class="btn-gold" onclick="addAccount()">+ Nova Conta</button></div>
+    <div class="sec-note">Cada conta pertence a uma única empresa. Contas de empresas diferentes nunca são somadas automaticamente.</div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Empresa</th><th>Nome da Conta</th><th>Tipo</th><th>Moeda</th><th></th></tr></thead>
+        <tbody>${rows||'<tr><td colspan="5" class="dim" style="text-align:center;padding:24px">Nenhuma conta cadastrada ainda.</td></tr>'}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+function esc(s){return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+// ── BOOT ──
+if(sessionStorage.getItem('finusa_auth')==='1'){
+  document.getElementById('login-screen').style.display='none';
+  document.getElementById('app').style.display='flex';
+  document.getElementById('tb-user').textContent=sessionStorage.getItem('finusa_user')||'';
+  initApp();
+} else {
+  document.getElementById('login-screen').style.display='flex';
+}
+goTab('home');
+</script>
+</body>
+</html>
