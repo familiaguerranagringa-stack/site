@@ -311,6 +311,12 @@ function syncFromFB(){
       if(!tx35k.category){tx35k.category='Member Contribution';tx35k.cpaCategory='Member Equity – Capital Contribution';tx35k.status='REVIEWED';}
       saveAndSync();
     }
+    let tx28k=DATA.transactions.find(t=>(t.originalDescription||'').includes('2026040800578886'));
+    if(tx28k && !tx28k.userDescription){
+      tx28k.userDescription='Aporte de capital - Leandro Guerra - Wire internacional do Brasil via Standard Chartered Bank - Ref: INVESTIMENTO DIRETO';
+      if(!tx28k.category){tx28k.category='Member Contribution';tx28k.cpaCategory='Member Equity – Capital Contribution';tx28k.status='REVIEWED';}
+      saveAndSync();
+    }
     setTimeout(()=>setSyncStatus('• Online','var(--green)'),2500);
   }).catch(e=>{
     DATA.entities=load('finusa_entities');
@@ -596,6 +602,24 @@ function learnRule(entityId,desc,category,cpaCategory){
   else { DATA.rules.push({id:uuid(),entityId,key,category,cpaCategory:cpaCategory||''}); }
 }
 
+// ── DETECÇÃO AUTOMÁTICA: aporte de capital internacional (wire do Brasil, origem Leandro Guerra) ──
+function detectWireContributionFromBrazil(desc){
+  const d=(desc||'').toUpperCase();
+  if(!d.includes('WIRE TYPE:WIRE IN')) return null;
+  if(!d.includes('ORIG:LEANDRO GUERRA')) return null;
+  let bank='banco internacional (verificar remetente)';
+  if(d.includes('NEW YORK MELLON')) bank='Bank of NY Mellon';
+  else if(d.includes('TANDARD CHARTERED')||d.includes('STANDARD CHARTERED')) bank='Standard Chartered Bank';
+  let ref='Wire internacional';
+  if(d.includes('APORT')) ref='APORTE';
+  else if(d.includes('INVESTI') && d.includes('DIRETO')) ref='INVESTIMENTO DIRETO';
+  return {
+    category:'Member Contribution',
+    cpaCategory:'Member Equity – Capital Contribution',
+    userDescription:`Aporte de capital - Leandro Guerra - Wire internacional do Brasil via ${bank} - Ref: ${ref}`
+  };
+}
+
 // ── IMPORT STATE ──
 const IMP={entityId:null,accountId:null,pendingRows:null,fileName:''};
 
@@ -696,18 +720,19 @@ function processImportRows(rows){
     if(existing.has(key)){ duplicadas++; return; }
     existing.add(key);
     const rule=findRule(IMP.entityId,p.description);
+    const wireGuess=!rule?detectWireContributionFromBrazil(p.description):null;
     toAdd.push({
       id:uuid(),
       entityId:IMP.entityId,
       accountId:IMP.accountId,
       date:p.date,
       originalDescription:p.description,
-      userDescription:'',
+      userDescription:rule?'':(wireGuess?wireGuess.userDescription:''),
       amount:p.amount,
       balance:p.balance,
-      category:rule?rule.category:'',
-      cpaCategory:rule?rule.cpaCategory:'',
-      status:rule?'AI_SUGGESTED':'UNREVIEWED'
+      category:rule?rule.category:(wireGuess?wireGuess.category:''),
+      cpaCategory:rule?rule.cpaCategory:(wireGuess?wireGuess.cpaCategory:''),
+      status:(rule||wireGuess)?'AI_SUGGESTED':'UNREVIEWED'
     });
     novas++;
   });
@@ -749,7 +774,8 @@ function renderReview(c){
       ${t.status==='AI_SUGGESTED' ? `
         <div style="background:var(--gold-bg);border:1px solid var(--gold-dim);border-radius:8px;padding:12px;margin-bottom:14px">
           <div style="font-size:10px;font-weight:700;letter-spacing:.1em;color:var(--gold);text-transform:uppercase;margin-bottom:4px">Suggested Category (aprendido)</div>
-          <div style="font-weight:700;margin-bottom:8px">${esc(t.category)}${t.cpaCategory?' · '+esc(t.cpaCategory):''}</div>
+          <div style="font-weight:700;margin-bottom:4px">${esc(t.category)}${t.cpaCategory?' · '+esc(t.cpaCategory):''}</div>
+          ${t.userDescription?`<div style="font-size:12px;color:var(--muted);margin-bottom:8px">📝 ${esc(t.userDescription)}</div>`:''}
           <button class="btn-gold" onclick="approveReview('${t.id}')">✓ Approve</button>
           <button class="btn-ghost" style="margin-left:8px" onclick="clearSuggestion('${t.id}')">Change</button>
         </div>
