@@ -343,6 +343,15 @@ function syncFromFB(){
       txMM.status='REVIEWED';
       saveAndSync();
     }
+    // Transferência de entrada (+$301.299,85) de outra empresa do grupo, para aplicar $500k em CD
+    let tx301k=DATA.transactions.find(t=>(t.originalDescription||'').includes('000001710'));
+    if(tx301k && (!tx301k.category || tx301k.category==='CPA Review')){
+      tx301k.category='Intercompany Transfer';
+      tx301k.cpaCategory='Intercompany Transfer — from Related Entity (nome a confirmar: Familia Guerra Investing LLC?)';
+      tx301k.userDescription='Transferência recebida de outra empresa do grupo (nome exato a confirmar) — usada para aplicar $500.000 em CD (renda fixa, equivalente a Selic no Brasil)';
+      tx301k.status='REVIEWED';
+      saveAndSync();
+    }
     setTimeout(()=>setSyncStatus('• Online','var(--green)'),2500);
   }).catch(e=>{
     DATA.entities=load('finusa_entities');
