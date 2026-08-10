@@ -327,6 +327,15 @@ function syncFromFB(){
       }
       if(mmgChanged) saveAndSync();
     }
+    // Conta bancária da MM Guerra Empreendimentos LLC (Business Adv Fundamentals, aberta 26/03/2024)
+    if(mmg && !DATA.accounts.some(a=>a.entityId===mmg.id && (a.name||'').includes('9436'))){
+      DATA.accounts.push({
+        id:uuid(), entityId:mmg.id,
+        name:'Bank of America — Business Adv Fundamentals •9436',
+        type:'Checking', currency:'USD'
+      });
+      saveAndSync();
+    }
     if(gfe && (gfe.notes||'').includes('vence 06/11/2026') && !(gfe.notes||'').includes('APY')){
       gfe.notes=gfe.notes.replace(
         'CD 7 Month Featured •9478: aberto 06/04/2026, vence 06/11/2026 ($500k principal, ~$506,4k valor atual) — rendimento vira transação só no vencimento.',
