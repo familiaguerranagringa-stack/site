@@ -292,6 +292,12 @@ function syncFromFB(){
       });
       saveAndSync();
     }
+    // Corrige nota com placeholder não substituído (TRN:2026012600570834 = wire $22.418,43 via Bank of NY Mellon)
+    let txFix=DATA.transactions.find(t=>(t.originalDescription||'').includes('2026012600570834'));
+    if(txFix && (txFix.userDescription||'').includes('[Bank of NY Mellon / Standard Chartered]')){
+      txFix.userDescription=txFix.userDescription.replace('[Bank of NY Mellon / Standard Chartered]','Bank of NY Mellon');
+      saveAndSync();
+    }
     setTimeout(()=>setSyncStatus('• Online','var(--green)'),2500);
   }).catch(e=>{
     DATA.entities=load('finusa_entities');
