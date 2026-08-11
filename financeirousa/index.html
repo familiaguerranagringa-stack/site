@@ -264,17 +264,17 @@ function seedFamiliaGuerraInvesting(){
     stateRegNumber:'L24000530605',
     formationDate:'2025-01-01',
     address:'8554 Abbotsbury Drive, Windermere, FL 34786',
-    registeredAgent:'ALL7 Service LLC — 2295 Hiawassee Rd #104, Orlando, FL 32835',
-    members:'Guerra Family Empire LLC (99%, AMBR), Leandro Guerra Marino Fiuza de Castro (1%, AMBR)',
+    registeredAgent:'ALL7 Service LLC — 2295 Hiawassee Rd #104, Orlando, FL 32835 (atualizado em 04/30/2026; anteriormente Registered Agents Inc — 7901 4th St Ste 300, St Petersburg, FL 33702)',
+    members:'Guerra Family Empire LLC ($999, 99%, AMBR — assinado por Julyana Soares Guerra), Leandro Guerra Marino Fiuza de Castro ($1, 1%, AMBR)',
     managers:'Guerra Family Empire LLC (AMBR) e Leandro Guerra Marino Fiuza de Castro (AMBR)',
-    ownershipPercentage:'Guerra Family Empire LLC 99% / Leandro Guerra 1% (mesma estrutura da MM Guerra Empreendimentos — confirmado pelo usuário)',
+    ownershipPercentage:'Guerra Family Empire LLC 99% ($999 capital) / Leandro Guerra 1% ($1 capital) — total $1.000 (mesma estrutura da MM Guerra Empreendimentos — confirmado pelo usuário)',
     fiscalYear:'Calendar Year (Jan-Dez)',
     currency:'USD',
     entityType:'LLC',
     taxClassification:'Partnership',
     principalActivity:'Real Estate Development — possui terreno em Citrus Springs, FL e está construindo casa unifamiliar via contrato de terceirização com a VIX Construction Management Corp.',
     cpa:'All7 Service — Diego — (407) 970-8143 — diego@all7service.com',
-    notes:'Subsidiária 99% da Guerra Family Empire LLC. Document Number L24000530605, filed 12/26/2024, effective 01/01/2025. Last Event: LC AMENDMENT em 03/07/2025. Annual Report 2026 filed em 04/30/2026. Status ACTIVE no Sunbiz. Registered Agent alterado em 04/30/2026 (ALL7 Service LLC). | OBRA: Construção de casa unifamiliar em 3489 W Eunice Dr, Citrus Springs, FL 34433 (Modelo Angel – Garage Left, 2.112 sqft total / 1.564 sqft área útil). Contratista: VIX Construction Management Corp. (Lic. CBC1266572, 7065 Westpointe Blvd Suite 303, Orlando FL 32835). Contrato assinado 20/03/2026 (documento datado 08/04/2026), preço fixo total $192.000,00, prazo estimado 4 meses + 30 dias de carência (máx. 5 meses sem multa; após isso, multa de $200/dia). Cronograma de pagamento: Deposit $10.000 | Permit Approval $40.000 | Framing/Trusses $50.000 | Drywall $40.000 | Cabinets/Interior Finishes $45.000 | Final (CO) $7.000. Garantia: 1 ano mão de obra, 10 anos estrutural.'
+    notes:'Subsidiária 99% da Guerra Family Empire LLC. Document Number L24000530605, filed 12/26/2024, effective 01/01/2025. Last Event: LC AMENDMENT em 03/07/2025. Annual Report 2026 filed em 04/30/2026. Status ACTIVE no Sunbiz. | LLC AGREEMENT (Operating Agreement): datado 12/26/2024, reconhecido em cartório em 10/03/2025 (notário Diego Ramos Correa, Orange County, FL). Guerra Family Empire LLC assinou por Julyana Soares Guerra (AMBR). Capital: $999 (99%) + $1 (1%) = $1.000 total. Tributação pretendida: Partnership (Subchapter K, IRC). Nota: o Exhibit B (modelo de Joinder Agreement) anexado ao contrato faz referência equivocada a "FAMILIA GUERRA HOLDING LLC" em vez de "INVESTING LLC" — parece erro de template copiado de outro contrato do grupo; o corpo principal do agreement está correto. Documento sem assinaturas no Exhibit B (apenas modelo). | OBRA: Construção de casa unifamiliar em 3489 W Eunice Dr, Citrus Springs, FL 34433 (Modelo Angel – Garage Left, 2.112 sqft total / 1.564 sqft área útil). Contratista: VIX Construction Management Corp. (Lic. CBC1266572, 7065 Westpointe Blvd Suite 303, Orlando FL 32835). Contrato assinado 20/03/2026 (documento datado 08/04/2026), preço fixo total $192.000,00, prazo estimado 4 meses + 30 dias de carência (máx. 5 meses sem multa; após isso, multa de $200/dia). Cronograma de pagamento: Deposit $10.000 | Permit Approval $40.000 | Framing/Trusses $50.000 | Drywall $40.000 | Cabinets/Interior Finishes $45.000 | Final (CO) $7.000. Garantia: 1 ano mão de obra, 10 anos estrutural.'
   };
 }
 
@@ -358,11 +358,14 @@ function syncFromFB(){
       fgi=seedFamiliaGuerraInvesting();
       DATA.entities.push(fgi);
       saveAndSync();
-    } else if(!(fgi.notes||'').includes('VIX Construction')){
-      // Atualiza cadastro já existente com os dados do contrato de construção (obtidos após o cadastro inicial)
+    } else if(!(fgi.notes||'').includes('LLC AGREEMENT (Operating')){
+      // Atualiza cadastro já existente com os dados do Operating Agreement (obtidos após o cadastro inicial)
       const seed=seedFamiliaGuerraInvesting();
       fgi.principalActivity=seed.principalActivity;
       fgi.notes=seed.notes;
+      fgi.registeredAgent=seed.registeredAgent;
+      fgi.members=seed.members;
+      fgi.ownershipPercentage=seed.ownershipPercentage;
       saveAndSync();
     }
     // Conta bancária da Familia Guerra Investing LLC (Bank of America, terminação •7761)
