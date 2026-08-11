@@ -547,7 +547,7 @@ function syncFromFB(){
     let retro=false;
     DATA.transactions.forEach(t=>{
       if(t.status==='UNREVIEWED' && !t.category){
-        const guess=detectWireContributionFromBrazil(t.originalDescription)||detectMemberDistribution(t.originalDescription)||detectIntercompanyContribution(t.originalDescription)||detectPropertyPatterns(t.originalDescription)||detectSecurityFirstInsurance(t.originalDescription)||detectBofaMaintenanceFee(t.originalDescription,t.amount)||detectChkg7968InternalTransfer(t.originalDescription)||detectVixConstructionPayment(t.originalDescription,t.amount)||detectMarichellLandscaping(t.originalDescription)||detectTMobilePersonal(t.originalDescription);
+        const guess=detectWireContributionFromBrazil(t.originalDescription)||detectMemberDistribution(t.originalDescription)||detectIntercompanyContribution(t.originalDescription)||detectPropertyPatterns(t.originalDescription)||detectSecurityFirstInsurance(t.originalDescription)||detectBofaMaintenanceFee(t.originalDescription,t.amount)||detectChkg7968InternalTransfer(t.originalDescription)||detectVixConstructionPayment(t.originalDescription,t.amount)||detectMarichellLandscaping(t.originalDescription)||detectTMobilePersonal(t.originalDescription)||detectSpectrumInternet(t.originalDescription);
         if(guess){
           t.category=guess.category;
           t.cpaCategory=guess.cpaCategory;
@@ -558,7 +558,7 @@ function syncFromFB(){
       }
       // Recupera transações marcadas como CPA Review que na verdade batem com um padrão conhecido (ex: Duke Energy)
       if(t.status==='CPA_REVIEW'){
-        const guess2=detectPropertyPatterns(t.originalDescription)||detectSecurityFirstInsurance(t.originalDescription)||detectBofaMaintenanceFee(t.originalDescription,t.amount)||detectChkg7968InternalTransfer(t.originalDescription)||detectVixConstructionPayment(t.originalDescription,t.amount)||detectMarichellLandscaping(t.originalDescription)||detectTMobilePersonal(t.originalDescription);
+        const guess2=detectPropertyPatterns(t.originalDescription)||detectSecurityFirstInsurance(t.originalDescription)||detectBofaMaintenanceFee(t.originalDescription,t.amount)||detectChkg7968InternalTransfer(t.originalDescription)||detectVixConstructionPayment(t.originalDescription,t.amount)||detectMarichellLandscaping(t.originalDescription)||detectTMobilePersonal(t.originalDescription)||detectSpectrumInternet(t.originalDescription);
         if(guess2){
           t.category=guess2.category;
           t.cpaCategory=guess2.cpaCategory;
@@ -618,6 +618,14 @@ function syncFromFB(){
         t.category=tmobileGuess.category;
         t.cpaCategory=tmobileGuess.cpaCategory;
         if(!t.userDescription || t.status!=='REVIEWED') t.userDescription=tmobileGuess.userDescription;
+        if(t.status!=='REVIEWED') t.status='AI_SUGGESTED';
+        bofaFix=true;
+      }
+      const spectrumGuess=detectSpectrumInternet(t.originalDescription);
+      if(spectrumGuess && t.cpaCategory!==spectrumGuess.cpaCategory){
+        t.category=spectrumGuess.category;
+        t.cpaCategory=spectrumGuess.cpaCategory;
+        if(!t.userDescription || t.status!=='REVIEWED') t.userDescription=spectrumGuess.userDescription;
         if(t.status!=='REVIEWED') t.status='AI_SUGGESTED';
         bofaFix=true;
       }
@@ -1037,6 +1045,18 @@ function detectTMobilePersonal(desc){
   };
 }
 
+// ── DETECÇÃO AUTOMÁTICA: Spectrum — internet da casa (Familia Guerra Holding LLC, residência pessoal) ──
+function detectSpectrumInternet(desc){
+  const d=(desc||'').toUpperCase();
+  const compact=d.replace(/[^A-Z]/g,'');
+  if(!compact.includes('SPECTRUM')) return null;
+  return {
+    category:'Personal Expense Paid by Business',
+    cpaCategory:'Personal Expense Paid by Business — Internet (Personal Residence)',
+    userDescription:'Spectrum — internet da casa (residência pessoal, Familia Guerra Holding LLC). Despesa pessoal.'
+  };
+}
+
 function detectMarichellLandscaping(desc){
   const d=(desc||'').toUpperCase();
   const compact=d.replace(/[^A-Z]/g,'');
@@ -1200,7 +1220,8 @@ function processImportRows(rows){
     const vixGuess=(!rule && !wireGuess && !distGuess && !intercoGuess && !propGuess && !secGuess && !bofaGuess && !chkgGuess)?detectVixConstructionPayment(p.description,p.amount):null;
     const marichellGuess=(!rule && !wireGuess && !distGuess && !intercoGuess && !propGuess && !secGuess && !bofaGuess && !chkgGuess && !vixGuess)?detectMarichellLandscaping(p.description):null;
     const tmobileGuess=(!rule && !wireGuess && !distGuess && !intercoGuess && !propGuess && !secGuess && !bofaGuess && !chkgGuess && !vixGuess && !marichellGuess)?detectTMobilePersonal(p.description):null;
-    const guess=wireGuess||distGuess||intercoGuess||propGuess||secGuess||bofaGuess||chkgGuess||vixGuess||marichellGuess||tmobileGuess;
+    const spectrumGuess=(!rule && !wireGuess && !distGuess && !intercoGuess && !propGuess && !secGuess && !bofaGuess && !chkgGuess && !vixGuess && !marichellGuess && !tmobileGuess)?detectSpectrumInternet(p.description):null;
+    const guess=wireGuess||distGuess||intercoGuess||propGuess||secGuess||bofaGuess||chkgGuess||vixGuess||marichellGuess||tmobileGuess||spectrumGuess;
     toAdd.push({
       id:uuid(),
       entityId:IMP.entityId,
