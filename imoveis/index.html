@@ -779,6 +779,7 @@ function matchImovel(addr){
   return bestScore>0?best:null;
 }
 let _pdfPendingFile=null;
+let _pdfParsedAtual=null;
 function formatarDataBR(iso){
   if(!iso)return '';
   const [yy,mm,dd]=String(iso).split('-');
@@ -794,18 +795,27 @@ function isoParaBR(iso){
   return formatarDataBR(iso);
 }
 function abrirCadastroImovelInline(enderecoSugerido){
+  const d=_pdfParsedAtual||{};
+  const endereco=d.imovelAddr||enderecoSugerido||'';
+  const nomeSugerido=endereco?endereco.split(',').slice(0,3).join(',').trim():'';
+  const valorSugerido=d.totalCobrado||d.valorRepassado||'';
+  let diaVencSugerido='';
+  if(d.dataVencimento){
+    const partes=d.dataVencimento.split('/');
+    if(partes[0])diaVencSugerido=partes[0].replace(/^0/,'');
+  }
   document.getElementById('modal-root').innerHTML=`
   <div class="modal-bg" onclick="if(event.target===this)fecharModal()">
     <div class="modal" style="max-width:560px;width:92vw">
       <h2>Cadastro Completo de Imóvel</h2>
-      <p>Preencha os dados essenciais — depois você pode completar o resto em "Cadastro de Imóveis".</p>
+      <p>Preencha os dados essenciais — depois você pode completar o resto em "Cadastro de Imóveis".${_pdfParsedAtual?' Já pré-preenchi com o que consegui ler do relatório.':''}</p>
       <div class="fg" style="grid-template-columns:1fr 1fr">
         <div class="fl" style="margin-bottom:12px"><label>Grupo / Empreendimento</label><input class="fi input-uppercase" id="aci-grupo" placeholder="Ex: Engracia da Silva Araújo"></div>
-        <div class="fl" style="margin-bottom:12px"><label>Nome / Identificação do Imóvel</label><input class="fi input-uppercase" id="aci-nome" placeholder="Ex: Av Getúlio Vargas, 221, Sala 603" value="${enderecoSugerido?enderecoSugerido.split(',').slice(0,3).join(',').trim().replace(/"/g,'&quot;'):''}"></div>
-        <div class="fl" style="margin-bottom:12px"><label>Inquilino / Locatário</label><input class="fi input-uppercase" id="aci-inquilino" placeholder="Nome do inquilino"></div>
-        <div class="fl" style="margin-bottom:12px"><label>Valor do Aluguel (R$)</label><input class="fi" id="aci-valor" type="number" step="0.01" placeholder="0,00"></div>
-        <div class="fl" style="margin-bottom:12px;grid-column:1/-1"><label>Endereço Completo</label><input class="fi input-uppercase" id="aci-end" placeholder="Endereço, bairro, cidade - UF" value="${(enderecoSugerido||'').replace(/"/g,'&quot;')}"></div>
-        <div class="fl" style="margin-bottom:20px"><label>Dia de Vencimento</label><input class="fi" id="aci-vencimento" type="number" min="1" max="31" placeholder="Ex: 05"></div>
+        <div class="fl" style="margin-bottom:12px"><label>Nome / Identificação do Imóvel</label><input class="fi input-uppercase" id="aci-nome" placeholder="Ex: Av Getúlio Vargas, 221, Sala 603" value="${nomeSugerido.replace(/"/g,'&quot;')}"></div>
+        <div class="fl" style="margin-bottom:12px"><label>Inquilino / Locatário</label><input class="fi input-uppercase" id="aci-inquilino" placeholder="Nome do inquilino" value="${(d.locatario||'').replace(/"/g,'&quot;')}"></div>
+        <div class="fl" style="margin-bottom:12px"><label>Valor do Aluguel (R$)</label><input class="fi" id="aci-valor" type="number" step="0.01" placeholder="0,00" value="${valorSugerido}"></div>
+        <div class="fl" style="margin-bottom:12px;grid-column:1/-1"><label>Endereço Completo</label><input class="fi input-uppercase" id="aci-end" placeholder="Endereço, bairro, cidade - UF" value="${endereco.replace(/"/g,'&quot;')}"></div>
+        <div class="fl" style="margin-bottom:20px"><label>Dia de Vencimento</label><input class="fi" id="aci-vencimento" type="number" min="1" max="31" placeholder="Ex: 05" value="${diaVencSugerido}"></div>
       </div>
       <div style="display:flex;gap:10px">
         <button class="btn-ghost" onclick="fecharModal()">Cancelar</button>
@@ -841,6 +851,7 @@ function handleAluguelAnexo(input){
   if(!f)return;
   const statusEl=document.getElementById('al-import-status');
   if(f.type!=='application/pdf'){
+    _pdfParsedAtual=null;
     if(statusEl)statusEl.textContent='📎 Arquivo anexado como comprovante.';
     return;
   }
@@ -857,6 +868,7 @@ function handleAluguelAnexo(input){
         fullText+=tc.items.map(it=>it.str).join(' ')+' ';
       }
       const parsed=parseRelatorioAlude(fullText);
+      _pdfParsedAtual=parsed;
       const match=matchImovel(parsed.imovelAddr);
       const wrapperAviso=document.getElementById('wrapperAvisoImovel');
       const sel=document.getElementById('al-im');
