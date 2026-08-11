@@ -332,8 +332,24 @@ function syncFromFB(){
       saveAndSync();
     }
     // Seed automático: Familia Guerra Holding LLC (subsidiária confirmada da GFE — detém a casa própria)
-    if(!DATA.entities.some(e=>(e.legalName||'').toUpperCase().includes('FAMILIA GUERRA HOLDING'))){
-      DATA.entities.push(seedFamiliaGuerraHolding());
+    let fgh=DATA.entities.find(e=>(e.legalName||'').toUpperCase().includes('FAMILIA GUERRA HOLDING'));
+    if(!fgh){
+      fgh=seedFamiliaGuerraHolding();
+      DATA.entities.push(fgh);
+      saveAndSync();
+    }
+    // Conta bancária da Familia Guerra Holding LLC (Bank of America, terminação •3104)
+    if(fgh && !DATA.accounts.some(a=>a.entityId===fgh.id && (a.accountNumber==='898158523104' || (a.name||'').includes('3104')))){
+      DATA.accounts.push({
+        id:uuid(), entityId:fgh.id,
+        name:'Bank of America — Conta •3104',
+        type:'Checking', currency:'USD',
+        accountNumber:'898158523104',
+        routingNumberPaperElectronic:'063100277',
+        routingNumberWires:'026009593',
+        swiftUSD:'BOFAUS3N (Bank of America, N.A. — 222 Broadway, New York, NY 10038) — wire em dólares ou quando a moeda de origem não é conhecida',
+        swiftForeign:'BOFAUS6S (Bank of America, N.A. — 555 California St., San Francisco, CA 94104) — wire enviado em moeda estrangeira'
+      });
       saveAndSync();
     }
     // Seed automático: MM Guerra Empreendimentos LLC (subsidiária confirmada da GFE)
