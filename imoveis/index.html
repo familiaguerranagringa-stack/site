@@ -470,7 +470,8 @@ function renderImoveis(){
   <div class="form-card">
     <div class="sec-hdr"><h2>Novo Imóvel</h2><div class="sec-line"></div></div>
     <div class="fg">
-      <div class="fl"><label>Nome / Identificação</label><input class="fi" id="im-nome" placeholder="Ex: Paul Harris — Loja 01"></div>
+      <div class="fl"><label>Grupo / Empreendimento</label><input class="fi input-uppercase" id="im-grupo" placeholder="Ex: Travessa Gomes"></div>
+      <div class="fl"><label>Nome / Identificação</label><input class="fi" id="im-nome" placeholder="Ex: Travessa Gomes Casa 105"></div>
       <div class="fl"><label>Endereço</label><input class="fi" id="im-end" placeholder="Rua, número, bairro"></div>
       <div class="fl"><label>Inquilino</label><input class="fi" id="im-inq" placeholder="Nome do inquilino"></div>
       <div class="fl"><label>Imobiliária / Corretor</label><input class="fi" id="im-corr" placeholder="Ex: Aprisco, Gerson..."></div>
@@ -483,9 +484,9 @@ function renderImoveis(){
   </div>
   <div class="sec-hdr"><h2>Imóveis Cadastrados</h2><div class="sec-line"></div></div>
   <div class="tbl-wrap"><table>
-    <thead><tr><th>Imóvel</th><th>Inquilino</th><th>Corretor</th><th>Valor Contratado</th><th></th></tr></thead>
+    <thead><tr><th>Imóvel</th><th>Grupo</th><th>Inquilino</th><th>Corretor</th><th>Valor Contratado</th><th></th></tr></thead>
     <tbody>
-      ${ims.length?ims.map(i=>`<tr><td>${i.endereco?`<div>${i.nome}</div><div class="dim" style="font-size:11px">${i.endereco}</div>`:i.nome}</td><td>${i.inquilino||'—'}</td><td>${i.corretor||'—'}</td><td>${fmt(i.valor)}</td><td><button class="btn-sm btn-ok" onclick="abrirEdicaoImovel('${i.id}')">editar</button> <button class="btn-sm" onclick="delImovel('${i.id}')">excluir</button></td></tr>`).join(''):`<tr><td colspan="5"><div class="empty">Nenhum imóvel cadastrado ainda.</div></td></tr>`}
+      ${ims.length?ims.map(i=>`<tr><td>${i.endereco?`<div>${i.nome}</div><div class="dim" style="font-size:11px">${i.endereco}</div>`:i.nome}</td><td>${i.grupo||'<span class="dim">—</span>'}</td><td>${i.inquilino||'—'}</td><td>${i.corretor||'—'}</td><td>${fmt(i.valor)}</td><td><button class="btn-sm btn-ok" onclick="abrirEdicaoImovel('${i.id}')">editar</button> <button class="btn-sm" onclick="delImovel('${i.id}')">excluir</button></td></tr>`).join(''):`<tr><td colspan="6"><div class="empty">Nenhum imóvel cadastrado ainda.</div></td></tr>`}
     </tbody>
   </table></div>`;
 }
@@ -493,7 +494,7 @@ function addImovel(){
   const nome=document.getElementById('im-nome').value.trim();
   if(!nome){notify('Informe o nome do imóvel','err');return;}
   const ims=getImoveis();
-  ims.push({id:uuid(),nome,endereco:document.getElementById('im-end').value.trim(),inquilino:document.getElementById('im-inq').value.trim(),corretor:document.getElementById('im-corr').value.trim(),valor:+document.getElementById('im-val').value||0});
+  ims.push({id:uuid(),nome,grupo:document.getElementById('im-grupo').value.trim(),endereco:document.getElementById('im-end').value.trim(),inquilino:document.getElementById('im-inq').value.trim(),corretor:document.getElementById('im-corr').value.trim(),valor:+document.getElementById('im-val').value||0});
   save(pk('imoveis'),ims);
   notify('Imóvel adicionado','ok');render();
 }
@@ -508,7 +509,8 @@ function abrirEdicaoImovel(id){
   <div class="modal-bg" onclick="if(event.target===this)fecharModal()">
     <div class="modal">
       <h2>Editar Imóvel</h2>
-      <p>O valor do aluguel muda com o tempo — atualize aqui sempre que reajustar ou trocar de inquilino. Isso não altera os lançamentos já registrados nos meses anteriores.</p>
+      <p>O valor do aluguel muda com o tempo — atualize aqui sempre que reajustar ou trocar de inquilino. O Grupo define em qual bloco o imóvel aparece no Dashboard, Aluguéis e Contas.</p>
+      <div class="fl" style="margin-bottom:12px"><label>Grupo / Empreendimento</label><input class="fi input-uppercase" id="ed-grupo" value="${(im.grupo||'').replace(/"/g,'&quot;')}"></div>
       <div class="fl" style="margin-bottom:12px"><label>Nome / Identificação</label><input class="fi" id="ed-nome" value="${(im.nome||'').replace(/"/g,'&quot;')}"></div>
       <div class="fl" style="margin-bottom:12px"><label>Endereço</label><input class="fi" id="ed-end" value="${(im.endereco||'').replace(/"/g,'&quot;')}"></div>
       <div class="fl" style="margin-bottom:12px"><label>Inquilino</label><input class="fi" id="ed-inq" value="${(im.inquilino||'').replace(/"/g,'&quot;')}"></div>
@@ -525,6 +527,7 @@ function salvarEdicaoImovel(id){
   const ims=getImoveis();
   const im=ims.find(i=>i.id===id);
   if(!im)return;
+  im.grupo=document.getElementById('ed-grupo').value.trim();
   im.nome=document.getElementById('ed-nome').value.trim()||im.nome;
   im.endereco=document.getElementById('ed-end').value.trim();
   im.inquilino=document.getElementById('ed-inq').value.trim();
@@ -559,6 +562,18 @@ function getGrupoTitulo(imovelNome){
   const g=GRUPOS_ORDEM.find(g=>g.match.some(m=>n.includes(normTxt(m))));
   return g?g.titulo:null;
 }
+function getGrupoTituloImovel(im){
+  // 1) Se o campo "Grupo / Empreendimento" foi preenchido manualmente, ele manda —
+  //    comparamos com os títulos fixos pra ver se bate com algum (ex: "Travessa Gomes").
+  if(im.grupo){
+    const ng=normTxt(im.grupo);
+    const gExato=GRUPOS_ORDEM.find(g=>normTxt(g.titulo)===ng || g.match.some(m=>ng.includes(normTxt(m))));
+    if(gExato)return gExato.titulo;
+  }
+  // 2) Senão, tenta pelo nome + endereço combinados (cobre tanto "TRAVESSA GOMES CASA 105"
+  //    quanto "TRAVESSA GOMES, 50, CASA 105" — o número/vírgula não atrapalha o match)
+  return getGrupoTitulo((im.nome||'')+' '+(im.endereco||''));
+}
 function ordemNatural(a,b){
   return String(a).localeCompare(String(b),'pt-BR',{numeric:true,sensitivity:'base'});
 }
@@ -566,7 +581,7 @@ function montarModulos(){
   const ims=getImoveis();
   const usados=new Set();
   const modulos=GRUPOS_ORDEM.map(g=>{
-    const imsDoGrupo=ims.filter(im=>getGrupoTitulo(im.nome)===g.titulo).sort((a,b)=>ordemNatural(a.nome,b.nome));
+    const imsDoGrupo=ims.filter(im=>getGrupoTituloImovel(im)===g.titulo).sort((a,b)=>ordemNatural(a.nome,b.nome));
     imsDoGrupo.forEach(im=>usados.add(im.id));
     return {titulo:g.titulo,imoveis:imsDoGrupo};
   });
@@ -797,12 +812,19 @@ function ddmmyyyy2iso(d){
 function isoParaBR(iso){
   return formatarDataBR(iso);
 }
+function limparNomeImovel(endereco,grupo){
+  if(!endereco)return '';
+  const m=endereco.match(/(CASA|LOJA|SALA|APTO|APARTAMENTO)\s*\.?\s*(\d+)/i);
+  const unidade=m?`${m[1].toUpperCase()} ${m[2]}`:'';
+  if(grupo)return unidade?`${grupo.toUpperCase()} ${unidade}`:grupo.toUpperCase();
+  return endereco.split(',')[0].trim().toUpperCase();
+}
 function abrirCadastroImovelInline(enderecoSugerido){
   const d=_pdfParsedAtual||{};
   const endereco=d.imovelAddr||enderecoSugerido||'';
-  const nomeSugerido=endereco?endereco.split(',').slice(0,3).join(',').trim():'';
+  const grupoSugerido=getGrupoTitulo(endereco)||'';
+  const nomeSugerido=limparNomeImovel(endereco,grupoSugerido);
   const valorSugerido=d.totalCobrado||d.valorRepassado||'';
-  const grupoSugerido=getGrupoTitulo(endereco||nomeSugerido)||'';
   let diaVencSugerido='';
   if(d.dataVencimento){
     const partes=d.dataVencimento.split('/');
