@@ -493,7 +493,7 @@ function syncFromFB(){
     let retro=false;
     DATA.transactions.forEach(t=>{
       if(t.status==='UNREVIEWED' && !t.category){
-        const guess=detectWireContributionFromBrazil(t.originalDescription)||detectMemberDistribution(t.originalDescription)||detectIntercompanyContribution(t.originalDescription)||detectPropertyPatterns(t.originalDescription)||detectSecurityFirstInsurance(t.originalDescription)||detectBofaMaintenanceFee(t.originalDescription,t.amount);
+        const guess=detectWireContributionFromBrazil(t.originalDescription)||detectMemberDistribution(t.originalDescription)||detectIntercompanyContribution(t.originalDescription)||detectPropertyPatterns(t.originalDescription)||detectSecurityFirstInsurance(t.originalDescription)||detectBofaMaintenanceFee(t.originalDescription,t.amount)||detectChkg7968InternalTransfer(t.originalDescription);
         if(guess){
           t.category=guess.category;
           t.cpaCategory=guess.cpaCategory;
@@ -504,7 +504,7 @@ function syncFromFB(){
       }
       // Recupera transações marcadas como CPA Review que na verdade batem com um padrão conhecido (ex: Duke Energy)
       if(t.status==='CPA_REVIEW'){
-        const guess2=detectPropertyPatterns(t.originalDescription)||detectSecurityFirstInsurance(t.originalDescription)||detectBofaMaintenanceFee(t.originalDescription,t.amount);
+        const guess2=detectPropertyPatterns(t.originalDescription)||detectSecurityFirstInsurance(t.originalDescription)||detectBofaMaintenanceFee(t.originalDescription,t.amount)||detectChkg7968InternalTransfer(t.originalDescription);
         if(guess2){
           t.category=guess2.category;
           t.cpaCategory=guess2.cpaCategory;
@@ -532,6 +532,14 @@ function syncFromFB(){
         t.category=bofaGuess.category;
         t.cpaCategory=bofaGuess.cpaCategory;
         if(!t.userDescription || t.status!=='REVIEWED') t.userDescription=bofaGuess.userDescription;
+        if(t.status!=='REVIEWED') t.status='AI_SUGGESTED';
+        bofaFix=true;
+      }
+      const chkgGuess=detectChkg7968InternalTransfer(t.originalDescription);
+      if(chkgGuess && t.cpaCategory!==chkgGuess.cpaCategory){
+        t.category=chkgGuess.category;
+        t.cpaCategory=chkgGuess.cpaCategory;
+        if(!t.userDescription || t.status!=='REVIEWED') t.userDescription=chkgGuess.userDescription;
         if(t.status!=='REVIEWED') t.status='AI_SUGGESTED';
         bofaFix=true;
       }
@@ -897,6 +905,26 @@ function detectBofaMaintenanceFee(desc,amount){
     userDescription:'Taxa de manutenção mensal — conta Business Advantage Fundamentals (Bank of America), cobrada quando o saldo/gastos ficam abaixo do mínimo exigido no ciclo do extrato. Saldo mantido acima de $5.000 a partir de agosto/2026 para evitar a cobrança.'
   };
 }
+// ── DETECÇÃO AUTOMÁTICA: transferência interna própria via BofA, referência CHKG 7968 ──
+// Confirmado pelo usuário: é movimentação entre contas do próprio grupo (checking/CD), não é receita nem despesa.
+// Aparece em textos diferentes dependendo da ponta (ex: "Transfer FR CHKG 7968" na conta que recebe,
+// "TO CHKG 7968" na conta que envia) — por isso precisa de um padrão dedicado, já que regras aprendidas
+// são por descrição exata + empresa, e cada ponta tem descrição e empresa diferentes.
+function detectChkg7968InternalTransfer(desc){
+  const d=(desc||'').toUpperCase();
+  const compact=d.replace(/[^A-Z]/g,'');
+  if(!compact.includes('CHKG7968')) return null;
+  const isOutgoing = d.includes(' TO CHKG 7968') || compact.includes('TOCHKG7968');
+  const isIncoming = d.includes(' FR CHKG 7968') || compact.includes('FRCHKG7968');
+  let direcao = 'movimentação interna';
+  if(isOutgoing) direcao='saída de recursos para a conta checking •7968 (mesmo grupo)';
+  else if(isIncoming) direcao='entrada de recursos vinda da conta checking •7968 (mesmo grupo)';
+  return {
+    category:'Transfer',
+    cpaCategory:'Internal Transfer — Own Account (BofA Checking •7968)',
+    userDescription:`Transferência interna entre contas do próprio grupo via Bank of America (referência CHKG 7968) — ${direcao}. Não é receita nem despesa. Confirmado pelo usuário anteriormente na revisão da Guerra Family Empire LLC.`
+  };
+}
 const GRUPO_EMPRESAS=['GUERRA FAMILY EMPIRE LLC','FAMILIA GUERRA HOLDING LLC','MM GUERRA EMPREENDIMENTOS LLC','FAMILIA GUERRA INVESTING LLC'];
 function detectIntercompanyContribution(desc){
   const d=(desc||'').toUpperCase();
@@ -1045,7 +1073,8 @@ function processImportRows(rows){
     const propGuess=(!rule && !wireGuess && !distGuess && !intercoGuess)?detectPropertyPatterns(p.description):null;
     const secGuess=(!rule && !wireGuess && !distGuess && !intercoGuess && !propGuess)?detectSecurityFirstInsurance(p.description):null;
     const bofaGuess=(!rule && !wireGuess && !distGuess && !intercoGuess && !propGuess && !secGuess)?detectBofaMaintenanceFee(p.description,p.amount):null;
-    const guess=wireGuess||distGuess||intercoGuess||propGuess||secGuess||bofaGuess;
+    const chkgGuess=(!rule && !wireGuess && !distGuess && !intercoGuess && !propGuess && !secGuess && !bofaGuess)?detectChkg7968InternalTransfer(p.description):null;
+    const guess=wireGuess||distGuess||intercoGuess||propGuess||secGuess||bofaGuess||chkgGuess;
     toAdd.push({
       id:uuid(),
       entityId:IMP.entityId,
