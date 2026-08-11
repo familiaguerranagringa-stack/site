@@ -463,9 +463,11 @@ function selectImoveis(id,onchange){
 function renderImoveis(){
   const ims=imoveisOrdenados();
   return `
-  <div class="header-pagina" style="margin-bottom:0">
+  <div class="header-pagina" style="margin-bottom:0;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
     <button id="btnToggleImovel" class="btn-toggle-aba" onclick="toggleJanela('btnToggleImovel','painelNovoImovel','+ Novo Imóvel')">+ Novo Imóvel</button>
+    <button class="btn-ghost" onclick="corrigirGruposAutomaticamente()">🔧 Corrigir Grupos Automaticamente</button>
   </div>
+  <div class="sec-note" style="margin-top:14px">O botão "Corrigir Grupos" passa por todos os imóveis já cadastrados e preenche o campo Grupo sozinho, usando a mesma lógica de reconhecimento dos 11 blocos fixos — sem precisar editar um por um.</div>
   <div id="painelNovoImovel" class="painel-rateio-container">
   <div class="form-card">
     <div class="sec-hdr"><h2>Novo Imóvel</h2><div class="sec-line"></div></div>
@@ -489,6 +491,29 @@ function renderImoveis(){
       ${ims.length?ims.map(i=>`<tr><td>${i.endereco?`<div>${i.nome}</div><div class="dim" style="font-size:11px">${i.endereco}</div>`:i.nome}</td><td>${i.grupo||'<span class="dim">—</span>'}</td><td>${i.inquilino||'—'}</td><td>${i.corretor||'—'}</td><td>${fmt(i.valor)}</td><td><button class="btn-sm btn-ok" onclick="abrirEdicaoImovel('${i.id}')">editar</button> <button class="btn-sm" onclick="delImovel('${i.id}')">excluir</button></td></tr>`).join(''):`<tr><td colspan="6"><div class="empty">Nenhum imóvel cadastrado ainda.</div></td></tr>`}
     </tbody>
   </table></div>`;
+}
+function corrigirGruposAutomaticamente(){
+  const ims=getImoveis();
+  let corrigidos=0;
+  const detalhes=[];
+  ims.forEach(im=>{
+    const detectado=getGrupoTitulo((im.nome||'')+' '+(im.endereco||''));
+    if(detectado && im.grupo!==detectado){
+      detalhes.push(`${im.nome}: "${im.grupo||'(vazio)'}" → "${detectado}"`);
+      im.grupo=detectado;
+      corrigidos++;
+    }
+  });
+  if(corrigidos===0){
+    notify('Nenhum imóvel precisava de correção — todos os grupos já estavam certos.','ok');
+    return;
+  }
+  if(!confirm(`Encontrei ${corrigidos} imóvel(is) com o Grupo desatualizado ou vazio:\n\n${detalhes.join('\n')}\n\nConfirmar a correção?`)){
+    return;
+  }
+  save(pk('imoveis'),ims);
+  notify(`${corrigidos} imóvel(is) corrigido(s) com sucesso`,'ok');
+  render();
 }
 function addImovel(){
   const nome=document.getElementById('im-nome').value.trim();
