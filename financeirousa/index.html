@@ -981,7 +981,7 @@ function detectSecurityFirstInsurance(desc){
 function detectBofaMaintenanceFee(desc,amount){
   const d=(desc||'').toUpperCase();
   const compact=d.replace(/[^A-Z]/g,'');
-  const isFeeText = compact.includes('MAINTENANCEFEE') || compact.includes('MOMAINTFEE') || compact.includes('MONTHLYMAINTENANCEFEE') || compact.includes('ACCTMAINTFEE');
+  const isFeeText = compact.includes('MAINTENANCEFEE') || compact.includes('MOMAINTFEE') || compact.includes('MONTHLYMAINTENANCEFEE') || compact.includes('ACCTMAINTFEE') || (compact.includes('MONTHLYFEE') && compact.includes('BUSINESSADV'));
   // fallback: se o texto não bater com os padrões conhecidos de descrição, mas o valor for exatamente $16 num débito do BofA, sinaliza mesmo assim
   const isBofaSixteen = Math.abs(Math.abs(amount||0)-16)<0.005 && (compact.includes('BKOFAMERICA')||compact.includes('BANKOFAMERICA'));
   if(!isFeeText && !isBofaSixteen) return null;
