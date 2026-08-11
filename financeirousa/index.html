@@ -355,11 +355,12 @@ function syncFromFB(){
     // Seed automático: Familia Guerra Investing LLC (subsidiária confirmada da GFE)
     let fgi=DATA.entities.find(e=>(e.legalName||'').toUpperCase().includes('FAMILIA GUERRA INVESTING')||(e.legalName||'').toUpperCase().includes('FAMÍLIA GUERRA INVESTING'));
     if(!fgi){
-      DATA.entities.push(seedFamiliaGuerraInvesting());
+      fgi=seedFamiliaGuerraInvesting();
+      DATA.entities.push(fgi);
       saveAndSync();
     }
     // Conta bancária da Familia Guerra Investing LLC (Bank of America, terminação •7761)
-    if(fgi && !DATA.accounts.some(a=>a.entityId===fgi.id && (a.name||'').includes('7761'))){
+    if(fgi && !DATA.accounts.some(a=>a.entityId===fgi.id && (a.accountNumber==='898158827761' || (a.name||'').includes('7761')))){
       DATA.accounts.push({
         id:uuid(), entityId:fgi.id,
         name:'Bank of America — Conta •7761',
