@@ -547,7 +547,7 @@ function syncFromFB(){
     let retro=false;
     DATA.transactions.forEach(t=>{
       if(t.status==='UNREVIEWED' && !t.category){
-        const guess=detectWireContributionFromBrazil(t.originalDescription)||detectMemberDistribution(t.originalDescription)||detectIntercompanyContribution(t.originalDescription)||detectPropertyPatterns(t.originalDescription)||detectSecurityFirstInsurance(t.originalDescription)||detectBofaMaintenanceFee(t.originalDescription,t.amount)||detectChkg7968InternalTransfer(t.originalDescription)||detectVixConstructionPayment(t.originalDescription,t.amount)||detectMarichellLandscaping(t.originalDescription);
+        const guess=detectWireContributionFromBrazil(t.originalDescription)||detectMemberDistribution(t.originalDescription)||detectIntercompanyContribution(t.originalDescription)||detectPropertyPatterns(t.originalDescription)||detectSecurityFirstInsurance(t.originalDescription)||detectBofaMaintenanceFee(t.originalDescription,t.amount)||detectChkg7968InternalTransfer(t.originalDescription)||detectVixConstructionPayment(t.originalDescription,t.amount)||detectMarichellLandscaping(t.originalDescription)||detectTMobilePersonal(t.originalDescription);
         if(guess){
           t.category=guess.category;
           t.cpaCategory=guess.cpaCategory;
@@ -558,7 +558,7 @@ function syncFromFB(){
       }
       // Recupera transações marcadas como CPA Review que na verdade batem com um padrão conhecido (ex: Duke Energy)
       if(t.status==='CPA_REVIEW'){
-        const guess2=detectPropertyPatterns(t.originalDescription)||detectSecurityFirstInsurance(t.originalDescription)||detectBofaMaintenanceFee(t.originalDescription,t.amount)||detectChkg7968InternalTransfer(t.originalDescription)||detectVixConstructionPayment(t.originalDescription,t.amount)||detectMarichellLandscaping(t.originalDescription);
+        const guess2=detectPropertyPatterns(t.originalDescription)||detectSecurityFirstInsurance(t.originalDescription)||detectBofaMaintenanceFee(t.originalDescription,t.amount)||detectChkg7968InternalTransfer(t.originalDescription)||detectVixConstructionPayment(t.originalDescription,t.amount)||detectMarichellLandscaping(t.originalDescription)||detectTMobilePersonal(t.originalDescription);
         if(guess2){
           t.category=guess2.category;
           t.cpaCategory=guess2.cpaCategory;
@@ -610,6 +610,14 @@ function syncFromFB(){
         t.category=marichellGuess.category;
         t.cpaCategory=marichellGuess.cpaCategory;
         if(!t.userDescription || t.status!=='REVIEWED') t.userDescription=marichellGuess.userDescription;
+        if(t.status!=='REVIEWED') t.status='AI_SUGGESTED';
+        bofaFix=true;
+      }
+      const tmobileGuess=detectTMobilePersonal(t.originalDescription);
+      if(tmobileGuess && t.cpaCategory!==tmobileGuess.cpaCategory){
+        t.category=tmobileGuess.category;
+        t.cpaCategory=tmobileGuess.cpaCategory;
+        if(!t.userDescription || t.status!=='REVIEWED') t.userDescription=tmobileGuess.userDescription;
         if(t.status!=='REVIEWED') t.status='AI_SUGGESTED';
         bofaFix=true;
       }
@@ -1016,6 +1024,19 @@ function detectChkg7968InternalTransfer(desc){
   };
 }
 // ── DETECÇÃO AUTOMÁTICA: Marichell — empresa de jardinagem da casa (Familia Guerra Holding LLC, residência pessoal) ──
+// ── DETECÇÃO AUTOMÁTICA: T-Mobile — plano de celular da família (Leandro, esposa e 2 filhos) ──
+// Depois trocado para AT&T e movido pra pessoa física, mas T-Mobile sempre foi despesa pessoal do plano familiar.
+function detectTMobilePersonal(desc){
+  const d=(desc||'').toUpperCase();
+  const compact=d.replace(/[^A-Z]/g,'');
+  if(!compact.includes('TMOBILE')) return null;
+  return {
+    category:'Personal Expense Paid by Business',
+    cpaCategory:'Personal Expense Paid by Business — Cell Phone Plan (Family)',
+    userDescription:'Plano de celular T-Mobile usado pela família (Leandro, esposa e 2 filhos) — despesa pessoal. Posteriormente trocado para AT&T, já sob pessoa física.'
+  };
+}
+
 function detectMarichellLandscaping(desc){
   const d=(desc||'').toUpperCase();
   const compact=d.replace(/[^A-Z]/g,'');
@@ -1178,7 +1199,8 @@ function processImportRows(rows){
     const chkgGuess=(!rule && !wireGuess && !distGuess && !intercoGuess && !propGuess && !secGuess && !bofaGuess)?detectChkg7968InternalTransfer(p.description):null;
     const vixGuess=(!rule && !wireGuess && !distGuess && !intercoGuess && !propGuess && !secGuess && !bofaGuess && !chkgGuess)?detectVixConstructionPayment(p.description,p.amount):null;
     const marichellGuess=(!rule && !wireGuess && !distGuess && !intercoGuess && !propGuess && !secGuess && !bofaGuess && !chkgGuess && !vixGuess)?detectMarichellLandscaping(p.description):null;
-    const guess=wireGuess||distGuess||intercoGuess||propGuess||secGuess||bofaGuess||chkgGuess||vixGuess||marichellGuess;
+    const tmobileGuess=(!rule && !wireGuess && !distGuess && !intercoGuess && !propGuess && !secGuess && !bofaGuess && !chkgGuess && !vixGuess && !marichellGuess)?detectTMobilePersonal(p.description):null;
+    const guess=wireGuess||distGuess||intercoGuess||propGuess||secGuess||bofaGuess||chkgGuess||vixGuess||marichellGuess||tmobileGuess;
     toAdd.push({
       id:uuid(),
       entityId:IMP.entityId,
