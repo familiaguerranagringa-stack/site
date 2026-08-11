@@ -278,6 +278,31 @@ function seedMMGuerraEmpreendimentos(){
   };
 }
 
+function seedFamiliaGuerraInvesting(){
+  return {
+    id:uuid(),
+    legalName:'FAMILIA GUERRA INVESTING LLC',
+    dba:'',
+    ein:'33-3257040',
+    state:'Florida',
+    stateRegNumber:'L24000530605',
+    formationDate:'2025-01-01',
+    address:'8554 Abbotsbury Drive, Windermere, FL 34786',
+    registeredAgent:'ALL7 Service LLC — 2295 Hiawassee Rd #104, Orlando, FL 32835 (atualizado em 04/30/2026; anteriormente Registered Agents Inc — 7901 4th St Ste 300, St Petersburg, FL 33702)',
+    members:'Guerra Family Empire LLC ($999, 99%, AMBR — assinado por Julyana Soares Guerra), Leandro Guerra Marino Fiuza de Castro ($1, 1%, AMBR)',
+    managers:'Guerra Family Empire LLC (AMBR) e Leandro Guerra Marino Fiuza de Castro (AMBR)',
+    ownershipPercentage:'Guerra Family Empire LLC 99% ($999 capital) / Leandro Guerra 1% ($1 capital) — total $1.000 (mesma estrutura da MM Guerra Empreendimentos — confirmado pelo usuário)',
+    fiscalYear:'Calendar Year (Jan-Dez)',
+    currency:'USD',
+    entityType:'LLC',
+    taxClassification:'Partnership',
+    principalActivity:'Real Estate Development — possui terreno em Citrus Springs, FL e está construindo casa unifamiliar via contrato de terceirização com a VIX Construction Management Corp.',
+    cpa:'All7 Service — Diego — (407) 970-8143 — diego@all7service.com',
+    notes:'Subsidiária 99% da Guerra Family Empire LLC. Document Number L24000530605, filed 12/26/2024, effective 01/01/2025. Last Event: LC AMENDMENT em 03/07/2025. Annual Report 2026 filed em 04/30/2026. Status ACTIVE no Sunbiz. | LLC AGREEMENT (Operating Agreement): datado 12/26/2024, reconhecido em cartório em 10/03/2025 (notário Diego Ramos Correa, Orange County, FL). Guerra Family Empire LLC assinou por Julyana Soares Guerra (AMBR). Capital: $999 (99%) + $1 (1%) = $1.000 total. Tributação pretendida: Partnership (Subchapter K, IRC). Nota: o Exhibit B (modelo de Joinder Agreement) anexado ao contrato faz referência equivocada a "FAMILIA GUERRA HOLDING LLC" em vez de "INVESTING LLC" — parece erro de template copiado de outro contrato do grupo; o corpo principal do agreement está correto. Documento sem assinaturas no Exhibit B (apenas modelo). | OBRA: Construção de casa unifamiliar em 3489 W Eunice Dr, Citrus Springs, FL 34433 (Modelo Angel – Garage Left, 2.112 sqft total / 1.564 sqft área útil). Contratista: VIX Construction Management Corp. (Lic. CBC1266572, 7065 Westpointe Blvd Suite 303, Orlando FL 32835). Contrato assinado 20/03/2026 (documento datado 08/04/2026), preço fixo total $192.000,00, prazo estimado 4 meses + 30 dias de carência (máx. 5 meses sem multa; após isso, multa de $200/dia). Cronograma de pagamento: Deposit $10.000 | Permit Approval $40.000 | Framing/Trusses $50.000 | Drywall $40.000 | Cabinets/Interior Finishes $45.000 | Final (CO) $7.000. Garantia: 1 ano mão de obra, 10 anos estrutural.'
+  };
+}
+
+
 // ── DEDUPE: funde empresas com o mesmo nome (evita duplicatas de cadastro manual + seed automático) ──
 function dedupeEntities(){
   const groups={};
@@ -371,6 +396,36 @@ function syncFromFB(){
         mmgChanged=true;
       }
       if(mmgChanged) saveAndSync();
+    }
+    // Seed automático: Familia Guerra Investing LLC (subsidiária confirmada da GFE)
+    let fgi=DATA.entities.find(e=>(e.legalName||'').toUpperCase().includes('FAMILIA GUERRA INVESTING')||(e.legalName||'').toUpperCase().includes('FAMÍLIA GUERRA INVESTING'));
+    if(!fgi){
+      fgi=seedFamiliaGuerraInvesting();
+      DATA.entities.push(fgi);
+      saveAndSync();
+    } else if(!(fgi.notes||'').includes('LLC AGREEMENT (Operating')){
+      // Atualiza cadastro já existente com os dados do Operating Agreement (obtidos após o cadastro inicial)
+      const seed=seedFamiliaGuerraInvesting();
+      fgi.principalActivity=seed.principalActivity;
+      fgi.notes=seed.notes;
+      fgi.registeredAgent=seed.registeredAgent;
+      fgi.members=seed.members;
+      fgi.ownershipPercentage=seed.ownershipPercentage;
+      saveAndSync();
+    }
+    // Conta bancária da Familia Guerra Investing LLC (Bank of America, terminação •7761)
+    if(fgi && !DATA.accounts.some(a=>a.entityId===fgi.id && (a.accountNumber==='898158827761' || (a.name||'').includes('7761')))){
+      DATA.accounts.push({
+        id:uuid(), entityId:fgi.id,
+        name:'Bank of America — Conta •7761',
+        type:'Checking', currency:'USD',
+        accountNumber:'898158827761',
+        routingNumberPaperElectronic:'063100277',
+        routingNumberWires:'026009593',
+        swiftUSD:'BOFAUS3N (Bank of America, N.A. — 222 Broadway, New York, NY 10038) — wire em dólares ou quando a moeda de origem não é conhecida',
+        swiftForeign:'BOFAUS6S (Bank of America, N.A. — 555 California St., San Francisco, CA 94104) — wire enviado em moeda estrangeira'
+      });
+      saveAndSync();
     }
     // Conta bancária da MM Guerra Empreendimentos LLC (Business Adv Fundamentals, aberta 26/03/2024)
     if(mmg && !DATA.accounts.some(a=>a.entityId===mmg.id && (a.name||'').includes('9436'))){
@@ -492,7 +547,7 @@ function syncFromFB(){
     let retro=false;
     DATA.transactions.forEach(t=>{
       if(t.status==='UNREVIEWED' && !t.category){
-        const guess=detectWireContributionFromBrazil(t.originalDescription)||detectMemberDistribution(t.originalDescription)||detectIntercompanyContribution(t.originalDescription)||detectPropertyPatterns(t.originalDescription);
+        const guess=detectWireContributionFromBrazil(t.originalDescription)||detectMemberDistribution(t.originalDescription)||detectIntercompanyContribution(t.originalDescription)||detectPropertyPatterns(t.originalDescription)||detectSecurityFirstInsurance(t.originalDescription)||detectBofaMaintenanceFee(t.originalDescription,t.amount)||detectChkg7968InternalTransfer(t.originalDescription)||detectVixConstructionPayment(t.originalDescription,t.amount)||detectMarichellLandscaping(t.originalDescription);
         if(guess){
           t.category=guess.category;
           t.cpaCategory=guess.cpaCategory;
@@ -503,7 +558,7 @@ function syncFromFB(){
       }
       // Recupera transações marcadas como CPA Review que na verdade batem com um padrão conhecido (ex: Duke Energy)
       if(t.status==='CPA_REVIEW'){
-        const guess2=detectPropertyPatterns(t.originalDescription);
+        const guess2=detectPropertyPatterns(t.originalDescription)||detectSecurityFirstInsurance(t.originalDescription)||detectBofaMaintenanceFee(t.originalDescription,t.amount)||detectChkg7968InternalTransfer(t.originalDescription)||detectVixConstructionPayment(t.originalDescription,t.amount)||detectMarichellLandscaping(t.originalDescription);
         if(guess2){
           t.category=guess2.category;
           t.cpaCategory=guess2.cpaCategory;
@@ -514,6 +569,52 @@ function syncFromFB(){
       }
     });
     if(retro) saveAndSync();
+    // Migração retroativa específica: reclassifica QUALQUER lançamento já existente que bata com os padrões
+    // do seguro Security First e da tarifa do BofA (mesmo que já tenha sido categorizado errado antes)
+    let bofaFix=false;
+    DATA.transactions.forEach(t=>{
+      const secGuess=detectSecurityFirstInsurance(t.originalDescription);
+      if(secGuess && t.cpaCategory!==secGuess.cpaCategory){
+        t.category=secGuess.category;
+        t.cpaCategory=secGuess.cpaCategory;
+        if(!t.userDescription || t.status!=='REVIEWED') t.userDescription=secGuess.userDescription;
+        if(t.status!=='REVIEWED') t.status='AI_SUGGESTED';
+        bofaFix=true;
+      }
+      const bofaGuess=detectBofaMaintenanceFee(t.originalDescription,t.amount);
+      if(bofaGuess && t.cpaCategory!==bofaGuess.cpaCategory){
+        t.category=bofaGuess.category;
+        t.cpaCategory=bofaGuess.cpaCategory;
+        if(!t.userDescription || t.status!=='REVIEWED') t.userDescription=bofaGuess.userDescription;
+        if(t.status!=='REVIEWED') t.status='AI_SUGGESTED';
+        bofaFix=true;
+      }
+      const chkgGuess=detectChkg7968InternalTransfer(t.originalDescription);
+      if(chkgGuess && t.cpaCategory!==chkgGuess.cpaCategory){
+        t.category=chkgGuess.category;
+        t.cpaCategory=chkgGuess.cpaCategory;
+        if(!t.userDescription || t.status!=='REVIEWED') t.userDescription=chkgGuess.userDescription;
+        if(t.status!=='REVIEWED') t.status='AI_SUGGESTED';
+        bofaFix=true;
+      }
+      const vixGuess=detectVixConstructionPayment(t.originalDescription,t.amount);
+      if(vixGuess && t.cpaCategory!==vixGuess.cpaCategory){
+        t.category=vixGuess.category;
+        t.cpaCategory=vixGuess.cpaCategory;
+        if(!t.userDescription || t.status!=='REVIEWED') t.userDescription=vixGuess.userDescription;
+        if(t.status!=='REVIEWED') t.status='AI_SUGGESTED';
+        bofaFix=true;
+      }
+      const marichellGuess=detectMarichellLandscaping(t.originalDescription);
+      if(marichellGuess && t.cpaCategory!==marichellGuess.cpaCategory){
+        t.category=marichellGuess.category;
+        t.cpaCategory=marichellGuess.cpaCategory;
+        if(!t.userDescription || t.status!=='REVIEWED') t.userDescription=marichellGuess.userDescription;
+        if(t.status!=='REVIEWED') t.status='AI_SUGGESTED';
+        bofaFix=true;
+      }
+    });
+    if(bofaFix) saveAndSync();
     // Saque de $940 para cheque administrativo (LPT Realty — 50% do aluguel + taxa do banco), conforme explicado pelo usuário
     let tx940=DATA.transactions.find(t=>(t.originalDescription||'').includes('WITHDRWL 7968') && Math.abs(t.amount+940)<0.01);
     if(tx940 && !tx940.category){
@@ -849,6 +950,83 @@ function detectPropertyPatterns(desc){
   }
   return null;
 }
+// ── DETECÇÃO AUTOMÁTICA: seguro da casa de Ocala (Security First Insurance, apólice FL00185503-01) ──
+// Plano parcelado da corretora: 1ª parcela $109,10 + 10x de $73,99 = $849,00/ano (07/15/2026 a 07/15/2027)
+function detectSecurityFirstInsurance(desc){
+  const d=(desc||'').toUpperCase();
+  const compact=d.replace(/[^A-Z]/g,'');
+  if(!compact.includes('SECURITYFIRST')) return null;
+  return {
+    category:'Expense',
+    cpaCategory:'Insurance — Property (Security First, Policy FL00185503-01)',
+    userDescription:'Seguro dwelling do imóvel de Ocala (6671 SW 151st Loop) — Security First Insurance, apólice FL00185503-01, vigência 07/15/2026 a 07/15/2027. Plano parcelado: 1ª parcela $109,10 + 10x de $73,99 = $849,00/ano.'
+  };
+}
+function detectBofaMaintenanceFee(desc,amount){
+  const d=(desc||'').toUpperCase();
+  const compact=d.replace(/[^A-Z]/g,'');
+  const isFeeText = compact.includes('MAINTENANCEFEE') || compact.includes('MOMAINTFEE') || compact.includes('MONTHLYMAINTENANCEFEE') || compact.includes('ACCTMAINTFEE');
+  // fallback: se o texto não bater com os padrões conhecidos de descrição, mas o valor for exatamente $16 num débito do BofA, sinaliza mesmo assim
+  const isBofaSixteen = Math.abs(Math.abs(amount||0)-16)<0.005 && (compact.includes('BKOFAMERICA')||compact.includes('BANKOFAMERICA'));
+  if(!isFeeText && !isBofaSixteen) return null;
+  return {
+    category:'Expense',
+    cpaCategory:'Bank Fees — Account Maintenance (BofA)',
+    userDescription:'Taxa de manutenção mensal — conta Business Advantage Fundamentals (Bank of America), cobrada quando o saldo/gastos ficam abaixo do mínimo exigido no ciclo do extrato. Saldo mantido acima de $5.000 a partir de agosto/2026 para evitar a cobrança.'
+  };
+}
+// ── DETECÇÃO AUTOMÁTICA: pagamentos à VIX Construction Management Corp — obra da Familia Guerra Investing LLC ──
+// Contrato assinado 20/03/2026: casa unifamiliar em 3489 W Eunice Dr, Citrus Springs, FL 34433, preço fixo $192.000
+// Cronograma: Deposit $10.000 | Permit Approval $40.000 | Framing $50.000 | Drywall $40.000 | Cabinets $45.000 | Final (CO) $7.000
+function detectVixConstructionPayment(desc,amount){
+  const d=(desc||'').toUpperCase();
+  const compact=d.replace(/[^A-Z]/g,'');
+  if(!compact.includes('VIXCONSTRUCTION')) return null;
+  const amt=Math.abs(amount||0);
+  let milestone='Parcela do contrato — marco específico a confirmar manualmente (ver cronograma completo no cadastro da empresa).';
+  if(Math.abs(amt-10000)<0.01){
+    milestone='Marco: "Deposit – Contract Execution" ($10.000,00), conforme cronograma original do contrato.';
+  } else if(Math.abs(amt-20000)<0.01 || Math.abs(amt-5160)<0.01){
+    milestone='Marco: "Permit Approval" — pago em 3 parcelas ($20.000 + $20.000 + $5.160,00 = $45.160,00 no total). Valor acima dos $40.000 previstos no contrato devido a aumento nas taxas de permit em Citrus County, avisado previamente pelo contratante (cláusula 7A do contrato prevê esse tipo de repasse).';
+  }
+  return {
+    category:'Fixed Asset',
+    cpaCategory:'Construction in Progress — 3489 W Eunice Dr, Citrus Springs FL 34433 (VIX Construction Mgmt Corp — Contrato $192.000)',
+    userDescription:`Pagamento à VIX Construction Management Corp. (Lic. CBC1266572) — construção de casa unifamiliar (Modelo Angel – Garage Left, 2.112 sqft total / 1.564 sqft área útil) em 3489 W Eunice Dr, Citrus Springs, FL 34433. Contrato assinado 20/03/2026, preço fixo total $192.000,00. ${milestone}`
+  };
+}
+// ── DETECÇÃO AUTOMÁTICA: transferência interna própria via BofA, referência CHKG 7968 ──
+// Confirmado pelo usuário: é movimentação entre contas do próprio grupo (checking/CD), não é receita nem despesa.
+// Aparece em textos diferentes dependendo da ponta (ex: "Transfer FR CHKG 7968" na conta que recebe,
+// "TO CHKG 7968" na conta que envia) — por isso precisa de um padrão dedicado, já que regras aprendidas
+// são por descrição exata + empresa, e cada ponta tem descrição e empresa diferentes.
+function detectChkg7968InternalTransfer(desc){
+  const d=(desc||'').toUpperCase();
+  const compact=d.replace(/[^A-Z]/g,'');
+  if(!compact.includes('CHKG7968')) return null;
+  const isOutgoing = d.includes(' TO CHKG 7968') || compact.includes('TOCHKG7968');
+  const isIncoming = d.includes(' FR CHKG 7968') || compact.includes('FRCHKG7968');
+  let direcao = 'movimentação interna';
+  if(isOutgoing) direcao='saída de recursos para a conta checking •7968 (mesmo grupo)';
+  else if(isIncoming) direcao='entrada de recursos vinda da conta checking •7968 (mesmo grupo)';
+  return {
+    category:'Transfer',
+    cpaCategory:'Internal Transfer — Own Account (BofA Checking •7968)',
+    userDescription:`Transferência interna entre contas do próprio grupo via Bank of America (referência CHKG 7968) — ${direcao}. Não é receita nem despesa. Confirmado pelo usuário anteriormente na revisão da Guerra Family Empire LLC.`
+  };
+}
+// ── DETECÇÃO AUTOMÁTICA: Marichell — empresa de jardinagem da casa (Familia Guerra Holding LLC, residência pessoal) ──
+function detectMarichellLandscaping(desc){
+  const d=(desc||'').toUpperCase();
+  const compact=d.replace(/[^A-Z]/g,'');
+  if(!compact.includes('MARICHELL')) return null;
+  return {
+    category:'Personal Expense Paid by Business',
+    cpaCategory:'Personal Expense Paid by Business — Landscaping (Personal Residence)',
+    userDescription:'Pagamento à Marichell — empresa de jardinagem da casa (residência pessoal, Familia Guerra Holding LLC). Confirmar tratamento fiscal com o contador, já que é despesa de imóvel de uso pessoal.'
+  };
+}
+
 const GRUPO_EMPRESAS=['GUERRA FAMILY EMPIRE LLC','FAMILIA GUERRA HOLDING LLC','MM GUERRA EMPREENDIMENTOS LLC','FAMILIA GUERRA INVESTING LLC'];
 function detectIntercompanyContribution(desc){
   const d=(desc||'').toUpperCase();
@@ -995,7 +1173,12 @@ function processImportRows(rows){
     const distGuess=(!rule && !wireGuess)?detectMemberDistribution(p.description):null;
     const intercoGuess=(!rule && !wireGuess && !distGuess)?detectIntercompanyContribution(p.description):null;
     const propGuess=(!rule && !wireGuess && !distGuess && !intercoGuess)?detectPropertyPatterns(p.description):null;
-    const guess=wireGuess||distGuess||intercoGuess||propGuess;
+    const secGuess=(!rule && !wireGuess && !distGuess && !intercoGuess && !propGuess)?detectSecurityFirstInsurance(p.description):null;
+    const bofaGuess=(!rule && !wireGuess && !distGuess && !intercoGuess && !propGuess && !secGuess)?detectBofaMaintenanceFee(p.description,p.amount):null;
+    const chkgGuess=(!rule && !wireGuess && !distGuess && !intercoGuess && !propGuess && !secGuess && !bofaGuess)?detectChkg7968InternalTransfer(p.description):null;
+    const vixGuess=(!rule && !wireGuess && !distGuess && !intercoGuess && !propGuess && !secGuess && !bofaGuess && !chkgGuess)?detectVixConstructionPayment(p.description,p.amount):null;
+    const marichellGuess=(!rule && !wireGuess && !distGuess && !intercoGuess && !propGuess && !secGuess && !bofaGuess && !chkgGuess && !vixGuess)?detectMarichellLandscaping(p.description):null;
+    const guess=wireGuess||distGuess||intercoGuess||propGuess||secGuess||bofaGuess||chkgGuess||vixGuess||marichellGuess;
     toAdd.push({
       id:uuid(),
       entityId:IMP.entityId,
