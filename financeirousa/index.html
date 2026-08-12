@@ -1579,6 +1579,7 @@ function clearSuggestion(id){
 // ── LEDGER (todas as transações) — com edição inline e filtro por empresa ──
 let EDIT_TX_ID=null;
 let LEDGER_FILTER_ENTITY='';
+let LEDGER_SEARCH='';
 function openEditTx(id){ EDIT_TX_ID=id; render(); }
 function cancelEditTx(){ EDIT_TX_ID=null; render(); }
 function saveEditTx(id){
@@ -1599,12 +1600,40 @@ function saveEditTx(id){
   render();
 }
 
+let ledgerSearchDebounce=null;
+function handleLedgerSearch(val){
+  LEDGER_SEARCH=val;
+  clearTimeout(ledgerSearchDebounce);
+  ledgerSearchDebounce=setTimeout(()=>{
+    const activeEl=document.activeElement;
+    const cursorPos=(activeEl && activeEl.id==='ledger-search')?activeEl.selectionStart:null;
+    render();
+    const newEl=document.getElementById('ledger-search');
+    if(newEl){
+      newEl.focus();
+      if(cursorPos!==null) newEl.setSelectionRange(cursorPos,cursorPos);
+    }
+  },200);
+}
+
 function renderLedger(c){
   if(!DATA.transactions.length){
     c.innerHTML=`<div class="empty"><div style="font-size:28px">📒</div><div>Nenhuma transação importada ainda.</div></div>`;
     return;
   }
-  const filtered=LEDGER_FILTER_ENTITY?DATA.transactions.filter(t=>t.entityId===LEDGER_FILTER_ENTITY):DATA.transactions;
+  let filtered=LEDGER_FILTER_ENTITY?DATA.transactions.filter(t=>t.entityId===LEDGER_FILTER_ENTITY):DATA.transactions;
+  if(LEDGER_SEARCH.trim()){
+    const q=LEDGER_SEARCH.trim().toLowerCase();
+    filtered=filtered.filter(t=>{
+      const ent=DATA.entities.find(e=>e.id===t.entityId);
+      const acc=DATA.accounts.find(a=>a.id===t.accountId);
+      const haystack=[
+        t.originalDescription,t.userDescription,t.category,t.cpaCategory,
+        t.date,String(t.amount),ent?ent.legalName:'',acc?acc.name:''
+      ].join(' ').toLowerCase();
+      return haystack.includes(q);
+    });
+  }
   const sorted=[...filtered].sort((a,b)=>new Date(b.date)-new Date(a.date));
 
   let editBox='';
@@ -1657,8 +1686,11 @@ function renderLedger(c){
         <option value="">Todas as empresas (${DATA.transactions.length})</option>
         ${DATA.entities.map(e=>`<option value="${e.id}" ${LEDGER_FILTER_ENTITY===e.id?'selected':''}>${esc(e.legalName)||'(sem nome)'} (${DATA.transactions.filter(t=>t.entityId===e.id).length})</option>`).join('')}
       </select>
-      <div style="font-size:11px;color:var(--dim);margin-left:12px">${filtered.length} transação(ões) · clique em uma linha para editar</div>
     </div>
+    <div class="fl" style="max-width:420px;margin-bottom:14px">
+      <input class="fi" type="text" id="ledger-search" placeholder="🔎 Buscar por qualquer parte do texto (descrição, categoria, empresa, valor...)" value="${esc(LEDGER_SEARCH)}" oninput="handleLedgerSearch(this.value)">
+    </div>
+    <div style="font-size:11px;color:var(--dim);margin:-8px 0 14px">${filtered.length} transação(ões)${LEDGER_SEARCH.trim()?` encontrada(s) para "${esc(LEDGER_SEARCH.trim())}"`:''} · clique em uma linha para editar</div>
     ${editBox}
     <div class="tbl-wrap">
       <table>
