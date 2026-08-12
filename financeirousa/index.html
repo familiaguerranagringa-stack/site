@@ -547,7 +547,7 @@ function syncFromFB(){
     let retro=false;
     DATA.transactions.forEach(t=>{
       if(t.status==='UNREVIEWED' && !t.category){
-        const guess=detectWireContributionFromBrazil(t.originalDescription)||detectMemberDistribution(t.originalDescription)||detectIntercompanyContribution(t.originalDescription)||detectPropertyPatterns(t.originalDescription)||detectSecurityFirstInsurance(t.originalDescription)||detectBofaMaintenanceFee(t.originalDescription,t.amount)||detectChkg7968InternalTransfer(t.originalDescription)||detectVixConstructionPayment(t.originalDescription,t.amount)||detectMarichellLandscaping(t.originalDescription)||detectTMobilePersonal(t.originalDescription)||detectSpectrumInternet(t.originalDescription)||detectOrangeCountyUtilities(t.originalDescription)||detectLakesOfWindermereHOA(t.originalDescription);
+        const guess=detectWireContributionFromBrazil(t.originalDescription)||detectMemberDistribution(t.originalDescription)||detectIntercompanyContribution(t.originalDescription)||detectPropertyPatterns(t.originalDescription)||detectSecurityFirstInsurance(t.originalDescription)||detectBofaMaintenanceFee(t.originalDescription,t.amount)||detectChkg7968InternalTransfer(t.originalDescription)||detectVixConstructionPayment(t.originalDescription,t.amount)||detectMarichellLandscaping(t.originalDescription)||detectTMobilePersonal(t.originalDescription)||detectSpectrumInternet(t.originalDescription)||detectOrangeCountyUtilities(t.originalDescription)||detectLakesOfWindermereHOA(t.originalDescription)||detectPaschoalLandscaping(t.originalDescription);
         if(guess){
           t.category=guess.category;
           t.cpaCategory=guess.cpaCategory;
@@ -558,7 +558,7 @@ function syncFromFB(){
       }
       // Recupera transações marcadas como CPA Review que na verdade batem com um padrão conhecido (ex: Duke Energy)
       if(t.status==='CPA_REVIEW'){
-        const guess2=detectPropertyPatterns(t.originalDescription)||detectSecurityFirstInsurance(t.originalDescription)||detectBofaMaintenanceFee(t.originalDescription,t.amount)||detectChkg7968InternalTransfer(t.originalDescription)||detectVixConstructionPayment(t.originalDescription,t.amount)||detectMarichellLandscaping(t.originalDescription)||detectTMobilePersonal(t.originalDescription)||detectSpectrumInternet(t.originalDescription)||detectOrangeCountyUtilities(t.originalDescription)||detectLakesOfWindermereHOA(t.originalDescription);
+        const guess2=detectPropertyPatterns(t.originalDescription)||detectSecurityFirstInsurance(t.originalDescription)||detectBofaMaintenanceFee(t.originalDescription,t.amount)||detectChkg7968InternalTransfer(t.originalDescription)||detectVixConstructionPayment(t.originalDescription,t.amount)||detectMarichellLandscaping(t.originalDescription)||detectTMobilePersonal(t.originalDescription)||detectSpectrumInternet(t.originalDescription)||detectOrangeCountyUtilities(t.originalDescription)||detectLakesOfWindermereHOA(t.originalDescription)||detectPaschoalLandscaping(t.originalDescription);
         if(guess2){
           t.category=guess2.category;
           t.cpaCategory=guess2.cpaCategory;
@@ -642,6 +642,14 @@ function syncFromFB(){
         t.category=hoaGuess.category;
         t.cpaCategory=hoaGuess.cpaCategory;
         if(!t.userDescription || t.status!=='REVIEWED') t.userDescription=hoaGuess.userDescription;
+        if(t.status!=='REVIEWED') t.status='AI_SUGGESTED';
+        bofaFix=true;
+      }
+      const paschoalGuess=detectPaschoalLandscaping(t.originalDescription);
+      if(paschoalGuess && t.cpaCategory!==paschoalGuess.cpaCategory){
+        t.category=paschoalGuess.category;
+        t.cpaCategory=paschoalGuess.cpaCategory;
+        if(!t.userDescription || t.status!=='REVIEWED') t.userDescription=paschoalGuess.userDescription;
         if(t.status!=='REVIEWED') t.status='AI_SUGGESTED';
         bofaFix=true;
       }
@@ -1106,6 +1114,18 @@ function detectLakesOfWindermereHOA(desc){
   };
 }
 
+// ── DETECÇÃO AUTOMÁTICA: Paschoal — paisagismo + manutenção de irrigação do jardim da casa (serviço all-inclusive) ──
+function detectPaschoalLandscaping(desc){
+  const d=(desc||'').toUpperCase();
+  const compact=d.replace(/[^A-Z]/g,'');
+  if(!compact.includes('PASCHOAL')) return null;
+  return {
+    category:'Personal Expense Paid by Business',
+    cpaCategory:'Personal Expense Paid by Business — Landscaping & Irrigation Maintenance (Personal Residence)',
+    userDescription:'Paschoal — serviço de paisagismo e manutenção da irrigação do jardim da casa (tudo incluso), residência pessoal (Familia Guerra Holding LLC).'
+  };
+}
+
 function detectMarichellLandscaping(desc){
   const d=(desc||'').toUpperCase();
   const compact=d.replace(/[^A-Z]/g,'');
@@ -1272,7 +1292,8 @@ function processImportRows(rows){
     const spectrumGuess=(!rule && !wireGuess && !distGuess && !intercoGuess && !propGuess && !secGuess && !bofaGuess && !chkgGuess && !vixGuess && !marichellGuess && !tmobileGuess)?detectSpectrumInternet(p.description):null;
     const orangeCoGuess=(!rule && !wireGuess && !distGuess && !intercoGuess && !propGuess && !secGuess && !bofaGuess && !chkgGuess && !vixGuess && !marichellGuess && !tmobileGuess && !spectrumGuess)?detectOrangeCountyUtilities(p.description):null;
     const hoaGuess=(!rule && !wireGuess && !distGuess && !intercoGuess && !propGuess && !secGuess && !bofaGuess && !chkgGuess && !vixGuess && !marichellGuess && !tmobileGuess && !spectrumGuess && !orangeCoGuess)?detectLakesOfWindermereHOA(p.description):null;
-    const guess=wireGuess||distGuess||intercoGuess||propGuess||secGuess||bofaGuess||chkgGuess||vixGuess||marichellGuess||tmobileGuess||spectrumGuess||orangeCoGuess||hoaGuess;
+    const paschoalGuess=(!rule && !wireGuess && !distGuess && !intercoGuess && !propGuess && !secGuess && !bofaGuess && !chkgGuess && !vixGuess && !marichellGuess && !tmobileGuess && !spectrumGuess && !orangeCoGuess && !hoaGuess)?detectPaschoalLandscaping(p.description):null;
+    const guess=wireGuess||distGuess||intercoGuess||propGuess||secGuess||bofaGuess||chkgGuess||vixGuess||marichellGuess||tmobileGuess||spectrumGuess||orangeCoGuess||hoaGuess||paschoalGuess;
     toAdd.push({
       id:uuid(),
       entityId:IMP.entityId,
