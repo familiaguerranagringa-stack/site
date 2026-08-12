@@ -1596,6 +1596,7 @@ function clearSuggestion(id){
 // ── LEDGER (todas as transações) — com edição inline e filtro por empresa ──
 let EDIT_TX_ID=null;
 let LEDGER_FILTER_ENTITY='';
+let LEDGER_FILTER_STATUS='';
 let LEDGER_SEARCH='';
 function openEditTx(id){ EDIT_TX_ID=id; render(); }
 function cancelEditTx(){ EDIT_TX_ID=null; render(); }
@@ -1639,6 +1640,9 @@ function renderLedger(c){
     return;
   }
   let filtered=LEDGER_FILTER_ENTITY?DATA.transactions.filter(t=>t.entityId===LEDGER_FILTER_ENTITY):DATA.transactions;
+  if(LEDGER_FILTER_STATUS){
+    filtered=filtered.filter(t=>t.status===LEDGER_FILTER_STATUS);
+  }
   if(LEDGER_SEARCH.trim()){
     const q=LEDGER_SEARCH.trim().toLowerCase();
     filtered=filtered.filter(t=>{
@@ -1702,6 +1706,13 @@ function renderLedger(c){
       <select class="fi" style="width:260px" onchange="LEDGER_FILTER_ENTITY=this.value;render()">
         <option value="">Todas as empresas (${DATA.transactions.length})</option>
         ${DATA.entities.map(e=>`<option value="${e.id}" ${LEDGER_FILTER_ENTITY===e.id?'selected':''}>${esc(e.legalName)||'(sem nome)'} (${DATA.transactions.filter(t=>t.entityId===e.id).length})</option>`).join('')}
+      </select>
+      <select class="fi" style="width:220px;margin-left:10px" onchange="LEDGER_FILTER_STATUS=this.value;render()">
+        <option value="">Todos os status (${DATA.transactions.length})</option>
+        <option value="REVIEWED" ${LEDGER_FILTER_STATUS==='REVIEWED'?'selected':''}>Reviewed (${DATA.transactions.filter(t=>t.status==='REVIEWED').length})</option>
+        <option value="AI_SUGGESTED" ${LEDGER_FILTER_STATUS==='AI_SUGGESTED'?'selected':''}>AI Suggested (${DATA.transactions.filter(t=>t.status==='AI_SUGGESTED').length})</option>
+        <option value="UNREVIEWED" ${LEDGER_FILTER_STATUS==='UNREVIEWED'?'selected':''}>Unreviewed (${DATA.transactions.filter(t=>t.status==='UNREVIEWED').length})</option>
+        <option value="CPA_REVIEW" ${LEDGER_FILTER_STATUS==='CPA_REVIEW'?'selected':''}>CPA Review — pendente (${DATA.transactions.filter(t=>t.status==='CPA_REVIEW').length})</option>
       </select>
     </div>
     <div class="fl" style="max-width:420px;margin-bottom:14px">
