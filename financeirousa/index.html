@@ -1426,6 +1426,8 @@ function clearPersonalSuggestion(id){
 // ── PERSONAL LEDGER ──
 let PEDIT_TX_ID=null;
 let PLEDGER_SEARCH='';
+let PLEDGER_FILTER_ACCOUNT='';
+let PLEDGER_FILTER_STATUS='';
 function openPEditTx(id){ PEDIT_TX_ID=id; render(); }
 function cancelPEditTx(){ PEDIT_TX_ID=null; render(); }
 function savePEditTx(id){
@@ -1462,6 +1464,12 @@ function renderPersonalLedger(c){
     return;
   }
   let filtered=DATA.personalTransactions;
+  if(PLEDGER_FILTER_ACCOUNT){
+    filtered=filtered.filter(t=>t.accountId===PLEDGER_FILTER_ACCOUNT);
+  }
+  if(PLEDGER_FILTER_STATUS){
+    filtered=filtered.filter(t=>t.status===PLEDGER_FILTER_STATUS);
+  }
   if(PLEDGER_SEARCH.trim()){
     const q=PLEDGER_SEARCH.trim().toLowerCase();
     filtered=filtered.filter(t=>{
@@ -1509,7 +1517,19 @@ function renderPersonalLedger(c){
     </tr>`;
   }).join('');
   document.getElementById('content').innerHTML=`
-    <div class="sec-hdr"><h2>Personal — Transações</h2><div class="sec-line"></div></div>
+    <div class="sec-hdr"><h2>Personal — Transações</h2><div class="sec-line"></div>
+      <select class="fi" style="width:220px" onchange="PLEDGER_FILTER_ACCOUNT=this.value;render()">
+        <option value="">Todas as contas (${DATA.personalTransactions.length})</option>
+        ${DATA.personalAccounts.map(a=>`<option value="${a.id}" ${PLEDGER_FILTER_ACCOUNT===a.id?'selected':''}>${esc(a.name)||'(sem nome)'} (${DATA.personalTransactions.filter(t=>t.accountId===a.id).length})</option>`).join('')}
+      </select>
+      <select class="fi" style="width:220px;margin-left:10px" onchange="PLEDGER_FILTER_STATUS=this.value;render()">
+        <option value="">Todos os status (${DATA.personalTransactions.length})</option>
+        <option value="REVIEWED" ${PLEDGER_FILTER_STATUS==='REVIEWED'?'selected':''}>Reviewed (${DATA.personalTransactions.filter(t=>t.status==='REVIEWED').length})</option>
+        <option value="AI_SUGGESTED" ${PLEDGER_FILTER_STATUS==='AI_SUGGESTED'?'selected':''}>AI Suggested (${DATA.personalTransactions.filter(t=>t.status==='AI_SUGGESTED').length})</option>
+        <option value="UNREVIEWED" ${PLEDGER_FILTER_STATUS==='UNREVIEWED'?'selected':''}>Unreviewed (${DATA.personalTransactions.filter(t=>t.status==='UNREVIEWED').length})</option>
+        <option value="CPA_REVIEW" ${PLEDGER_FILTER_STATUS==='CPA_REVIEW'?'selected':''}>CPA Review — pendente (${DATA.personalTransactions.filter(t=>t.status==='CPA_REVIEW').length})</option>
+      </select>
+    </div>
     <div class="fl" style="max-width:420px;margin-bottom:14px">
       <input class="fi" type="text" id="pledger-search" placeholder="🔎 Buscar por qualquer parte do texto" value="${esc(PLEDGER_SEARCH)}" oninput="handlePLedgerSearch(this.value)">
     </div>
