@@ -547,7 +547,7 @@ function syncFromFB(){
     let retro=false;
     DATA.transactions.forEach(t=>{
       if(t.status==='UNREVIEWED' && !t.category){
-        const guess=detectWireContributionFromBrazil(t.originalDescription)||detectMemberDistribution(t.originalDescription)||detectIntercompanyContribution(t.originalDescription)||detectPropertyPatterns(t.originalDescription)||detectSecurityFirstInsurance(t.originalDescription)||detectBofaMaintenanceFee(t.originalDescription,t.amount)||detectChkg7968InternalTransfer(t.originalDescription)||detectVixConstructionPayment(t.originalDescription,t.amount)||detectMarichellLandscaping(t.originalDescription)||detectTMobilePersonal(t.originalDescription)||detectSpectrumInternet(t.originalDescription)||detectOrangeCountyUtilities(t.originalDescription);
+        const guess=detectWireContributionFromBrazil(t.originalDescription)||detectMemberDistribution(t.originalDescription)||detectIntercompanyContribution(t.originalDescription)||detectPropertyPatterns(t.originalDescription)||detectSecurityFirstInsurance(t.originalDescription)||detectBofaMaintenanceFee(t.originalDescription,t.amount)||detectChkg7968InternalTransfer(t.originalDescription)||detectVixConstructionPayment(t.originalDescription,t.amount)||detectMarichellLandscaping(t.originalDescription)||detectTMobilePersonal(t.originalDescription)||detectSpectrumInternet(t.originalDescription)||detectOrangeCountyUtilities(t.originalDescription)||detectLakesOfWindermereHOA(t.originalDescription);
         if(guess){
           t.category=guess.category;
           t.cpaCategory=guess.cpaCategory;
@@ -558,7 +558,7 @@ function syncFromFB(){
       }
       // Recupera transações marcadas como CPA Review que na verdade batem com um padrão conhecido (ex: Duke Energy)
       if(t.status==='CPA_REVIEW'){
-        const guess2=detectPropertyPatterns(t.originalDescription)||detectSecurityFirstInsurance(t.originalDescription)||detectBofaMaintenanceFee(t.originalDescription,t.amount)||detectChkg7968InternalTransfer(t.originalDescription)||detectVixConstructionPayment(t.originalDescription,t.amount)||detectMarichellLandscaping(t.originalDescription)||detectTMobilePersonal(t.originalDescription)||detectSpectrumInternet(t.originalDescription)||detectOrangeCountyUtilities(t.originalDescription);
+        const guess2=detectPropertyPatterns(t.originalDescription)||detectSecurityFirstInsurance(t.originalDescription)||detectBofaMaintenanceFee(t.originalDescription,t.amount)||detectChkg7968InternalTransfer(t.originalDescription)||detectVixConstructionPayment(t.originalDescription,t.amount)||detectMarichellLandscaping(t.originalDescription)||detectTMobilePersonal(t.originalDescription)||detectSpectrumInternet(t.originalDescription)||detectOrangeCountyUtilities(t.originalDescription)||detectLakesOfWindermereHOA(t.originalDescription);
         if(guess2){
           t.category=guess2.category;
           t.cpaCategory=guess2.cpaCategory;
@@ -634,6 +634,14 @@ function syncFromFB(){
         t.category=orangeCoGuess.category;
         t.cpaCategory=orangeCoGuess.cpaCategory;
         if(!t.userDescription || t.status!=='REVIEWED') t.userDescription=orangeCoGuess.userDescription;
+        if(t.status!=='REVIEWED') t.status='AI_SUGGESTED';
+        bofaFix=true;
+      }
+      const hoaGuess=detectLakesOfWindermereHOA(t.originalDescription);
+      if(hoaGuess && t.cpaCategory!==hoaGuess.cpaCategory){
+        t.category=hoaGuess.category;
+        t.cpaCategory=hoaGuess.cpaCategory;
+        if(!t.userDescription || t.status!=='REVIEWED') t.userDescription=hoaGuess.userDescription;
         if(t.status!=='REVIEWED') t.status='AI_SUGGESTED';
         bofaFix=true;
       }
@@ -1077,6 +1085,18 @@ function detectOrangeCountyUtilities(desc){
   };
 }
 
+// ── DETECÇÃO AUTOMÁTICA: Lakes of Windermere HOA — taxa de condomínio da casa (pagamento trimestral) ──
+function detectLakesOfWindermereHOA(desc){
+  const d=(desc||'').toUpperCase();
+  const compact=d.replace(/[^A-Z]/g,'');
+  if(!compact.includes('LAKESOFWIND')) return null;
+  return {
+    category:'Personal Expense Paid by Business',
+    cpaCategory:'Personal Expense Paid by Business — HOA Fee (Personal Residence, Quarterly)',
+    userDescription:'Lakes of Windermere — HOA (taxa de condomínio) da casa, residência pessoal, pago a cada 3 meses (trimestral). Familia Guerra Holding LLC.'
+  };
+}
+
 function detectMarichellLandscaping(desc){
   const d=(desc||'').toUpperCase();
   const compact=d.replace(/[^A-Z]/g,'');
@@ -1242,7 +1262,8 @@ function processImportRows(rows){
     const tmobileGuess=(!rule && !wireGuess && !distGuess && !intercoGuess && !propGuess && !secGuess && !bofaGuess && !chkgGuess && !vixGuess && !marichellGuess)?detectTMobilePersonal(p.description):null;
     const spectrumGuess=(!rule && !wireGuess && !distGuess && !intercoGuess && !propGuess && !secGuess && !bofaGuess && !chkgGuess && !vixGuess && !marichellGuess && !tmobileGuess)?detectSpectrumInternet(p.description):null;
     const orangeCoGuess=(!rule && !wireGuess && !distGuess && !intercoGuess && !propGuess && !secGuess && !bofaGuess && !chkgGuess && !vixGuess && !marichellGuess && !tmobileGuess && !spectrumGuess)?detectOrangeCountyUtilities(p.description):null;
-    const guess=wireGuess||distGuess||intercoGuess||propGuess||secGuess||bofaGuess||chkgGuess||vixGuess||marichellGuess||tmobileGuess||spectrumGuess||orangeCoGuess;
+    const hoaGuess=(!rule && !wireGuess && !distGuess && !intercoGuess && !propGuess && !secGuess && !bofaGuess && !chkgGuess && !vixGuess && !marichellGuess && !tmobileGuess && !spectrumGuess && !orangeCoGuess)?detectLakesOfWindermereHOA(p.description):null;
+    const guess=wireGuess||distGuess||intercoGuess||propGuess||secGuess||bofaGuess||chkgGuess||vixGuess||marichellGuess||tmobileGuess||spectrumGuess||orangeCoGuess||hoaGuess;
     toAdd.push({
       id:uuid(),
       entityId:IMP.entityId,
