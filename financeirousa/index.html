@@ -1149,7 +1149,7 @@ const PERSONAL_CATEGORIES=[
   'Business Related > Distribution Received','Business Related > Expense Paid Personally','Business Related > Contribution','Business Related > Loan to Business','Business Related > Reimbursement','Business Related > Other','Business Related > CPA Review',
   'Other > Gifts','Other > Donations','Other > Extraordinary Expense','Other > Uncategorized'
 ];
-const PERSONAL_CAT_QUICK=['Food > Grocery','Food > Restaurant','Housing > Mortgage','Shopping > Amazon','Financial > Transfer','Subscriptions > Streaming','Business Related > Expense Paid Personally','Other > Uncategorized'];
+const PERSONAL_CAT_QUICK=['Food > Grocery','Food > Restaurant','Housing > Mortgage','Shopping > Amazon','Financial > Transfer','Subscriptions > Streaming','Business Related > Expense Paid Personally','Business Related > CPA Review','Other > Uncategorized'];
 
 function addPersonalAccount(){
   DATA.personalAccounts.push({id:uuid(),name:'',type:'Bank Account',currency:'USD',titulares:'',maturityDate:''});
@@ -1315,10 +1315,21 @@ function processPersonalImportRows(rows){
 function personalPendingQueue(){
   return DATA.personalTransactions.filter(t=>t.status==='UNREVIEWED'||t.status==='AI_SUGGESTED');
 }
+function personalCpaReviewQueue(){
+  return DATA.personalTransactions.filter(t=>t.status==='CPA_REVIEW');
+}
 function renderPersonalReview(c){
   const queue=personalPendingQueue();
   if(!queue.length){
-    c.innerHTML=`<div class="empty"><div style="font-size:28px">✅</div><div>Tudo revisado! Nenhuma transação pessoal pendente.</div></div>`;
+    const cpaQ=personalCpaReviewQueue();
+    c.innerHTML=cpaQ.length ? `
+      <div class="empty">
+        <div style="font-size:28px">✅</div>
+        <div>Fila de classificação zerada!</div>
+        <div style="margin-top:10px;font-size:12px">Mas ainda há <b>${cpaQ.length} transação(ões)</b> marcada(s) como <b>CPA Review</b>, aguardando o contador decidir. Elas não bloqueiam seu fluxo, mas seguem pendentes.</div>
+        <button class="btn-gold" style="margin-top:14px" onclick="goTab('pledger')">Ver em Transações →</button>
+      </div>
+    ` : `<div class="empty"><div style="font-size:28px">✅</div><div>Tudo revisado! Nenhuma transação pessoal pendente.</div></div>`;
     return;
   }
   const t=queue[0];
@@ -1359,8 +1370,12 @@ function selectPersonalQuickCat(id,cat){
   if(!t)return;
   t.category=cat;
   t.userDescription=document.getElementById('prev-note-'+id)?document.getElementById('prev-note-'+id).value:'';
-  t.status='REVIEWED';
-  learnPersonalRule(t.originalDescription,t.category);
+  if(cat==='Business Related > CPA Review'){
+    t.status='CPA_REVIEW';
+  } else {
+    t.status='REVIEWED';
+    learnPersonalRule(t.originalDescription,t.category);
+  }
   saveAndSync();
   render();
 }
@@ -1371,8 +1386,12 @@ function savePersonalReviewFull(id){
   if(!cat){notify('Selecione uma categoria.','err');return;}
   t.category=cat;
   t.userDescription=document.getElementById('prev-note-'+id).value;
-  t.status='REVIEWED';
-  learnPersonalRule(t.originalDescription,t.category);
+  if(cat==='Business Related > CPA Review'){
+    t.status='CPA_REVIEW';
+  } else {
+    t.status='REVIEWED';
+    learnPersonalRule(t.originalDescription,t.category);
+  }
   saveAndSync();
   render();
 }
@@ -1401,8 +1420,12 @@ function savePEditTx(id){
   if(!t) return;
   t.category=document.getElementById('pedit-cat-'+id).value;
   t.userDescription=document.getElementById('pedit-note-'+id).value;
-  t.status='REVIEWED';
-  learnPersonalRule(t.originalDescription,t.category);
+  if(t.category==='Business Related > CPA Review'){
+    t.status='CPA_REVIEW';
+  } else {
+    t.status='REVIEWED';
+    learnPersonalRule(t.originalDescription,t.category);
+  }
   saveAndSync();
   PEDIT_TX_ID=null;
   notify('Transação atualizada','ok');
@@ -1462,7 +1485,7 @@ function renderPersonalLedger(c){
   }
   const rows=sorted.map(t=>{
     const acc=DATA.personalAccounts.find(a=>a.id===t.accountId);
-    const statusBadge=t.status==='REVIEWED'?'<span class="badge b-info">Reviewed</span>':t.status==='AI_SUGGESTED'?'<span class="badge b-pend">AI Suggested</span>':'<span class="badge" style="background:var(--bg-section);color:var(--dim);border:1px solid var(--border)">Unreviewed</span>';
+    const statusBadge=t.status==='REVIEWED'?'<span class="badge b-info">Reviewed</span>':t.status==='AI_SUGGESTED'?'<span class="badge b-pend">AI Suggested</span>':t.status==='CPA_REVIEW'?'<span class="badge" style="background:#FDEAEA;color:var(--red);border:1px solid #F3C6C6">CPA Review (pendente)</span>':'<span class="badge" style="background:var(--bg-section);color:var(--dim);border:1px solid var(--border)">Unreviewed</span>';
     return `<tr style="cursor:pointer" onclick="openPEditTx('${t.id}')" title="Clique para editar">
       <td>${esc(t.date)}</td>
       <td>${esc(acc?acc.name:'')}</td>
