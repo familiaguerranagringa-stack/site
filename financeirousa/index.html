@@ -673,6 +673,41 @@ function syncFromFB(){
       }
     });
     if(bofaFix) saveAndSync();
+    // Compras do robô Eufy (aspira/limpa/seca) — para a empresa, não é uso pessoal (confirmado pelo usuário)
+    let txEufy1=DATA.transactions.find(t=>(t.originalDescription||'').toUpperCase().includes('EUFY') && Math.abs(t.amount-511.19)<0.01);
+    if(txEufy1 && (!txEufy1.category || txEufy1.category==='')){
+      txEufy1.category='Expense';
+      txEufy1.cpaCategory='Expense — Office/Facility Cleaning Equipment (Eufy Robot Vacuum & Mop)';
+      txEufy1.userDescription='Robô aspirador/passa pano/seca (Eufy) — equipamento de limpeza para a empresa, não uso pessoal.';
+      txEufy1.status='REVIEWED';
+      saveAndSync();
+    }
+    let txEufy2=DATA.transactions.find(t=>(t.originalDescription||'').toUpperCase().includes('EUFY') && Math.abs(t.amount-17.88)<0.01);
+    if(txEufy2 && (!txEufy2.category || txEufy2.category==='')){
+      txEufy2.category='Expense';
+      txEufy2.cpaCategory='Expense — Office/Facility Cleaning Equipment (Eufy Robot Vacuum & Mop — accessory/tax)';
+      txEufy2.userDescription='Complemento/taxa da compra do robô aspirador Eufy — equipamento de limpeza para a empresa, não uso pessoal.';
+      txEufy2.status='REVIEWED';
+      saveAndSync();
+    }
+    // HomeGoods #379 — utensílios para a empresa (confirmado pelo usuário)
+    let txHomeGoods=DATA.transactions.find(t=>(t.originalDescription||'').toUpperCase().includes('HOMEGOODS') && Math.abs(t.amount-85.19)<0.01);
+    if(txHomeGoods && (!txHomeGoods.category || txHomeGoods.category==='')){
+      txHomeGoods.category='Expense';
+      txHomeGoods.cpaCategory='Expense — Office/Business Supplies (HomeGoods)';
+      txHomeGoods.userDescription='Utensílios para a empresa comprados na HomeGoods.';
+      txHomeGoods.status='REVIEWED';
+      saveAndSync();
+    }
+    // Pagamento de fatura de cartão (CRD 4504, $85,19, conf# 4867743951) — nunca é despesa nova, é Transfer
+    let txCC8519=DATA.transactions.find(t=>(t.originalDescription||'').includes('4867743951'));
+    if(txCC8519 && (!txCC8519.category || txCC8519.category==='CPA Review')){
+      txCC8519.category='Transfer';
+      txCC8519.cpaCategory='Transfer — Credit Card Payment (see Credit Card statement for itemized expenses)';
+      txCC8519.userDescription='Pagamento da fatura do cartão de crédito. Não é despesa nova — as compras já estão registradas individualmente na conta do próprio cartão de crédito.';
+      txCC8519.status='REVIEWED';
+      saveAndSync();
+    }
     // Cartão de crédito Bank of America da Guerra Family Empire LLC (terminação •2603)
     if(gfe && !DATA.accounts.some(a=>a.entityId===gfe.id && (a.name||'').includes('2603'))){
       DATA.accounts.push({
