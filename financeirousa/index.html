@@ -345,6 +345,16 @@ function syncFromFB(){
       DATA.rules=load('finusa_rules');
       setSyncStatus('• Online (vazio)','var(--green)');
     }
+    // Remove empresas sem nome e sem nenhuma transação/conta vinculada (lixo de testes/cadastro incompleto)
+    const antesDaLimpeza=DATA.entities.length;
+    DATA.entities=DATA.entities.filter(e=>{
+      const semNome=!(e.legalName||'').trim();
+      if(!semNome) return true;
+      const temConta=DATA.accounts.some(a=>a.entityId===e.id);
+      const temTransacao=DATA.transactions.some(t=>t.entityId===e.id);
+      return temConta || temTransacao; // mantém só se tiver algo vinculado, mesmo sem nome
+    });
+    if(DATA.entities.length!==antesDaLimpeza) saveAndSync();
     // Funde duplicatas de empresas com o mesmo nome (ex: cadastro manual vazio + seed automático)
     if(dedupeEntities()) saveAndSync();
     // Seed automático: se ainda não existe nenhuma empresa, já entra com a GUERRA FAMILY EMPIRE LLC preenchida
