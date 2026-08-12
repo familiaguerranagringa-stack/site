@@ -664,6 +664,15 @@ function syncFromFB(){
       txDevol.status='REVIEWED';
       saveAndSync();
     }
+    // Entrada $2.400 (Familia Guerra Holding) — pagamento errado recebido (mesma data da devolução) — fecha o ciclo do erro
+    let txErrado=DATA.transactions.find(t=>(t.originalDescription||'').includes('T1256YCRV'));
+    if(txErrado && (!txErrado.category || txErrado.category==='CPA Review')){
+      txErrado.category='Refund';
+      txErrado.cpaCategory='Refund — Erroneous Zelle Payment Received (Returned Same Day)';
+      txErrado.userDescription='Zelle recebido por engano de IMPORT FL LLC (juros do empréstimo Sala Icon pagos na conta errada) — devolvido no mesmo dia (07/05). Não é receita real da Familia Guerra Holding LLC. Correspondente à saída de devolução do mesmo valor e data. O pagamento correto foi recebido depois, em 02/07, na Familia Guerra Investing LLC.';
+      txErrado.status='REVIEWED';
+      saveAndSync();
+    }
     // Entrada $2.400 (Familia Guerra Investing) — juros de empréstimo (Sala Icon), pago corretamente após a correção do erro acima
     let txJuros=DATA.transactions.find(t=>(t.originalDescription||'').includes('T12CQ48L9'));
     if(txJuros && (!txJuros.category || txJuros.category==='CPA Review')){
