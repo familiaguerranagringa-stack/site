@@ -380,7 +380,7 @@ function syncFromFB(){
     let pRetro=false;
     DATA.personalTransactions.forEach(t=>{
       if(t.status==='UNREVIEWED' && !t.category){
-        const g=detectPersonalDistributionFromBusiness(t.originalDescription)||detectOutsideLoungePayroll(t.originalDescription)||detectChaseCreditCardPayment(t.originalDescription)||detectBestBuyCreditCardPayment(t.originalDescription)||detectOhMyBossPetGrooming(t.originalDescription)||detectRokkasMarket(t.originalDescription)||detectPublix(t.originalDescription)||detectBotecoDoManolo(t.originalDescription);
+        const g=detectPersonalDistributionFromBusiness(t.originalDescription)||detectOutsideLoungePayroll(t.originalDescription)||detectChaseCreditCardPayment(t.originalDescription)||detectBestBuyCreditCardPayment(t.originalDescription)||detectOhMyBossPetGrooming(t.originalDescription)||detectRokkasMarket(t.originalDescription)||detectPublix(t.originalDescription)||detectBotecoDoManolo(t.originalDescription)||detectSamsClubAnnualFee(t.originalDescription)||detectCostco(t.originalDescription);
         if(g){ t.category=g.category; if(!t.userDescription) t.userDescription=g.userDescription; t.status='AI_SUGGESTED'; pRetro=true; }
       }
     });
@@ -1303,6 +1303,27 @@ function handlePersonalImportFile(input){
 // ── DETECÇÃO AUTOMÁTICA: Oh My Boss — banho e tosa da cachorra Mel ──
 // ── DETECÇÃO AUTOMÁTICA: Rokkas Market — supermercado ──
 // ── DETECÇÃO AUTOMÁTICA: Publix — supermercado ──
+// ── DETECÇÃO AUTOMÁTICA: Sam's Club — anuidade do clube (duplicada com Costco, não é compra de mercado) ──
+function detectSamsClubAnnualFee(desc){
+  const d=(desc||'').toUpperCase();
+  const compact=d.replace(/[^A-Z]/g,'');
+  if(!compact.includes('SAMSCLUB')) return null;
+  return {
+    category:'Subscriptions > Memberships',
+    userDescription:'Anuidade Sams Club — membership pago sem querer, ja que a familia tem Costco (avaliar cancelar).'
+  };
+}
+// ── DETECÇÃO AUTOMÁTICA: Costco — supermercado/atacado ──
+function detectCostco(desc){
+  const d=(desc||'').toUpperCase();
+  const compact=d.replace(/[^A-Z]/g,'');
+  if(!compact.includes('COSTCO')) return null;
+  return {
+    category:'Food > Grocery',
+    userDescription:'Costco — compras de mercado/atacado.'
+  };
+}
+
 function detectPublix(desc){
   const d=(desc||'').toUpperCase();
   const compact=d.replace(/[^A-Z]/g,'');
@@ -1440,7 +1461,9 @@ function processPersonalImportRows(rows){
     const rokkasGuess=(!rule && !distGuess && !payrollGuess && !chaseGuess && !bestBuyGuess && !ohMyBossGuess)?detectRokkasMarket(p.description):null;
     const publixGuess=(!rule && !distGuess && !payrollGuess && !chaseGuess && !bestBuyGuess && !ohMyBossGuess && !rokkasGuess)?detectPublix(p.description):null;
     const manoloGuess=(!rule && !distGuess && !payrollGuess && !chaseGuess && !bestBuyGuess && !ohMyBossGuess && !rokkasGuess && !publixGuess)?detectBotecoDoManolo(p.description):null;
-    const pGuess=distGuess||payrollGuess||chaseGuess||bestBuyGuess||ohMyBossGuess||rokkasGuess||publixGuess||manoloGuess;
+    const samsGuess=(!rule && !distGuess && !payrollGuess && !chaseGuess && !bestBuyGuess && !ohMyBossGuess && !rokkasGuess && !publixGuess && !manoloGuess)?detectSamsClubAnnualFee(p.description):null;
+    const costcoGuess=(!rule && !distGuess && !payrollGuess && !chaseGuess && !bestBuyGuess && !ohMyBossGuess && !rokkasGuess && !publixGuess && !manoloGuess && !samsGuess)?detectCostco(p.description):null;
+    const pGuess=distGuess||payrollGuess||chaseGuess||bestBuyGuess||ohMyBossGuess||rokkasGuess||publixGuess||manoloGuess||samsGuess||costcoGuess;
     toAdd.push({
       id:uuid(), accountId:PIMP.accountId, date:p.date,
       originalDescription:p.description, userDescription:rule?'':(pGuess?pGuess.userDescription:''),
