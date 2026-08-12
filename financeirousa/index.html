@@ -380,7 +380,7 @@ function syncFromFB(){
     let pRetro=false;
     DATA.personalTransactions.forEach(t=>{
       if(t.status==='UNREVIEWED' && !t.category){
-        const g=detectPersonalDistributionFromBusiness(t.originalDescription)||detectOutsideLoungePayroll(t.originalDescription)||detectChaseCreditCardPayment(t.originalDescription);
+        const g=detectPersonalDistributionFromBusiness(t.originalDescription)||detectOutsideLoungePayroll(t.originalDescription)||detectChaseCreditCardPayment(t.originalDescription)||detectBestBuyCreditCardPayment(t.originalDescription);
         if(g){ t.category=g.category; if(!t.userDescription) t.userDescription=g.userDescription; t.status='AI_SUGGESTED'; pRetro=true; }
       }
     });
@@ -1298,6 +1298,17 @@ function handlePersonalImportFile(input){
 // ── DETECÇÃO AUTOMÁTICA: dinheiro recebido de qualquer uma das 4 empresas próprias = distribuição recebida ──
 // ── DETECÇÃO AUTOMÁTICA: Outside Lounge — salário W-2 recorrente do Leandro ──
 // ── DETECÇÃO AUTOMÁTICA: Chase Credit — pagamento do cartão de crédito pessoal Chase, nunca é despesa nova ──
+// ── DETECÇÃO AUTOMÁTICA: Best Buy — pagamento do cartão de crédito pessoal Best Buy, nunca é despesa nova ──
+function detectBestBuyCreditCardPayment(desc){
+  const d=(desc||'').toUpperCase();
+  const compact=d.replace(/[^A-Z]/g,'');
+  if(!compact.includes('BESTBUY')) return null;
+  return {
+    category:'Financial > Transfer',
+    userDescription:'Pagamento do cartão de crédito Best Buy (pessoal). Não é despesa nova — as compras já estão registradas na fatura do próprio cartão.'
+  };
+}
+
 function detectChaseCreditCardPayment(desc){
   const d=(desc||'').toUpperCase();
   const compact=d.replace(/[^A-Z]/g,'');
@@ -1380,7 +1391,8 @@ function processPersonalImportRows(rows){
     const distGuess=!rule?detectPersonalDistributionFromBusiness(p.description):null;
     const payrollGuess=(!rule && !distGuess)?detectOutsideLoungePayroll(p.description):null;
     const chaseGuess=(!rule && !distGuess && !payrollGuess)?detectChaseCreditCardPayment(p.description):null;
-    const pGuess=distGuess||payrollGuess||chaseGuess;
+    const bestBuyGuess=(!rule && !distGuess && !payrollGuess && !chaseGuess)?detectBestBuyCreditCardPayment(p.description):null;
+    const pGuess=distGuess||payrollGuess||chaseGuess||bestBuyGuess;
     toAdd.push({
       id:uuid(), accountId:PIMP.accountId, date:p.date,
       originalDescription:p.description, userDescription:rule?'':(pGuess?pGuess.userDescription:''),
