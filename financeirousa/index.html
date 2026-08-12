@@ -360,6 +360,15 @@ function syncFromFB(){
       DATA.personalRules=load('finusa_personalRules');
       setSyncStatus('• Online (vazio)','var(--green)');
     }
+    // Migração retroativa PESSOAL: aplica detecção de distribuição de empresa própria em transações já importadas
+    let pRetro=false;
+    DATA.personalTransactions.forEach(t=>{
+      if(t.status==='UNREVIEWED' && !t.category){
+        const g=detectPersonalDistributionFromBusiness(t.originalDescription);
+        if(g){ t.category=g.category; if(!t.userDescription) t.userDescription=g.userDescription; t.status='AI_SUGGESTED'; pRetro=true; }
+      }
+    });
+    if(pRetro) saveAndSync();
     // Conta conjunta pessoal (Leandro + Julyana) — Bank of America •9064
     if(!DATA.personalAccounts.some(a=>(a.accountNumber==='898151699064')||(a.name||'').includes('9064'))){
       DATA.personalAccounts.push({
@@ -1137,7 +1146,7 @@ const PERSONAL_CATEGORIES=[
   'Services > Babysitter','Services > Cleaning','Services > Landscaping','Services > Personal Services','Services > Maintenance',
   'Subscriptions > Streaming','Subscriptions > Software','Subscriptions > Apps','Subscriptions > Memberships',
   'Financial > Interest','Financial > Banking Fees','Financial > Transfer','Financial > Investment','Financial > Loan',
-  'Business Related > Expense Paid Personally','Business Related > Contribution','Business Related > Loan to Business','Business Related > Reimbursement','Business Related > Other','Business Related > CPA Review',
+  'Business Related > Distribution Received','Business Related > Expense Paid Personally','Business Related > Contribution','Business Related > Loan to Business','Business Related > Reimbursement','Business Related > Other','Business Related > CPA Review',
   'Other > Gifts','Other > Donations','Other > Extraordinary Expense','Other > Uncategorized'
 ];
 const PERSONAL_CAT_QUICK=['Food > Grocery','Food > Restaurant','Housing > Mortgage','Shopping > Amazon','Financial > Transfer','Subscriptions > Streaming','Business Related > Expense Paid Personally','Other > Uncategorized'];
@@ -1222,6 +1231,18 @@ function handlePersonalImportFile(input){
   reader.readAsBinaryString(file);
 }
 
+// ── DETECÇÃO AUTOMÁTICA: dinheiro recebido de qualquer uma das 4 empresas próprias = distribuição recebida ──
+function detectPersonalDistributionFromBusiness(desc){
+  const d=(desc||'').toUpperCase();
+  const empresa=GRUPO_EMPRESAS.find(nome=>d.includes(nome));
+  if(!empresa) return null;
+  const nomeFormatado=empresa.charAt(0)+empresa.slice(1).toLowerCase();
+  return {
+    category:'Business Related > Distribution Received',
+    userDescription:`Distribuição/transferência recebida de ${nomeFormatado} (empresa própria) na conta pessoal.`
+  };
+}
+
 function findPersonalRule(desc){
   const key=normalizeMerchant(desc);
   return DATA.personalRules.find(r=>key.includes(r.key));
@@ -1270,12 +1291,13 @@ function processPersonalImportRows(rows){
     if(existing.has(key)){ duplicadas++; return; }
     existing.add(key);
     const rule=findPersonalRule(p.description);
+    const distGuess=!rule?detectPersonalDistributionFromBusiness(p.description):null;
     toAdd.push({
       id:uuid(), accountId:PIMP.accountId, date:p.date,
-      originalDescription:p.description, userDescription:'',
+      originalDescription:p.description, userDescription:rule?'':(distGuess?distGuess.userDescription:''),
       amount:p.amount, balance:p.balance,
-      category:rule?rule.category:'',
-      status:rule?'AI_SUGGESTED':'UNREVIEWED'
+      category:rule?rule.category:(distGuess?distGuess.category:''),
+      status:(rule||distGuess)?'AI_SUGGESTED':'UNREVIEWED'
     });
     novas++;
   });
