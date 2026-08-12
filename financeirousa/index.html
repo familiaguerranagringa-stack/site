@@ -673,6 +673,15 @@ function syncFromFB(){
       }
     });
     if(bofaFix) saveAndSync();
+    // Zelle $240 para SHINEHOME LLC — limpeza da empresa (Familia Guerra Investing), serviço pontual, sem regra automática
+    let txShine=DATA.transactions.find(t=>(t.originalDescription||'').includes('oaa3kcxu5'));
+    if(txShine && (!txShine.category || txShine.category==='CPA Review')){
+      txShine.category='Expense';
+      txShine.cpaCategory='Expense — Cleaning Service (Familia Guerra Investing)';
+      txShine.userDescription='Serviço de limpeza (Shinehome LLC) contratado para a empresa. Serviço pontual.';
+      txShine.status='REVIEWED';
+      saveAndSync();
+    }
     // Compras do robô Eufy (aspira/limpa/seca) — para a empresa, não é uso pessoal (confirmado pelo usuário)
     let txEufy1=DATA.transactions.find(t=>(t.originalDescription||'').toUpperCase().includes('EUFY') && Math.abs(t.amount-511.19)<0.01);
     if(txEufy1 && (!txEufy1.category || txEufy1.category==='')){
