@@ -655,6 +655,24 @@ function syncFromFB(){
       }
     });
     if(bofaFix) saveAndSync();
+    // Saída $2.400 (Familia Guerra Holding) — devolução de zelle recebido errado na conta errada
+    let txDevol=DATA.transactions.find(t=>(t.originalDescription||'').includes('h6i9lxyd9'));
+    if(txDevol && (!txDevol.category || txDevol.category==='')){
+      txDevol.category='Refund';
+      txDevol.cpaCategory='Refund — Return of Erroneous Zelle Payment (Received in Wrong Account)';
+      txDevol.userDescription='Devolução de valor recebido por engano nessa conta (Zelle enviado errado por IMPORT FL LLC) — não é despesa real da Familia Guerra Holding LLC.';
+      txDevol.status='REVIEWED';
+      saveAndSync();
+    }
+    // Entrada $2.400 (Familia Guerra Investing) — juros de empréstimo (Sala Icon), pago corretamente após a correção do erro acima
+    let txJuros=DATA.transactions.find(t=>(t.originalDescription||'').includes('T12CQ48L9'));
+    if(txJuros && (!txJuros.category || txJuros.category==='CPA Review')){
+      txJuros.category='Interest Income';
+      txJuros.cpaCategory='Interest Income — Loan Interest (Sala Icon)';
+      txJuros.userDescription='Juros de empréstimo (projeto Sala Icon) pago por IMPORT FL LLC — pagamento correto, na conta certa (Familia Guerra Investing LLC), após correção de um envio anterior errado.';
+      txJuros.status='REVIEWED';
+      saveAndSync();
+    }
     // Zelle $950 para WINNER CARPENTRY BUILDER LLC — espelho de vidro para a sala de jantar (residência pessoal), sem regra automática (pedido pontual do usuário)
     let txWinner=DATA.transactions.find(t=>(t.originalDescription||'').includes('acxe6wt6u'));
     if(txWinner && (!txWinner.category || txWinner.category==='')){
