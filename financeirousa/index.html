@@ -1313,7 +1313,9 @@ function processPersonalImportRows(rows){
 
 // ── PERSONAL QUICK REVIEW ──
 function personalPendingQueue(){
-  return DATA.personalTransactions.filter(t=>t.status==='UNREVIEWED'||t.status==='AI_SUGGESTED');
+  return DATA.personalTransactions
+    .filter(t=>t.status==='UNREVIEWED'||t.status==='AI_SUGGESTED')
+    .sort((a,b)=>(a.status==='AI_SUGGESTED'?0:1)-(b.status==='AI_SUGGESTED'?0:1));
 }
 function personalCpaReviewQueue(){
   return DATA.personalTransactions.filter(t=>t.status==='CPA_REVIEW');
@@ -1912,7 +1914,9 @@ function processImportRows(rows){
 
 // ── QUICK REVIEW ──
 function pendingQueue(){
-  return DATA.transactions.filter(t=>t.status==='UNREVIEWED'||t.status==='AI_SUGGESTED');
+  return DATA.transactions
+    .filter(t=>t.status==='UNREVIEWED'||t.status==='AI_SUGGESTED')
+    .sort((a,b)=>(a.status==='AI_SUGGESTED'?0:1)-(b.status==='AI_SUGGESTED'?0:1));
 }
 function cpaReviewQueue(){
   return DATA.transactions.filter(t=>t.status==='CPA_REVIEW');
