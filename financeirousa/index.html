@@ -122,7 +122,10 @@ tr:hover td{background:var(--bg-hover)}
     <button class="sb-item" data-nav="import" onclick="goTab('import')">📥 Business — Import</button>
     <button class="sb-item" data-nav="review" onclick="goTab('review')">⚡ Business — Quick Review</button>
     <button class="sb-item" data-nav="ledger" onclick="goTab('ledger')">📒 Business — Transações</button>
-    <button class="sb-item" data-nav="personal" onclick="goTab('personal')">👤 Personal</button>
+    <button class="sb-item" data-nav="personal" onclick="goTab('personal')">👤 Personal — Contas</button>
+    <button class="sb-item" data-nav="pimport" onclick="goTab('pimport')">👤 Personal — Import</button>
+    <button class="sb-item" data-nav="preview" onclick="goTab('preview')">👤 Personal — Quick Review</button>
+    <button class="sb-item" data-nav="pledger" onclick="goTab('pledger')">👤 Personal — Transações</button>
     <button class="sb-item" data-nav="properties" onclick="goTab('properties')">🏘️ Properties</button>
     <button class="sb-item" data-nav="wealth" onclick="goTab('wealth')">📊 Wealth</button>
     <div class="sb-bottom">
@@ -180,7 +183,10 @@ const DATA={
   entities:[],    // empresas
   accounts:[],    // contas por empresa
   transactions:[],// transações importadas
-  rules:[]        // regras aprendidas (merchant normalizado -> categoria)
+  rules:[],       // regras aprendidas (merchant normalizado -> categoria)
+  personalAccounts:[],     // contas pessoais (banco/cartão/KAST/cash) — nunca misturado com Business
+  personalTransactions:[], // transações pessoais importadas
+  personalRules:[]         // regras aprendidas pra classificação pessoal
 };
 
 function load(k){try{return JSON.parse(localStorage.getItem(k)||'[]')}catch(e){return []}}
@@ -189,6 +195,9 @@ function saveLocal(){
   localStorage.setItem('finusa_accounts',JSON.stringify(DATA.accounts));
   localStorage.setItem('finusa_transactions',JSON.stringify(DATA.transactions));
   localStorage.setItem('finusa_rules',JSON.stringify(DATA.rules));
+  localStorage.setItem('finusa_personalAccounts',JSON.stringify(DATA.personalAccounts));
+  localStorage.setItem('finusa_personalTransactions',JSON.stringify(DATA.personalTransactions));
+  localStorage.setItem('finusa_personalRules',JSON.stringify(DATA.personalRules));
 }
 function saveAndSync(){
   saveLocal();
@@ -198,7 +207,7 @@ function pushToFB(){
   clearTimeout(_syncTimer);
   _syncTimer=setTimeout(()=>{
     setSyncStatus('⟳ Salvando...','var(--amber)');
-    _dbRef.set({entities:DATA.entities,accounts:DATA.accounts,transactions:DATA.transactions,rules:DATA.rules,_ts:Date.now()}).then(()=>{
+    _dbRef.set({entities:DATA.entities,accounts:DATA.accounts,transactions:DATA.transactions,rules:DATA.rules,personalAccounts:DATA.personalAccounts,personalTransactions:DATA.personalTransactions,personalRules:DATA.personalRules,_ts:Date.now()}).then(()=>{
       setSyncStatus('✓ Salvo','var(--green)');
       setTimeout(()=>setSyncStatus('• Online','var(--green)'),2000);
     }).catch(e=>{
@@ -336,6 +345,9 @@ function syncFromFB(){
       DATA.accounts=rec.accounts||[];
       DATA.transactions=rec.transactions||[];
       DATA.rules=rec.rules||[];
+      DATA.personalAccounts=rec.personalAccounts||[];
+      DATA.personalTransactions=rec.personalTransactions||[];
+      DATA.personalRules=rec.personalRules||[];
       saveLocal();
       setSyncStatus('✓ Sincronizado','var(--green)');
     } else {
@@ -343,7 +355,24 @@ function syncFromFB(){
       DATA.accounts=load('finusa_accounts');
       DATA.transactions=load('finusa_transactions');
       DATA.rules=load('finusa_rules');
+      DATA.personalAccounts=load('finusa_personalAccounts');
+      DATA.personalTransactions=load('finusa_personalTransactions');
+      DATA.personalRules=load('finusa_personalRules');
       setSyncStatus('• Online (vazio)','var(--green)');
+    }
+    // Conta conjunta pessoal (Leandro + Julyana) — Bank of America •9064
+    if(!DATA.personalAccounts.some(a=>(a.accountNumber==='898151699064')||(a.name||'').includes('9064'))){
+      DATA.personalAccounts.push({
+        id:uuid(),
+        name:'Conta Conjunta Pessoal',
+        type:'Bank Account',
+        currency:'USD',
+        titulares:'Leandro Guerra e Julyana Soares Silva Guerra',
+        accountNumber:'898151699064',
+        routingNumberPaperElectronic:'063100277',
+        routingNumberWires:'026009593'
+      });
+      saveAndSync();
     }
     // Remove empresas sem nome e sem nenhuma transação/conta vinculada (lixo de testes/cadastro incompleto)
     const antesDaLimpeza=DATA.entities.length;
@@ -809,6 +838,11 @@ function syncFromFB(){
   }).catch(e=>{
     DATA.entities=load('finusa_entities');
     DATA.accounts=load('finusa_accounts');
+    DATA.transactions=load('finusa_transactions');
+    DATA.rules=load('finusa_rules');
+    DATA.personalAccounts=load('finusa_personalAccounts');
+    DATA.personalTransactions=load('finusa_personalTransactions');
+    DATA.personalRules=load('finusa_personalRules');
     dedupeEntities();
     let gfe=DATA.entities.find(e=>(e.legalName||'').toUpperCase().includes('GUERRA FAMILY EMPIRE'));
     if(!gfe){
@@ -857,7 +891,7 @@ document.getElementById('l-user').addEventListener('keydown',e=>{if(e.key==='Ent
 
 // ── NAVEGAÇÃO ──
 const ST={tab:'home'};
-const TITLES={home:'Home',entities:'Business — Empresas',accounts:'Business — Contas',import:'Business — Import',review:'Business — Quick Review',ledger:'Business — Transações',personal:'Personal',properties:'Properties',wealth:'Wealth'};
+const TITLES={home:'Home',entities:'Business — Empresas',accounts:'Business — Contas',import:'Business — Import',review:'Business — Quick Review',ledger:'Business — Transações',personal:'Personal — Contas',pimport:'Personal — Import',preview:'Personal — Quick Review',pledger:'Personal — Transações',properties:'Properties',wealth:'Wealth'};
 function goTab(tab){
   ST.tab=tab;
   document.querySelectorAll('.sb-item').forEach(b=>b.classList.toggle('active',b.dataset.nav===tab));
@@ -877,7 +911,10 @@ function render(){
   if(ST.tab==='import') return renderImport(c);
   if(ST.tab==='review') return renderReview(c);
   if(ST.tab==='ledger') return renderLedger(c);
-  if(ST.tab==='personal') return renderPlaceholder(c,'Personal','Módulo de Finanças Pessoais — Income, Spending Sources (Bank/Card/KAST/Cash), Budget e Real Spending. Chega na próxima fase do MVP.');
+  if(ST.tab==='personal') return renderPersonalAccounts(c);
+  if(ST.tab==='pimport') return renderPersonalImport(c);
+  if(ST.tab==='preview') return renderPersonalReview(c);
+  if(ST.tab==='pledger') return renderPersonalLedger(c);
   if(ST.tab==='properties') return renderPlaceholder(c,'Properties','Módulo de Imóveis de Aluguel (EUA) — Property Profile, Rental Income, Expenses, Mortgage Split, Performance. Chega na próxima fase do MVP.');
   if(ST.tab==='wealth') return renderPlaceholder(c,'Wealth','Módulo de Patrimônio Consolidado (Net Worth) — reservado para Phase 4.');
 }
@@ -914,7 +951,7 @@ function renderHome(c){
       <div class="card-modulo" onclick="goTab('personal')">
         <div class="card-modulo-icon">👤</div>
         <div class="card-modulo-title">Personal</div>
-        <div class="card-modulo-sub">Em construção — próxima fase</div>
+        <div class="card-modulo-sub">${DATA.personalAccounts.length} conta(s) · ${DATA.personalTransactions.length} transações</div>
       </div>
       <div class="card-modulo" onclick="goTab('properties')">
         <div class="card-modulo-icon">🏘️</div>
@@ -1076,6 +1113,354 @@ function renderAccounts(c){
       <table>
         <thead><tr><th>Empresa</th><th>Nome da Conta</th><th>Tipo</th><th>Moeda</th><th>Vencimento</th><th></th></tr></thead>
         <tbody>${rows||'<tr><td colspan="6" class="dim" style="text-align:center;padding:24px">Nenhuma conta cadastrada ainda.</td></tr>'}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+// ══════════════════════════════════════════════════════════
+// MÓDULO PERSONAL — completamente separado do Business
+// ══════════════════════════════════════════════════════════
+
+const PERSONAL_ACC_TYPES=['Bank Account','Debit Card','Credit Card','KAST','Cash','Other Wallet'];
+
+// Plano de contas pessoal, conforme definido no projeto original
+const PERSONAL_CATEGORIES=[
+  'Housing > Mortgage','Housing > Rent','Housing > HOA','Housing > Electricity','Housing > Water','Housing > Internet','Housing > Phone','Housing > Landscaping','Housing > Pool','Housing > Cleaning','Housing > Maintenance','Housing > Furniture','Housing > Home Improvement',
+  'Food > Grocery','Food > Restaurant','Food > Delivery','Food > Coffee','Food > Snacks','Food > Drinks',
+  'Vehicles > Financing','Vehicles > Insurance','Vehicles > Fuel','Vehicles > Maintenance','Vehicles > Car Wash','Vehicles > Toll','Vehicles > Parking','Vehicles > Accessories',
+  'Children > School','Children > Sports','Children > Classes','Children > Clothing','Children > Activities','Children > Babysitter','Children > Other',
+  'Health > Doctor','Health > Dentist','Health > Medication','Health > Exams','Health > Therapy','Health > Insurance',
+  'Leisure > Parks','Leisure > Entertainment','Leisure > Events','Leisure > Movies',
+  'Travel > Flights','Travel > Hotels','Travel > Cruises','Travel > Food','Travel > Transportation','Travel > Activities',
+  'Shopping > Clothes','Shopping > Electronics','Shopping > Amazon','Shopping > Home','Shopping > Gifts','Shopping > Other',
+  'Services > Babysitter','Services > Cleaning','Services > Landscaping','Services > Personal Services','Services > Maintenance',
+  'Subscriptions > Streaming','Subscriptions > Software','Subscriptions > Apps','Subscriptions > Memberships',
+  'Financial > Interest','Financial > Banking Fees','Financial > Transfer','Financial > Investment','Financial > Loan',
+  'Business Related > Expense Paid Personally','Business Related > Contribution','Business Related > Loan to Business','Business Related > Reimbursement','Business Related > Other','Business Related > CPA Review',
+  'Other > Gifts','Other > Donations','Other > Extraordinary Expense','Other > Uncategorized'
+];
+const PERSONAL_CAT_QUICK=['Food > Grocery','Food > Restaurant','Housing > Mortgage','Shopping > Amazon','Financial > Transfer','Subscriptions > Streaming','Business Related > Expense Paid Personally','Other > Uncategorized'];
+
+function addPersonalAccount(){
+  DATA.personalAccounts.push({id:uuid(),name:'',type:'Bank Account',currency:'USD',titulares:'',maturityDate:''});
+  saveAndSync();
+  render();
+}
+function removePersonalAccount(id){
+  DATA.personalAccounts=DATA.personalAccounts.filter(a=>a.id!==id);
+  saveAndSync();
+  render();
+}
+function updPersonalAccount(id,field,val){
+  const a=DATA.personalAccounts.find(a=>a.id===id);
+  if(a){a[field]=val;saveAndSync();}
+}
+
+function renderPersonalAccounts(c){
+  let rows=DATA.personalAccounts.map(a=>`<tr>
+      <td><input class="fi" value="${esc(a.name)}" placeholder="Nome da conta" onchange="updPersonalAccount('${a.id}','name',this.value)"></td>
+      <td><select class="fi" onchange="updPersonalAccount('${a.id}','type',this.value)">
+        ${PERSONAL_ACC_TYPES.map(t=>`<option ${a.type===t?'selected':''}>${t}</option>`).join('')}
+      </select></td>
+      <td><input class="fi" value="${esc(a.titulares||'')}" placeholder="Ex: Leandro e Julyana" onchange="updPersonalAccount('${a.id}','titulares',this.value)"></td>
+      <td><input class="fi" value="${esc(a.currency)}" style="width:80px" onchange="updPersonalAccount('${a.id}','currency',this.value)"></td>
+      <td><button class="btn-sm" onclick="removePersonalAccount('${a.id}')">Remover</button></td>
+    </tr>`).join('');
+  document.getElementById('content').innerHTML=`
+    <div class="sec-hdr"><h2>Personal — Contas / Fontes de Gasto</h2><div class="sec-line"></div><button class="btn-gold" onclick="addPersonalAccount()">+ Nova Conta</button></div>
+    <div class="sec-note">Contas pessoais são completamente separadas das empresas. KAST entra aqui como fonte própria, sem precisar de vínculo bancário.</div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Nome</th><th>Tipo</th><th>Titulares</th><th>Moeda</th><th></th></tr></thead>
+        <tbody>${rows||'<tr><td colspan="5" class="dim" style="text-align:center;padding:24px">Nenhuma conta pessoal cadastrada ainda.</td></tr>'}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+// ── PERSONAL IMPORT ──
+const PIMP={accountId:null};
+function renderPersonalImport(c){
+  if(!DATA.personalAccounts.length){
+    c.innerHTML=`<div class="empty"><div style="font-size:28px">📥</div><div>Cadastre uma conta pessoal em <b>Personal — Contas</b> antes de importar extratos.</div></div>`;
+    return;
+  }
+  if(!PIMP.accountId || !DATA.personalAccounts.some(a=>a.id===PIMP.accountId)) PIMP.accountId=DATA.personalAccounts[0].id;
+  c.innerHTML=`
+    <div class="sec-hdr"><h2>Personal Transaction Import</h2><div class="sec-line"></div></div>
+    <div class="sec-note">Mesmo formato de arquivo do Business (CSV ou Excel). Detecta duplicatas automaticamente.</div>
+    <div class="form-card">
+      <div class="fl"><label>Conta</label>
+        <select class="fi" onchange="PIMP.accountId=this.value">
+          ${DATA.personalAccounts.map(a=>`<option value="${a.id}" ${a.id===PIMP.accountId?'selected':''}>${esc(a.name)||'(sem nome)'}</option>`).join('')}
+        </select>
+      </div>
+      <div class="fl" style="margin-top:6px">
+        <label>Arquivo (CSV / XLS / XLSX)</label>
+        <input class="fi" type="file" id="pimp-file" accept=".csv,.xls,.xlsx" onchange="handlePersonalImportFile(this)">
+      </div>
+      <div id="pimp-result" style="margin-top:14px"></div>
+    </div>
+  `;
+}
+
+function handlePersonalImportFile(input){
+  const file=input.files[0];
+  if(!file || !PIMP.accountId){notify('Selecione uma conta antes de importar.','err');return;}
+  const reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      const wb=XLSX.read(e.target.result,{type:'binary'});
+      const sheet=wb.Sheets[wb.SheetNames[0]];
+      const rows=XLSX.utils.sheet_to_json(sheet,{header:1,raw:false,defval:''});
+      processPersonalImportRows(rows);
+    }catch(err){
+      notify('Erro ao ler arquivo: '+err.message,'err');
+    }
+  };
+  reader.readAsBinaryString(file);
+}
+
+function findPersonalRule(desc){
+  const key=normalizeMerchant(desc);
+  return DATA.personalRules.find(r=>key.includes(r.key));
+}
+function learnPersonalRule(desc,category){
+  const key=normalizeMerchant(desc);
+  if(!key) return;
+  let r=DATA.personalRules.find(r=>r.key===key);
+  if(r){ r.category=category; }
+  else { DATA.personalRules.push({id:uuid(),key,category}); }
+}
+
+function processPersonalImportRows(rows){
+  let headerIdx=-1;
+  for(let i=0;i<rows.length;i++){
+    const rowStr=rows[i].map(x=>(x||'').toString().toLowerCase());
+    if(rowStr.some(x=>x.includes('date')) && rowStr.some(x=>x.includes('description'))){
+      headerIdx=i; break;
+    }
+  }
+  if(headerIdx===-1){notify('Não consegui localizar a tabela de transações no arquivo.','err');return;}
+  const header=rows[headerIdx].map(x=>(x||'').toString().toLowerCase());
+  const dateIdx=header.findIndex(x=>x.includes('date'));
+  const descIdx=header.findIndex(x=>x.includes('description'));
+  const amtIdx=header.findIndex(x=>x.includes('amount'));
+  const balIdx=header.findIndex(x=>x.includes('bal'));
+
+  const parsed=[];
+  for(let i=headerIdx+1;i<rows.length;i++){
+    const r=rows[i];
+    if(!r || !r[dateIdx]) continue;
+    const desc=(r[descIdx]||'').toString().trim();
+    const amtRaw=(r[amtIdx]||'').toString().replace(/,/g,'').replace(/"/g,'').trim();
+    const amt=parseFloat(amtRaw);
+    if(desc.toLowerCase().startsWith('beginning balance')) continue;
+    if(isNaN(amt) || amt===0) continue;
+    parsed.push({date:(r[dateIdx]||'').toString().trim(),description:desc,amount:amt,balance:balIdx>=0?(r[balIdx]||'').toString().trim():''});
+  }
+  if(!parsed.length){notify('Nenhuma transação válida encontrada no arquivo.','err');return;}
+
+  const existing=new Set(DATA.personalTransactions.filter(t=>t.accountId===PIMP.accountId).map(t=>t.accountId+'|'+t.date+'|'+t.amount+'|'+t.originalDescription));
+  let novas=0,duplicadas=0;
+  const toAdd=[];
+  parsed.forEach(p=>{
+    const key=PIMP.accountId+'|'+p.date+'|'+p.amount+'|'+p.description;
+    if(existing.has(key)){ duplicadas++; return; }
+    existing.add(key);
+    const rule=findPersonalRule(p.description);
+    toAdd.push({
+      id:uuid(), accountId:PIMP.accountId, date:p.date,
+      originalDescription:p.description, userDescription:'',
+      amount:p.amount, balance:p.balance,
+      category:rule?rule.category:'',
+      status:rule?'AI_SUGGESTED':'UNREVIEWED'
+    });
+    novas++;
+  });
+  DATA.personalTransactions=DATA.personalTransactions.concat(toAdd);
+  saveAndSync();
+  document.getElementById('pimp-result').innerHTML=`
+    <div class="badge b-info">✓ ${novas} nova(s) transação(ões) importada(s)</div>
+    ${duplicadas?`<div class="badge b-pend" style="margin-left:8px">${duplicadas} duplicata(s) ignorada(s)</div>`:''}
+    <div style="margin-top:10px"><button class="btn-gold" onclick="goTab('preview')">Ir para Quick Review →</button></div>
+  `;
+  notify(`${novas} transações importadas`,'ok');
+}
+
+// ── PERSONAL QUICK REVIEW ──
+function personalPendingQueue(){
+  return DATA.personalTransactions.filter(t=>t.status==='UNREVIEWED'||t.status==='AI_SUGGESTED');
+}
+function renderPersonalReview(c){
+  const queue=personalPendingQueue();
+  if(!queue.length){
+    c.innerHTML=`<div class="empty"><div style="font-size:28px">✅</div><div>Tudo revisado! Nenhuma transação pessoal pendente.</div></div>`;
+    return;
+  }
+  const t=queue[0];
+  const acc=DATA.personalAccounts.find(a=>a.id===t.accountId);
+  const isCredit=t.amount>0;
+  c.innerHTML=`
+    <div class="sec-hdr"><h2>Personal Quick Review</h2><div class="sec-line"></div><div style="font-size:11px;color:var(--dim)">${queue.length} pendente(s)</div></div>
+    <div class="form-card" style="max-width:620px">
+      <div style="font-size:11px;color:var(--dim);margin-bottom:4px">${esc(acc?acc.name:'')} · ${esc(t.date)}</div>
+      <div style="font-family:'Syne',sans-serif;font-size:22px;font-weight:800;color:${isCredit?'var(--green)':'var(--red)'};margin-bottom:6px">${isCredit?'+':''}$${Math.abs(t.amount).toLocaleString('en-US',{minimumFractionDigits:2})}</div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:14px;padding:10px;background:var(--bg-section);border-radius:6px">${esc(t.originalDescription)}</div>
+      ${t.status==='AI_SUGGESTED' ? `
+        <div style="background:var(--gold-bg);border:1px solid var(--gold-dim);border-radius:8px;padding:12px;margin-bottom:14px">
+          <div style="font-size:10px;font-weight:700;letter-spacing:.1em;color:var(--gold);text-transform:uppercase;margin-bottom:4px">Suggested Category (aprendido)</div>
+          <div style="font-weight:700;margin-bottom:8px">${esc(t.category)}</div>
+          <button class="btn-gold" onclick="approvePersonalReview('${t.id}')">✓ Approve</button>
+          <button class="btn-ghost" style="margin-left:8px" onclick="clearPersonalSuggestion('${t.id}')">Change</button>
+        </div>
+      ` : `
+        <div class="fl" style="margin-bottom:10px">
+          <label>What was this? (categoria)</label>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">
+            ${PERSONAL_CAT_QUICK.map(cat=>`<button class="btn-sm ok" style="padding:6px 12px" onclick="selectPersonalQuickCat('${t.id}','${cat}')">${cat.split(' > ')[1]}</button>`).join('')}
+          </div>
+          <select class="fi" id="prev-cat-${t.id}">
+            <option value="">Outra categoria...</option>
+            ${PERSONAL_CATEGORIES.map(cat=>`<option value="${cat}">${cat}</option>`).join('')}
+          </select>
+        </div>
+        <div class="fl"><label>Observação (nota)</label><input class="fi" id="prev-note-${t.id}" placeholder="Observação livre"></div>
+        <button class="btn-gold" style="margin-top:12px" onclick="savePersonalReviewFull('${t.id}')">SAVE & NEXT</button>
+      `}
+    </div>
+  `;
+}
+function selectPersonalQuickCat(id,cat){
+  const t=DATA.personalTransactions.find(t=>t.id===id);
+  if(!t)return;
+  t.category=cat;
+  t.userDescription=document.getElementById('prev-note-'+id)?document.getElementById('prev-note-'+id).value:'';
+  t.status='REVIEWED';
+  learnPersonalRule(t.originalDescription,t.category);
+  saveAndSync();
+  render();
+}
+function savePersonalReviewFull(id){
+  const t=DATA.personalTransactions.find(t=>t.id===id);
+  if(!t)return;
+  const cat=document.getElementById('prev-cat-'+id).value;
+  if(!cat){notify('Selecione uma categoria.','err');return;}
+  t.category=cat;
+  t.userDescription=document.getElementById('prev-note-'+id).value;
+  t.status='REVIEWED';
+  learnPersonalRule(t.originalDescription,t.category);
+  saveAndSync();
+  render();
+}
+function approvePersonalReview(id){
+  const t=DATA.personalTransactions.find(t=>t.id===id);
+  if(!t)return;
+  t.status='REVIEWED';
+  learnPersonalRule(t.originalDescription,t.category);
+  saveAndSync();
+  render();
+}
+function clearPersonalSuggestion(id){
+  const t=DATA.personalTransactions.find(t=>t.id===id);
+  if(!t)return;
+  t.status='UNREVIEWED';
+  render();
+}
+
+// ── PERSONAL LEDGER ──
+let PEDIT_TX_ID=null;
+let PLEDGER_SEARCH='';
+function openPEditTx(id){ PEDIT_TX_ID=id; render(); }
+function cancelPEditTx(){ PEDIT_TX_ID=null; render(); }
+function savePEditTx(id){
+  const t=DATA.personalTransactions.find(t=>t.id===id);
+  if(!t) return;
+  t.category=document.getElementById('pedit-cat-'+id).value;
+  t.userDescription=document.getElementById('pedit-note-'+id).value;
+  t.status='REVIEWED';
+  learnPersonalRule(t.originalDescription,t.category);
+  saveAndSync();
+  PEDIT_TX_ID=null;
+  notify('Transação atualizada','ok');
+  render();
+}
+let pLedgerSearchDebounce=null;
+function handlePLedgerSearch(val){
+  PLEDGER_SEARCH=val;
+  clearTimeout(pLedgerSearchDebounce);
+  pLedgerSearchDebounce=setTimeout(()=>{
+    const activeEl=document.activeElement;
+    const cursorPos=(activeEl && activeEl.id==='pledger-search')?activeEl.selectionStart:null;
+    render();
+    const newEl=document.getElementById('pledger-search');
+    if(newEl){ newEl.focus(); if(cursorPos!==null) newEl.setSelectionRange(cursorPos,cursorPos); }
+  },200);
+}
+function renderPersonalLedger(c){
+  if(!DATA.personalTransactions.length){
+    c.innerHTML=`<div class="empty"><div style="font-size:28px">📒</div><div>Nenhuma transação pessoal importada ainda.</div></div>`;
+    return;
+  }
+  let filtered=DATA.personalTransactions;
+  if(PLEDGER_SEARCH.trim()){
+    const q=PLEDGER_SEARCH.trim().toLowerCase();
+    filtered=filtered.filter(t=>{
+      const acc=DATA.personalAccounts.find(a=>a.id===t.accountId);
+      const haystack=[t.originalDescription,t.userDescription,t.category,t.date,String(t.amount),acc?acc.name:''].join(' ').toLowerCase();
+      return haystack.includes(q);
+    });
+  }
+  const sorted=[...filtered].sort((a,b)=>new Date(b.date)-new Date(a.date));
+
+  let editBox='';
+  if(PEDIT_TX_ID){
+    const t=DATA.personalTransactions.find(t=>t.id===PEDIT_TX_ID);
+    if(t){
+      const acc=DATA.personalAccounts.find(a=>a.id===t.accountId);
+      editBox=`
+        <div class="form-card" style="border-color:var(--gold)">
+          <div style="font-size:11px;color:var(--dim);margin-bottom:4px">Editando · ${esc(acc?acc.name:'')} · ${esc(t.date)}</div>
+          <div style="font-family:'Syne',sans-serif;font-size:16px;font-weight:800;margin-bottom:6px;color:${t.amount>0?'var(--green)':'var(--red)'}">${t.amount>0?'+':''}$${Math.abs(t.amount).toLocaleString('en-US',{minimumFractionDigits:2})}</div>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:12px">${esc(t.originalDescription)}</div>
+          <div class="fl"><label>Categoria</label>
+            <select class="fi" id="pedit-cat-${t.id}">
+              ${PERSONAL_CATEGORIES.map(cat=>`<option value="${cat}" ${t.category===cat?'selected':''}>${cat}</option>`).join('')}
+            </select>
+          </div>
+          <div class="fl" style="margin-top:10px"><label>Observação (nota)</label><input class="fi" id="pedit-note-${t.id}" value="${esc(t.userDescription)}"></div>
+          <div style="margin-top:12px">
+            <button class="btn-gold" onclick="savePEditTx('${t.id}')">Salvar</button>
+            <button class="btn-ghost" style="margin-left:8px" onclick="cancelPEditTx()">Cancelar</button>
+          </div>
+        </div>
+      `;
+    }
+  }
+  const rows=sorted.map(t=>{
+    const acc=DATA.personalAccounts.find(a=>a.id===t.accountId);
+    const statusBadge=t.status==='REVIEWED'?'<span class="badge b-info">Reviewed</span>':t.status==='AI_SUGGESTED'?'<span class="badge b-pend">AI Suggested</span>':'<span class="badge" style="background:var(--bg-section);color:var(--dim);border:1px solid var(--border)">Unreviewed</span>';
+    return `<tr style="cursor:pointer" onclick="openPEditTx('${t.id}')" title="Clique para editar">
+      <td>${esc(t.date)}</td>
+      <td>${esc(acc?acc.name:'')}</td>
+      <td style="max-width:320px;white-space:normal">${esc(t.originalDescription)}${t.userDescription?`<div style="color:var(--dim);font-size:11px;margin-top:2px">📝 ${esc(t.userDescription)}</div>`:''}</td>
+      <td style="text-align:right;color:${t.amount>0?'var(--green)':'var(--red)'};font-variant-numeric:tabular-nums">${t.amount>0?'+':''}$${Math.abs(t.amount).toLocaleString('en-US',{minimumFractionDigits:2})}</td>
+      <td>${esc(t.category)||'<span class="dim">—</span>'}</td>
+      <td>${statusBadge}</td>
+    </tr>`;
+  }).join('');
+  document.getElementById('content').innerHTML=`
+    <div class="sec-hdr"><h2>Personal — Transações</h2><div class="sec-line"></div></div>
+    <div class="fl" style="max-width:420px;margin-bottom:14px">
+      <input class="fi" type="text" id="pledger-search" placeholder="🔎 Buscar por qualquer parte do texto" value="${esc(PLEDGER_SEARCH)}" oninput="handlePLedgerSearch(this.value)">
+    </div>
+    <div style="font-size:11px;color:var(--dim);margin:-8px 0 14px">${filtered.length} transação(ões) · clique em uma linha para editar</div>
+    ${editBox}
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Data</th><th>Conta</th><th>Descrição</th><th style="text-align:right">Valor</th><th>Categoria</th><th>Status</th></tr></thead>
+        <tbody>${rows}</tbody>
       </table>
     </div>
   `;
