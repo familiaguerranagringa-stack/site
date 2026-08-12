@@ -186,10 +186,12 @@ const DATA={
   rules:[],       // regras aprendidas (merchant normalizado -> categoria)
   personalAccounts:[],     // contas pessoais (banco/cartão/KAST/cash) — nunca misturado com Business
   personalTransactions:[], // transações pessoais importadas
-  personalRules:[]         // regras aprendidas pra classificação pessoal
+  personalRules:[],        // regras aprendidas pra classificação pessoal
+  monthlyChecklist:{}      // { 'YYYY-MM': { itemId: true/false } } — checklist de atualização mensal de extratos
 };
 
 function load(k){try{return JSON.parse(localStorage.getItem(k)||'[]')}catch(e){return []}}
+function loadObj(k){try{return JSON.parse(localStorage.getItem(k)||'{}')}catch(e){return {}}}
 function saveLocal(){
   localStorage.setItem('finusa_entities',JSON.stringify(DATA.entities));
   localStorage.setItem('finusa_accounts',JSON.stringify(DATA.accounts));
@@ -198,6 +200,7 @@ function saveLocal(){
   localStorage.setItem('finusa_personalAccounts',JSON.stringify(DATA.personalAccounts));
   localStorage.setItem('finusa_personalTransactions',JSON.stringify(DATA.personalTransactions));
   localStorage.setItem('finusa_personalRules',JSON.stringify(DATA.personalRules));
+  localStorage.setItem('finusa_monthlyChecklist',JSON.stringify(DATA.monthlyChecklist));
 }
 function saveAndSync(){
   saveLocal();
@@ -207,7 +210,7 @@ function pushToFB(){
   clearTimeout(_syncTimer);
   _syncTimer=setTimeout(()=>{
     setSyncStatus('⟳ Salvando...','var(--amber)');
-    _dbRef.set({entities:DATA.entities,accounts:DATA.accounts,transactions:DATA.transactions,rules:DATA.rules,personalAccounts:DATA.personalAccounts,personalTransactions:DATA.personalTransactions,personalRules:DATA.personalRules,_ts:Date.now()}).then(()=>{
+    _dbRef.set({entities:DATA.entities,accounts:DATA.accounts,transactions:DATA.transactions,rules:DATA.rules,personalAccounts:DATA.personalAccounts,personalTransactions:DATA.personalTransactions,personalRules:DATA.personalRules,monthlyChecklist:DATA.monthlyChecklist,_ts:Date.now()}).then(()=>{
       setSyncStatus('✓ Salvo','var(--green)');
       setTimeout(()=>setSyncStatus('• Online','var(--green)'),2000);
     }).catch(e=>{
@@ -348,6 +351,7 @@ function syncFromFB(){
       DATA.personalAccounts=rec.personalAccounts||[];
       DATA.personalTransactions=rec.personalTransactions||[];
       DATA.personalRules=rec.personalRules||[];
+      DATA.monthlyChecklist=rec.monthlyChecklist||{};
       saveLocal();
       setSyncStatus('✓ Sincronizado','var(--green)');
     } else {
@@ -358,6 +362,7 @@ function syncFromFB(){
       DATA.personalAccounts=load('finusa_personalAccounts');
       DATA.personalTransactions=load('finusa_personalTransactions');
       DATA.personalRules=load('finusa_personalRules');
+      DATA.monthlyChecklist=loadObj('finusa_monthlyChecklist');
       setSyncStatus('• Online (vazio)','var(--green)');
     }
     // RT Consulting Services — processo EB3 da Julyana, 18 pagamentos já concluídos. Correção pontual, sem regra automática permanente.
@@ -375,7 +380,7 @@ function syncFromFB(){
     let pRetro=false;
     DATA.personalTransactions.forEach(t=>{
       if(t.status==='UNREVIEWED' && !t.category){
-        const g=detectPersonalDistributionFromBusiness(t.originalDescription)||detectOutsideLoungePayroll(t.originalDescription);
+        const g=detectPersonalDistributionFromBusiness(t.originalDescription)||detectOutsideLoungePayroll(t.originalDescription)||detectChaseCreditCardPayment(t.originalDescription);
         if(g){ t.category=g.category; if(!t.userDescription) t.userDescription=g.userDescription; t.status='AI_SUGGESTED'; pRetro=true; }
       }
     });
@@ -863,6 +868,7 @@ function syncFromFB(){
     DATA.personalAccounts=load('finusa_personalAccounts');
     DATA.personalTransactions=load('finusa_personalTransactions');
     DATA.personalRules=load('finusa_personalRules');
+    DATA.monthlyChecklist=loadObj('finusa_monthlyChecklist');
     dedupeEntities();
     let gfe=DATA.entities.find(e=>(e.legalName||'').toUpperCase().includes('GUERRA FAMILY EMPIRE'));
     if(!gfe){
@@ -940,13 +946,59 @@ function render(){
 }
 
 // ── HOME ──
+// ── CHECKLIST MENSAL DE ATUALIZAÇÃO — reseta automaticamente todo mês ──
+function currentMonthKey(){
+  const d=new Date();
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+}
+function monthLabelPtBr(){
+  const meses=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  const d=new Date();
+  return meses[d.getMonth()]+'/'+d.getFullYear();
+}
+function checklistItems(){
+  const items=[];
+  DATA.accounts.forEach(a=>{
+    const ent=DATA.entities.find(e=>e.id===a.entityId);
+    items.push({id:'biz-'+a.id, label:(ent?ent.legalName:'(sem empresa)')+' — '+(a.name||'(sem nome)')});
+  });
+  DATA.personalAccounts.forEach(a=>{
+    items.push({id:'per-'+a.id, label:'Personal — '+(a.name||'(sem nome)')});
+  });
+  return items;
+}
+function toggleChecklistItem(itemId){
+  const mk=currentMonthKey();
+  if(!DATA.monthlyChecklist[mk]) DATA.monthlyChecklist[mk]={};
+  DATA.monthlyChecklist[mk][itemId]=!DATA.monthlyChecklist[mk][itemId];
+  saveAndSync();
+  render();
+}
+
 function renderHome(c){
   const nEnt=DATA.entities.length;
   const nAcc=DATA.accounts.length;
   const nTx=DATA.transactions.length;
   const nPending=needsAttentionCount();
   const maturities=upcomingMaturities(10);
+  const mk=currentMonthKey();
+  const checkState=DATA.monthlyChecklist[mk]||{};
+  const items=checklistItems();
+  const checkedCount=items.filter(i=>checkState[i.id]).length;
+  const allChecked=items.length>0 && checkedCount===items.length;
   c.innerHTML=`
+    ${items.length ? `
+    <div class="sec-hdr"><h2>📋 Checklist do Mês — ${monthLabelPtBr()}</h2><div class="sec-line"></div><div style="font-size:11px;color:var(--dim)">${checkedCount} de ${items.length} atualizados</div></div>
+    <div class="form-card" style="border-color:${allChecked?'var(--green)':'var(--amber)'};margin-bottom:24px">
+      ${!allChecked ? `<div style="font-size:12px;color:var(--amber);margin-bottom:12px">⚠️ Ainda falta atualizar o extrato de ${items.length-checkedCount} conta(s) este mês.</div>` : `<div style="font-size:12px;color:var(--green);margin-bottom:12px">✅ Tudo atualizado este mês!</div>`}
+      ${items.map(i=>`
+        <label style="display:flex;align-items:center;gap:10px;padding:7px 0;cursor:pointer;border-bottom:1px solid var(--border-lite)">
+          <input type="checkbox" ${checkState[i.id]?'checked':''} onchange="toggleChecklistItem('${i.id}')" style="width:16px;height:16px;cursor:pointer">
+          <span style="font-size:13px;${checkState[i.id]?'color:var(--dim);text-decoration:line-through':''}">${esc(i.label)}</span>
+        </label>
+      `).join('')}
+    </div>
+    ` : ''}
     ${maturities.length ? `
     <div class="sec-hdr"><h2>⚠️ Vencimentos Próximos</h2><div class="sec-line"></div></div>
     <div class="kpi-grid">
@@ -1245,6 +1297,17 @@ function handlePersonalImportFile(input){
 
 // ── DETECÇÃO AUTOMÁTICA: dinheiro recebido de qualquer uma das 4 empresas próprias = distribuição recebida ──
 // ── DETECÇÃO AUTOMÁTICA: Outside Lounge — salário W-2 recorrente do Leandro ──
+// ── DETECÇÃO AUTOMÁTICA: Chase Credit — pagamento do cartão de crédito pessoal Chase, nunca é despesa nova ──
+function detectChaseCreditCardPayment(desc){
+  const d=(desc||'').toUpperCase();
+  const compact=d.replace(/[^A-Z]/g,'');
+  if(!compact.includes('CHASECREDIT')) return null;
+  return {
+    category:'Financial > Transfer',
+    userDescription:'Pagamento do cartão de crédito Chase (pessoal). Não é despesa nova — as compras já estão registradas na fatura do próprio cartão.'
+  };
+}
+
 function detectOutsideLoungePayroll(desc){
   const d=(desc||'').toUpperCase();
   const compact=d.replace(/[^A-Z]/g,'');
@@ -1316,7 +1379,8 @@ function processPersonalImportRows(rows){
     const rule=findPersonalRule(p.description);
     const distGuess=!rule?detectPersonalDistributionFromBusiness(p.description):null;
     const payrollGuess=(!rule && !distGuess)?detectOutsideLoungePayroll(p.description):null;
-    const pGuess=distGuess||payrollGuess;
+    const chaseGuess=(!rule && !distGuess && !payrollGuess)?detectChaseCreditCardPayment(p.description):null;
+    const pGuess=distGuess||payrollGuess||chaseGuess;
     toAdd.push({
       id:uuid(), accountId:PIMP.accountId, date:p.date,
       originalDescription:p.description, userDescription:rule?'':(pGuess?pGuess.userDescription:''),
