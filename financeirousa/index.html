@@ -673,6 +673,15 @@ function syncFromFB(){
       }
     });
     if(bofaFix) saveAndSync();
+    // Cartão de crédito Bank of America da Guerra Family Empire LLC (terminação •2603)
+    if(gfe && !DATA.accounts.some(a=>a.entityId===gfe.id && (a.name||'').includes('2603'))){
+      DATA.accounts.push({
+        id:uuid(), entityId:gfe.id,
+        name:'Bank of America Credit Card •2603',
+        type:'Credit Card', currency:'USD'
+      });
+      saveAndSync();
+    }
     // Pagamento de fatura de cartão de crédito ($529,07, GFE) — nunca é despesa nova, é Transfer
     let txCC529=DATA.transactions.find(t=>(t.originalDescription||'').toUpperCase().includes('CREDIT CARD BILL PAYMENT') && Math.abs(Math.abs(t.amount)-529.07)<0.01);
     if(txCC529 && (!txCC529.category || txCC529.category==='CPA Review')){
