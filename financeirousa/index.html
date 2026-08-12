@@ -371,11 +371,11 @@ function syncFromFB(){
       }
     });
     if(rtFix) saveAndSync();
-    // Migração retroativa PESSOAL: aplica detecção de distribuição de empresa própria em transações já importadas
+    // Migração retroativa PESSOAL: aplica detecção de distribuição de empresa própria + salário Outside Lounge em transações já importadas
     let pRetro=false;
     DATA.personalTransactions.forEach(t=>{
       if(t.status==='UNREVIEWED' && !t.category){
-        const g=detectPersonalDistributionFromBusiness(t.originalDescription);
+        const g=detectPersonalDistributionFromBusiness(t.originalDescription)||detectOutsideLoungePayroll(t.originalDescription);
         if(g){ t.category=g.category; if(!t.userDescription) t.userDescription=g.userDescription; t.status='AI_SUGGESTED'; pRetro=true; }
       }
     });
@@ -1146,6 +1146,7 @@ const PERSONAL_ACC_TYPES=['Bank Account','Debit Card','Credit Card','KAST','Cash
 
 // Plano de contas pessoal, conforme definido no projeto original
 const PERSONAL_CATEGORIES=[
+  'Income > W-2 Salary','Income > Rental Income','Income > Investment Income','Income > Business Distribution','Income > Reimbursement','Income > Other Income',
   'Housing > Mortgage','Housing > Rent','Housing > HOA','Housing > Electricity','Housing > Water','Housing > Internet','Housing > Phone','Housing > Landscaping','Housing > Pool','Housing > Cleaning','Housing > Maintenance','Housing > Furniture','Housing > Home Improvement',
   'Food > Grocery','Food > Restaurant','Food > Delivery','Food > Coffee','Food > Snacks','Food > Drinks',
   'Vehicles > Financing','Vehicles > Insurance','Vehicles > Fuel','Vehicles > Maintenance','Vehicles > Car Wash','Vehicles > Toll','Vehicles > Parking','Vehicles > Accessories',
@@ -1243,6 +1244,17 @@ function handlePersonalImportFile(input){
 }
 
 // ── DETECÇÃO AUTOMÁTICA: dinheiro recebido de qualquer uma das 4 empresas próprias = distribuição recebida ──
+// ── DETECÇÃO AUTOMÁTICA: Outside Lounge — salário W-2 recorrente do Leandro ──
+function detectOutsideLoungePayroll(desc){
+  const d=(desc||'').toUpperCase();
+  const compact=d.replace(/[^A-Z]/g,'');
+  if(!compact.includes('OUTSIDELOUNGE')) return null;
+  return {
+    category:'Income > W-2 Salary',
+    userDescription:'Salário W-2 recorrente — Outside Lounge (payroll).'
+  };
+}
+
 function detectPersonalDistributionFromBusiness(desc){
   const d=(desc||'').toUpperCase();
   const empresa=GRUPO_EMPRESAS.find(nome=>d.includes(nome));
@@ -1303,12 +1315,14 @@ function processPersonalImportRows(rows){
     existing.add(key);
     const rule=findPersonalRule(p.description);
     const distGuess=!rule?detectPersonalDistributionFromBusiness(p.description):null;
+    const payrollGuess=(!rule && !distGuess)?detectOutsideLoungePayroll(p.description):null;
+    const pGuess=distGuess||payrollGuess;
     toAdd.push({
       id:uuid(), accountId:PIMP.accountId, date:p.date,
-      originalDescription:p.description, userDescription:rule?'':(distGuess?distGuess.userDescription:''),
+      originalDescription:p.description, userDescription:rule?'':(pGuess?pGuess.userDescription:''),
       amount:p.amount, balance:p.balance,
-      category:rule?rule.category:(distGuess?distGuess.category:''),
-      status:(rule||distGuess)?'AI_SUGGESTED':'UNREVIEWED'
+      category:rule?rule.category:(pGuess?pGuess.category:''),
+      status:(rule||pGuess)?'AI_SUGGESTED':'UNREVIEWED'
     });
     novas++;
   });
