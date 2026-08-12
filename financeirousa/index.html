@@ -647,6 +647,15 @@ function syncFromFB(){
       }
     });
     if(bofaFix) saveAndSync();
+    // Zelle $950 para WINNER CARPENTRY BUILDER LLC — espelho de vidro para a sala de jantar (residência pessoal), sem regra automática (pedido pontual do usuário)
+    let txWinner=DATA.transactions.find(t=>(t.originalDescription||'').includes('acxe6wt6u'));
+    if(txWinner && (!txWinner.category || txWinner.category==='')){
+      txWinner.category='Personal Expense Paid by Business';
+      txWinner.cpaCategory='Personal Expense Paid by Business — Home Furnishings/Decor (Personal Residence)';
+      txWinner.userDescription='Espelho de vidro para a sala de jantar da casa — vidraçaria/marcenaria (Winner Carpentry Builder LLC), residência pessoal (Familia Guerra Holding LLC).';
+      txWinner.status='REVIEWED';
+      saveAndSync();
+    }
     // Saque de $940 para cheque administrativo (LPT Realty — 50% do aluguel + taxa do banco), conforme explicado pelo usuário
     let tx940=DATA.transactions.find(t=>(t.originalDescription||'').includes('WITHDRWL 7968') && Math.abs(t.amount+940)<0.01);
     if(tx940 && !tx940.category){
