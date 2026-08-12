@@ -673,6 +673,15 @@ function syncFromFB(){
       }
     });
     if(bofaFix) saveAndSync();
+    // Pagamento de fatura de cartão de crédito ($529,07, GFE) — nunca é despesa nova, é Transfer
+    let txCC529=DATA.transactions.find(t=>(t.originalDescription||'').toUpperCase().includes('CREDIT CARD BILL PAYMENT') && Math.abs(Math.abs(t.amount)-529.07)<0.01);
+    if(txCC529 && (!txCC529.category || txCC529.category==='CPA Review')){
+      txCC529.category='Transfer';
+      txCC529.cpaCategory='Transfer — Credit Card Payment (see Credit Card statement for itemized expenses)';
+      txCC529.userDescription='Pagamento da fatura do cartão de crédito. Não é despesa nova — as compras já devem estar (ou serão) registradas individualmente na conta do próprio cartão de crédito.';
+      txCC529.status='REVIEWED';
+      saveAndSync();
+    }
     // Saída $2.400 (Familia Guerra Holding) — devolução de zelle recebido errado na conta errada
     let txDevol=DATA.transactions.find(t=>(t.originalDescription||'').includes('h6i9lxyd9'));
     if(txDevol && (!txDevol.category || txDevol.category==='')){
