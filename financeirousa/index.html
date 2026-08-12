@@ -681,6 +681,23 @@ function syncFromFB(){
       }
     });
     if(bofaFix) saveAndSync();
+    // Bruno Ferreira Martins (Prime Tuff Orlando) — instalação de grama sintética no quintal da casa (residência pessoal), 2 pagamentos pontuais, sem regra automática
+    let txGrama1=DATA.transactions.find(t=>(t.originalDescription||'').includes('cjv4cu06g'));
+    if(txGrama1 && (!txGrama1.category || txGrama1.category==='CPA Review')){
+      txGrama1.category='Personal Expense Paid by Business';
+      txGrama1.cpaCategory='Personal Expense Paid by Business — Landscaping/Yard Improvement (Personal Residence)';
+      txGrama1.userDescription='Instalação de grama sintética na parte de trás do quintal da casa (Prime Tuff Orlando, pago a Bruno Ferreira Martins). Residência pessoal, Familia Guerra Holding LLC.';
+      txGrama1.status='REVIEWED';
+      saveAndSync();
+    }
+    let txGrama2=DATA.transactions.find(t=>(t.originalDescription||'').includes('b0sturyg5'));
+    if(txGrama2 && (!txGrama2.category || txGrama2.category==='CPA Review')){
+      txGrama2.category='Personal Expense Paid by Business';
+      txGrama2.cpaCategory='Personal Expense Paid by Business — Landscaping/Yard Improvement (Personal Residence)';
+      txGrama2.userDescription='Instalação de grama sintética na parte de trás do quintal da casa (Prime Tuff Orlando, pago a Bruno Ferreira Martins) — 2ª parcela. Residência pessoal, Familia Guerra Holding LLC.';
+      txGrama2.status='REVIEWED';
+      saveAndSync();
+    }
     // Zelle $240 para SHINEHOME LLC — limpeza da empresa (Familia Guerra Investing), serviço pontual, sem regra automática
     let txShine=DATA.transactions.find(t=>(t.originalDescription||'').includes('oaa3kcxu5'));
     if(txShine && (!txShine.category || txShine.category==='CPA Review')){
