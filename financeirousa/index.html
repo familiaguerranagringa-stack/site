@@ -365,6 +365,14 @@ function syncFromFB(){
       DATA.monthlyChecklist=loadObj('finusa_monthlyChecklist');
       setSyncStatus('• Online (vazio)','var(--green)');
     }
+    // Cheque de $17.000 (BKOFAMERICA BC) — entrada do Jet Ski Seadoo GTX 325 Limited 2026. Correção pontual, sem regra automática.
+    let txJetski=DATA.personalTransactions.find(t=>Math.abs(Math.abs(t.amount)-17000)<0.01 && (t.originalDescription||'').toUpperCase().includes('BKOFAMERICA'));
+    if(txJetski && (!txJetski.category || txJetski.category==='CPA Review')){
+      txJetski.category='Vehicles > Financing';
+      txJetski.userDescription='Cashiers check — entrada do Jet Ski Seadoo GTX 325 Limited 2026.';
+      txJetski.status='REVIEWED';
+      saveAndSync();
+    }
     // RT Consulting Services — processo EB3 da Julyana, 18 pagamentos já concluídos. Correção pontual, sem regra automática permanente.
     let rtFix=false;
     DATA.personalTransactions.forEach(t=>{
