@@ -181,6 +181,12 @@
   </header>
 
   <div class="panel">
+    <p class="panel-title">Regiões para pesquisar (marca onde quer buscar na próxima varredura)</p>
+    <div id="regioes-selecao"></div>
+    <p style="font-size:12px; color:var(--text-muted); margin:12px 0 0;">Selecionado automaticamente ao marcar/desmarcar — não precisa salvar.</p>
+  </div>
+
+  <div class="panel">
     <p class="panel-title">Filtros</p>
     <div class="filters">
       <div class="field">
@@ -221,6 +227,47 @@
 const FIREBASE_DB_URL = 'https://scanner-imoveis-fg-default-rtdb.firebaseio.com';
 let TODOS = [];
 
+const TODAS_REGIOES_UI = [
+  { grupo: 'Norte da Flórida', cidades: ['Pensacola', 'Tallahassee', 'Panama City', 'Lake City', 'Gainesville'] },
+  { grupo: 'Central Florida', cidades: ['Ocala', 'Citrus Springs', 'Inverness', 'Kissimmee', 'Sanford', 'Winter Haven', 'Lakeland', 'Davenport', 'Clermont', 'Leesburg', 'The Villages', 'DeLand', 'Deltona', 'Daytona Beach', 'Titusville', 'Melbourne', 'Palm Bay', 'Cocoa'] },
+  { grupo: 'Tampa Bay', cidades: ['Tampa', 'Brandon', 'Riverview', 'St Petersburg', 'Clearwater', 'Spring Hill', 'New Port Richey', 'Zephyrhills', 'Bradenton', 'Sarasota', 'Venice', 'North Port', 'Port Charlotte', 'Punta Gorda'] },
+  { grupo: 'Sudoeste', cidades: ['Fort Myers', 'Cape Coral', 'Naples'] },
+  { grupo: 'Sudeste', cidades: ['West Palm Beach', 'Boca Raton', 'Port St Lucie', 'Fort Pierce', 'Stuart', 'Vero Beach', 'Hollywood', 'Fort Lauderdale', 'Pembroke Pines', 'Miami', 'Homestead', 'Key West'] },
+];
+const REGIOES_PADRAO_UI = ['Ocala', 'Citrus Springs', 'Lakeland', 'Davenport', 'Gainesville'];
+
+async function carregarRegioesSelecionadas() {
+  let selecionadas = REGIOES_PADRAO_UI;
+  try {
+    const res = await fetch(`${FIREBASE_DB_URL}/scanner_imoveis/config/regioes_ativas.json`);
+    const salvas = await res.json();
+    if (salvas && Array.isArray(salvas) && salvas.length > 0) selecionadas = salvas;
+  } catch {}
+
+  const container = document.getElementById('regioes-selecao');
+  container.innerHTML = TODAS_REGIOES_UI.map(grupo => `
+    <div style="margin-bottom:14px;">
+      <p style="font-size:12px; color:var(--text-muted); margin:0 0 8px; text-transform:uppercase; letter-spacing:0.04em;">${grupo.grupo}</p>
+      <div class="regioes-check">
+        ${grupo.cidades.map(c => `
+          <label><input type="checkbox" value="${c}" class="regiao-scan-chk" ${selecionadas.includes(c) ? 'checked' : ''}> ${c}</label>
+        `).join('')}
+      </div>
+    </div>
+  `).join('');
+
+  container.querySelectorAll('.regiao-scan-chk').forEach(el => el.addEventListener('change', salvarRegioesSelecionadas));
+}
+
+async function salvarRegioesSelecionadas() {
+  const marcadas = [...document.querySelectorAll('.regiao-scan-chk:checked')].map(el => el.value);
+  await fetch(`${FIREBASE_DB_URL}/scanner_imoveis/config/regioes_ativas.json`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(marcadas),
+  });
+}
+
 async function checarSenha() {
   const usuario = document.getElementById('login-input').value;
   const tentativa = document.getElementById('senha-input').value;
@@ -235,6 +282,7 @@ async function checarSenha() {
       sessionStorage.setItem('scanner_desbloqueado', '1');
       document.getElementById('lock-screen').style.display = 'none';
       document.getElementById('conteudo').style.display = 'block';
+      carregarRegioesSelecionadas();
       carregar();
     } else {
       document.getElementById('senha-erro').style.display = 'block';
@@ -349,6 +397,7 @@ async function carregar() {
 if (sessionStorage.getItem('scanner_desbloqueado') === '1') {
   document.getElementById('lock-screen').style.display = 'none';
   document.getElementById('conteudo').style.display = 'block';
+  carregarRegioesSelecionadas();
   carregar();
 }
 </script>
