@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scanner de Imóveis · Família Guerra</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@500;700;800&family=DM+Sans:wght@400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #12160f;
+    --surface: #1a2016;
+    --surface-2: #212a1c;
+    --border: #2c3626;
+    --gold: #c9a24a;
+    --gold-soft: #e2c77e;
+    --text: #eee9db;
+    --text-muted: #9aa38e;
+    --green: #7fae6a;
+    --amber: #d1a24a;
+    --red: #c17454;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+  }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 40px 24px 80px; }
+
+  header { margin-bottom: 36px; }
+  .eyebrow {
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--gold-soft);
+    margin: 0 0 10px;
+  }
+  h1 {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: clamp(28px, 4vw, 42px);
+    margin: 0 0 8px;
+    letter-spacing: -0.01em;
+  }
+  .subtitle { color: var(--text-muted); font-size: 15px; margin: 0; }
+  .last-updated { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--text-muted); margin-top: 14px; }
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 22px 24px;
+    margin-bottom: 28px;
+  }
+  .panel-title {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--gold-soft);
+    margin: 0 0 16px;
+  }
+  .filters {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 16px;
+  }
+  .field label {
+    display: block;
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+  }
+  .field input, .field select {
+    width: 100%;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 9px 10px;
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+  }
+  .field input:focus, .field select:focus { outline: 1px solid var(--gold); border-color: var(--gold); }
+  .regioes-check {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .regioes-check label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 6px 12px;
+    font-size: 13px;
+    cursor: pointer;
+    color: var(--text-muted);
+  }
+  .regioes-check input { accent-color: var(--gold); }
+  .regioes-check label:has(input:checked) { color: var(--gold-soft); border-color: var(--gold); }
+
+  .summary-row {
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+  .summary-row b { color: var(--gold-soft); font-weight: 500; }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px 20px;
+    margin-bottom: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .card .addr { font-size: 15px; margin: 0 0 4px; }
+  .card .meta { font-size: 13px; color: var(--text-muted); margin: 0; font-family: 'DM Mono', monospace; }
+  .card .metrics { text-align: right; }
+  .card .yield-pct { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 20px; margin: 0; }
+  .badge {
+    display: inline-block;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    margin-top: 4px;
+  }
+  .badge.excelente { background: rgba(127,174,106,0.15); color: var(--green); }
+  .badge.meta { background: rgba(209,162,74,0.15); color: var(--amber); }
+  .badge.perto { background: rgba(154,163,142,0.15); color: var(--text-muted); }
+  .badge.abaixo { background: rgba(193,116,84,0.12); color: var(--red); }
+
+  .empty {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text-muted);
+    font-size: 14px;
+  }
+
+  footer { margin-top: 40px; font-size: 12px; color: var(--text-muted); text-align: center; }
+</style>
+</head>
+<body>
+
+<div id="lock-screen" style="min-height:100vh; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:16px;">
+  <p class="eyebrow">Família Guerra — Financeiro USA</p>
+  <h1 style="margin:0;">Scanner de Oportunidades</h1>
+  <input type="password" id="senha-input" placeholder="Senha" style="background:var(--surface-2); border:1px solid var(--border); border-radius:8px; padding:12px 16px; color:var(--text); font-family:'DM Sans',sans-serif; font-size:15px; width:240px; text-align:center;">
+  <button id="senha-btn" style="background:var(--gold); color:#1a1200; font-family:'Syne',sans-serif; font-weight:700; font-size:13px; padding:10px 24px; border:none; border-radius:8px; cursor:pointer;">Entrar</button>
+  <p id="senha-erro" style="color:var(--red); font-size:13px; display:none;">Senha incorreta.</p>
+</div>
+
+<div class="wrap" id="conteudo" style="display:none;">
+  <header>
+    <p class="eyebrow">Família Guerra — Financeiro USA</p>
+    <h1>Scanner de Oportunidades</h1>
+    <p class="subtitle">Varredura automática de imóveis para investimento em renda no raio de Orlando.</p>
+    <p class="last-updated" id="last-updated">Carregando última varredura…</p>
+    <a href="https://github.com/familiaguerranagringa-stack/financeiro-usa-scanner/actions/workflows/scan.yml" target="_blank" rel="noopener"
+       style="display:inline-block; margin-top:14px; background:var(--gold); color:#1a1200; font-family:'Syne',sans-serif; font-weight:700; font-size:13px; padding:10px 18px; border-radius:8px; text-decoration:none;">
+      ▶ Rodar nova varredura agora
+    </a>
+  </header>
+
+  <div class="panel">
+    <p class="panel-title">Filtros</p>
+    <div class="filters">
+      <div class="field">
+        <label for="preco-min">Preço mínimo</label>
+        <input type="number" id="preco-min" placeholder="$0" step="1000">
+      </div>
+      <div class="field">
+        <label for="preco-max">Preço máximo</label>
+        <input type="number" id="preco-max" placeholder="Sem limite" step="1000">
+      </div>
+      <div class="field">
+        <label for="yield-min">Rendimento mínimo (%/mês)</label>
+        <input type="number" id="yield-min" placeholder="0" step="0.05">
+      </div>
+      <div class="field">
+        <label for="ordenar">Ordenar por</label>
+        <select id="ordenar">
+          <option value="yield-desc">Melhor rendimento primeiro</option>
+          <option value="preco-asc">Menor preço primeiro</option>
+          <option value="preco-desc">Maior preço primeiro</option>
+          <option value="fluxo-desc">Maior fluxo de caixa/mês</option>
+        </select>
+      </div>
+    </div>
+    <div class="field" style="margin-top:16px;">
+      <label>Regiões</label>
+      <div class="regioes-check" id="regioes-container"></div>
+    </div>
+  </div>
+
+  <div class="summary-row" id="summary-row"></div>
+  <div id="results"></div>
+
+  <footer>Dados via RentCast API · Atualizado manualmente pelo botão acima</footer>
+</div>
+
+<script>
+const FIREBASE_DB_URL = 'https://scanner-imoveis-fg-default-rtdb.firebaseio.com';
+let TODOS = [];
+
+async function checarSenha() {
+  const tentativa = document.getElementById('senha-input').value;
+  try {
+    const res = await fetch(`${FIREBASE_DB_URL}/scanner_imoveis/config/senha.json`);
+    const senhaCorreta = await res.json();
+    const senhaEsperada = senhaCorreta || 'guerra2026';
+    if (tentativa === senhaEsperada) {
+      sessionStorage.setItem('scanner_desbloqueado', '1');
+      document.getElementById('lock-screen').style.display = 'none';
+      document.getElementById('conteudo').style.display = 'block';
+      carregar();
+    } else {
+      document.getElementById('senha-erro').style.display = 'block';
+    }
+  } catch {
+    document.getElementById('senha-erro').textContent = 'Erro ao verificar senha.';
+    document.getElementById('senha-erro').style.display = 'block';
+  }
+}
+
+document.getElementById('senha-btn').addEventListener('click', checarSenha);
+document.getElementById('senha-input').addEventListener('keydown', e => { if (e.key === 'Enter') checarSenha(); });
+
+function classeBadge(classificacao) {
+  if (classificacao === 'Excelente') return 'excelente';
+  if (classificacao === 'Dentro da meta') return 'meta';
+  if (classificacao === 'Perto da meta') return 'perto';
+  return 'abaixo';
+}
+
+function popularRegioes(oportunidades) {
+  const regioes = [...new Set(oportunidades.map(o => o.condado))].sort();
+  const container = document.getElementById('regioes-container');
+  container.innerHTML = regioes.map(r => `
+    <label><input type="checkbox" value="${r}" checked class="regiao-chk"> ${r}</label>
+  `).join('');
+  container.querySelectorAll('.regiao-chk').forEach(el => el.addEventListener('change', renderizar));
+}
+
+function renderizar() {
+  const precoMin = parseFloat(document.getElementById('preco-min').value) || 0;
+  const precoMax = parseFloat(document.getElementById('preco-max').value) || Infinity;
+  const yieldMin = parseFloat(document.getElementById('yield-min').value) || 0;
+  const ordenar = document.getElementById('ordenar').value;
+  const regioesAtivas = [...document.querySelectorAll('.regiao-chk:checked')].map(el => el.value);
+
+  let filtrados = TODOS.filter(o =>
+    o.preco >= precoMin &&
+    o.preco <= precoMax &&
+    parseFloat(o.yieldMensalPct) >= yieldMin &&
+    regioesAtivas.includes(o.condado)
+  );
+
+  const ordenadores = {
+    'yield-desc': (a, b) => parseFloat(b.yieldMensalPct) - parseFloat(a.yieldMensalPct),
+    'preco-asc': (a, b) => a.preco - b.preco,
+    'preco-desc': (a, b) => b.preco - a.preco,
+    'fluxo-desc': (a, b) => b.fluxoCaixaMensal - a.fluxoCaixaMensal,
+  };
+  filtrados.sort(ordenadores[ordenar]);
+
+  const resultsEl = document.getElementById('results');
+  const summaryEl = document.getElementById('summary-row');
+
+  if (filtrados.length === 0) {
+    summaryEl.innerHTML = '';
+    resultsEl.innerHTML = '<div class="empty">Nenhum imóvel bate com esses filtros ainda. Ajuste os critérios ou aguarde a próxima varredura.</div>';
+    return;
+  }
+
+  const excelentes = filtrados.filter(o => o.classificacao === 'Excelente').length;
+  summaryEl.innerHTML = `<span><b>${filtrados.length}</b> imóveis encontrados</span><span><b>${excelentes}</b> classificados como Excelente</span>`;
+
+  resultsEl.innerHTML = filtrados.map(o => `
+    <div class="card">
+      <div>
+        <p class="addr">${o.endereco}</p>
+        <p class="meta">$${o.preco.toLocaleString('en-US')} · aluguel est. $${o.aluguelEstimado.toLocaleString('en-US')}/mês · ${o.condado}</p>
+        <p class="meta" style="margin-top:2px; color:var(--gold-soft);">${o.tamanhoSqft ? o.tamanhoSqft.toLocaleString('en-US') + ' sqft' : 'Tamanho não informado'}${o.quartos ? ' · ' + o.quartos + ' qts' : ''}${o.banheiros ? ' · ' + o.banheiros + ' banh' : ''}</p>
+        <p class="meta" style="margin-top:6px;">
+          <a href="${o.linkZillow}" target="_blank" rel="noopener" style="color:var(--gold-soft); text-decoration:none;">Ver no Zillow →</a>
+          ${o.url ? `&nbsp;&nbsp;<a href="${o.url}" target="_blank" rel="noopener" style="color:var(--text-muted); text-decoration:none;">Anúncio original →</a>` : ''}
+        </p>
+      </div>
+      <div class="metrics">
+        <p class="yield-pct">${o.yieldMensalPct}%/mês</p>
+        <span class="badge ${classeBadge(o.classificacao)}">${o.classificacao}</span>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function carregar() {
+  try {
+    const res = await fetch(`${FIREBASE_DB_URL}/scanner_imoveis/ultima_varredura.json`);
+    const data = await res.json();
+    if (!data || !data.oportunidades) {
+      document.getElementById('last-updated').textContent = 'Nenhuma varredura registrada ainda.';
+      document.getElementById('results').innerHTML = '<div class="empty">O scanner ainda não rodou nenhuma vez, ou os dados ainda não chegaram aqui.</div>';
+      return;
+    }
+    TODOS = data.oportunidades;
+    const dt = new Date(data.executado_em);
+    document.getElementById('last-updated').textContent = 'Última varredura: ' + dt.toLocaleString('pt-BR', { dateStyle: 'long', timeStyle: 'short' });
+    popularRegioes(TODOS);
+    renderizar();
+  } catch (err) {
+    document.getElementById('last-updated').textContent = 'Erro ao carregar dados.';
+    console.error(err);
+  }
+}
+
+['preco-min', 'preco-max', 'yield-min', 'ordenar'].forEach(id => {
+  document.getElementById(id).addEventListener('input', renderizar);
+  document.getElementById(id).addEventListener('change', renderizar);
+});
+
+if (sessionStorage.getItem('scanner_desbloqueado') === '1') {
+  document.getElementById('lock-screen').style.display = 'none';
+  document.getElementById('conteudo').style.display = 'block';
+  carregar();
+}
+</script>
+</body>
+</html>
