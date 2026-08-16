@@ -181,12 +181,18 @@
   </header>
 
   <div class="panel">
-    <button id="regioes-toggle" style="width:100%; display:flex; justify-content:space-between; align-items:center; background:none; border:none; padding:0; cursor:pointer; color:var(--text);">
-      <p class="panel-title" style="margin:0;">Regiões para pesquisar <span id="regioes-contagem" style="color:var(--text-muted); font-weight:400; text-transform:none; letter-spacing:normal;"></span></p>
-      <span id="regioes-seta" style="font-family:'Syne',sans-serif; color:var(--gold-soft); font-size:16px; transition:transform 0.2s;">▾</span>
-    </button>
-    <div id="regioes-selecao" style="max-height:0; overflow:hidden; transition:max-height 0.25s ease;"></div>
-    <p id="regioes-dica" style="font-size:12px; color:var(--text-muted); margin:0; display:none;">Marca/desmarca — salva sozinho, sem precisar de botão.</p>
+    <p class="panel-title">Área de busca</p>
+    <div class="field" style="max-width:280px;">
+      <label for="raio-select">Raio a partir de Windermere</label>
+      <select id="raio-select">
+        <option value="25">25 milhas (~40 km)</option>
+        <option value="60">60 milhas (~1h de carro)</option>
+        <option value="100">100 milhas (~1h40 de carro)</option>
+        <option value="150">150 milhas (~2h30 de carro)</option>
+        <option value="220">220 milhas (Flórida inteira)</option>
+      </select>
+    </div>
+    <p style="font-size:12px; color:var(--text-muted); margin:10px 0 0;">Busca tudo dentro do raio, sem depender de lista de cidades — inclui Windermere e qualquer outro lugar dentro da área.</p>
   </div>
 
   <div class="panel">
@@ -230,73 +236,23 @@
 const FIREBASE_DB_URL = 'https://scanner-imoveis-fg-default-rtdb.firebaseio.com';
 let TODOS = [];
 
-const TODAS_REGIOES_UI = [
-  { grupo: 'Norte da Flórida', cidades: ['Pensacola', 'Tallahassee', 'Panama City', 'Lake City', 'Gainesville'] },
-  { grupo: 'Central Florida', cidades: ['Ocala', 'Citrus Springs', 'Inverness', 'Kissimmee', 'Sanford', 'Winter Haven', 'Lakeland', 'Davenport', 'Clermont', 'Leesburg', 'The Villages', 'DeLand', 'Deltona', 'Daytona Beach', 'Titusville', 'Melbourne', 'Palm Bay', 'Cocoa'] },
-  { grupo: 'Tampa Bay', cidades: ['Tampa', 'Brandon', 'Riverview', 'St Petersburg', 'Clearwater', 'Spring Hill', 'New Port Richey', 'Zephyrhills', 'Bradenton', 'Sarasota', 'Venice', 'North Port', 'Port Charlotte', 'Punta Gorda'] },
-  { grupo: 'Sudoeste', cidades: ['Fort Myers', 'Cape Coral', 'Naples'] },
-  { grupo: 'Sudeste', cidades: ['West Palm Beach', 'Boca Raton', 'Port St Lucie', 'Fort Pierce', 'Stuart', 'Vero Beach', 'Hollywood', 'Fort Lauderdale', 'Pembroke Pines', 'Miami', 'Homestead', 'Key West'] },
-];
-const REGIOES_PADRAO_UI = ['Ocala', 'Citrus Springs', 'Lakeland', 'Davenport', 'Gainesville'];
-
-async function carregarRegioesSelecionadas() {
-  let selecionadas = REGIOES_PADRAO_UI;
+async function carregarRaioSelecionado() {
+  let raioAtual = '60';
   try {
-    const res = await fetch(`${FIREBASE_DB_URL}/scanner_imoveis/config/regioes_ativas.json`);
-    const salvas = await res.json();
-    if (salvas && Array.isArray(salvas) && salvas.length > 0) selecionadas = salvas;
+    const res = await fetch(`${FIREBASE_DB_URL}/scanner_imoveis/config/raio_milhas.json`);
+    const salvo = await res.json();
+    if (salvo && salvo > 0) raioAtual = String(salvo);
   } catch {}
-
-  const container = document.getElementById('regioes-selecao');
-  container.innerHTML = `<div style="padding-top:14px;">` + TODAS_REGIOES_UI.map(grupo => `
-    <div style="margin-bottom:14px;">
-      <p style="font-size:12px; color:var(--text-muted); margin:0 0 8px; text-transform:uppercase; letter-spacing:0.04em;">${grupo.grupo}</p>
-      <div class="regioes-check">
-        ${grupo.cidades.map(c => `
-          <label><input type="checkbox" value="${c}" class="regiao-scan-chk" ${selecionadas.includes(c) ? 'checked' : ''}> ${c}</label>
-        `).join('')}
-      </div>
-    </div>
-  `).join('') + `</div>`;
-
-  container.querySelectorAll('.regiao-scan-chk').forEach(el => el.addEventListener('change', () => {
-    salvarRegioesSelecionadas();
-    atualizarContagemRegioes();
-  }));
-
-  atualizarContagemRegioes();
+  document.getElementById('raio-select').value = raioAtual;
 }
 
-function atualizarContagemRegioes() {
-  const n = document.querySelectorAll('.regiao-scan-chk:checked').length;
-  document.getElementById('regioes-contagem').textContent = `(${n} selecionada${n === 1 ? '' : 's'})`;
-}
-
-let regioesAbertas = false;
-document.getElementById('regioes-toggle').addEventListener('click', () => {
-  regioesAbertas = !regioesAbertas;
-  const painel = document.getElementById('regioes-selecao');
-  const seta = document.getElementById('regioes-seta');
-  const dica = document.getElementById('regioes-dica');
-  if (regioesAbertas) {
-    painel.style.maxHeight = painel.scrollHeight + 'px';
-    seta.style.transform = 'rotate(180deg)';
-    dica.style.display = 'block';
-  } else {
-    painel.style.maxHeight = '0';
-    seta.style.transform = 'rotate(0deg)';
-    dica.style.display = 'none';
-  }
-});
-
-async function salvarRegioesSelecionadas() {
-  const marcadas = [...document.querySelectorAll('.regiao-scan-chk:checked')].map(el => el.value);
-  await fetch(`${FIREBASE_DB_URL}/scanner_imoveis/config/regioes_ativas.json`, {
+document.getElementById('raio-select').addEventListener('change', async (e) => {
+  await fetch(`${FIREBASE_DB_URL}/scanner_imoveis/config/raio_milhas.json`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(marcadas),
+    body: JSON.stringify(Number(e.target.value)),
   });
-}
+});
 
 async function checarSenha() {
   const usuario = document.getElementById('login-input').value;
@@ -312,7 +268,7 @@ async function checarSenha() {
       sessionStorage.setItem('scanner_desbloqueado', '1');
       document.getElementById('lock-screen').style.display = 'none';
       document.getElementById('conteudo').style.display = 'block';
-      carregarRegioesSelecionadas();
+      carregarRaioSelecionado();
       carregar();
     } else {
       document.getElementById('senha-erro').style.display = 'block';
@@ -427,7 +383,7 @@ async function carregar() {
 if (sessionStorage.getItem('scanner_desbloqueado') === '1') {
   document.getElementById('lock-screen').style.display = 'none';
   document.getElementById('conteudo').style.display = 'block';
-  carregarRegioesSelecionadas();
+  carregarRaioSelecionado();
   carregar();
 }
 </script>
