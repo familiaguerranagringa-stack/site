@@ -162,6 +162,7 @@
 <div id="lock-screen" style="min-height:100vh; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:16px;">
   <p class="eyebrow">Família Guerra — Financeiro USA</p>
   <h1 style="margin:0;">Scanner de Oportunidades</h1>
+  <input type="text" id="login-input" placeholder="Usuário" style="background:var(--surface-2); border:1px solid var(--border); border-radius:8px; padding:12px 16px; color:var(--text); font-family:'DM Sans',sans-serif; font-size:15px; width:240px; text-align:center;">
   <input type="password" id="senha-input" placeholder="Senha" style="background:var(--surface-2); border:1px solid var(--border); border-radius:8px; padding:12px 16px; color:var(--text); font-family:'DM Sans',sans-serif; font-size:15px; width:240px; text-align:center;">
   <button id="senha-btn" style="background:var(--gold); color:#1a1200; font-family:'Syne',sans-serif; font-weight:700; font-size:13px; padding:10px 24px; border:none; border-radius:8px; cursor:pointer;">Entrar</button>
   <p id="senha-erro" style="color:var(--red); font-size:13px; display:none;">Senha incorreta.</p>
@@ -221,12 +222,16 @@ const FIREBASE_DB_URL = 'https://scanner-imoveis-fg-default-rtdb.firebaseio.com'
 let TODOS = [];
 
 async function checarSenha() {
+  const usuario = document.getElementById('login-input').value;
   const tentativa = document.getElementById('senha-input').value;
   try {
-    const res = await fetch(`${FIREBASE_DB_URL}/scanner_imoveis/config/senha.json`);
-    const senhaCorreta = await res.json();
-    const senhaEsperada = senhaCorreta || 'guerra2026';
-    if (tentativa === senhaEsperada) {
+    const [resLogin, resSenha] = await Promise.all([
+      fetch(`${FIREBASE_DB_URL}/scanner_imoveis/config/login.json`),
+      fetch(`${FIREBASE_DB_URL}/scanner_imoveis/config/senha.json`),
+    ]);
+    const loginCorreto = (await resLogin.json()) || 'Guerra';
+    const senhaCorreta = (await resSenha.json()) || 'Resiliencia2023@';
+    if (usuario === loginCorreto && tentativa === senhaCorreta) {
       sessionStorage.setItem('scanner_desbloqueado', '1');
       document.getElementById('lock-screen').style.display = 'none';
       document.getElementById('conteudo').style.display = 'block';
@@ -235,13 +240,14 @@ async function checarSenha() {
       document.getElementById('senha-erro').style.display = 'block';
     }
   } catch {
-    document.getElementById('senha-erro').textContent = 'Erro ao verificar senha.';
+    document.getElementById('senha-erro').textContent = 'Erro ao verificar login.';
     document.getElementById('senha-erro').style.display = 'block';
   }
 }
 
 document.getElementById('senha-btn').addEventListener('click', checarSenha);
 document.getElementById('senha-input').addEventListener('keydown', e => { if (e.key === 'Enter') checarSenha(); });
+document.getElementById('login-input').addEventListener('keydown', e => { if (e.key === 'Enter') checarSenha(); });
 
 function classeBadge(classificacao) {
   if (classificacao === 'Excelente') return 'excelente';
