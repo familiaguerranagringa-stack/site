@@ -299,14 +299,16 @@ function renderizar() {
   const excelentes = filtrados.filter(o => o.classificacao === 'Excelente').length;
   summaryEl.innerHTML = `<span><b>${filtrados.length}</b> imóveis encontrados</span><span><b>${excelentes}</b> classificados como Excelente</span>`;
 
-  resultsEl.innerHTML = filtrados.map(o => `
+  resultsEl.innerHTML = filtrados.map(o => {
+    const linkZillow = o.linkZillow || `https://www.zillow.com/homes/${encodeURIComponent(o.endereco)}_rb/`;
+    return `
     <div class="card">
       <div>
         <p class="addr">${o.endereco}</p>
         <p class="meta">$${o.preco.toLocaleString('en-US')} · aluguel est. $${o.aluguelEstimado.toLocaleString('en-US')}/mês · ${o.condado}</p>
         <p class="meta" style="margin-top:2px; color:var(--gold-soft);">${o.tamanhoSqft ? o.tamanhoSqft.toLocaleString('en-US') + ' sqft' : 'Tamanho não informado'}${o.quartos ? ' · ' + o.quartos + ' qts' : ''}${o.banheiros ? ' · ' + o.banheiros + ' banh' : ''}</p>
         <p class="meta" style="margin-top:6px;">
-          <a href="${o.linkZillow}" target="_blank" rel="noopener" style="color:var(--gold-soft); text-decoration:none;">Ver no Zillow →</a>
+          <a href="${linkZillow}" target="_blank" rel="noopener" style="color:var(--gold-soft); text-decoration:none;">Ver no Zillow →</a>
           ${o.url ? `&nbsp;&nbsp;<a href="${o.url}" target="_blank" rel="noopener" style="color:var(--text-muted); text-decoration:none;">Anúncio original →</a>` : ''}
         </p>
       </div>
@@ -315,7 +317,8 @@ function renderizar() {
         <span class="badge ${classeBadge(o.classificacao)}">${o.classificacao}</span>
       </div>
     </div>
-  `).join('');
+  `;
+  }).join('');
 }
 
 async function carregar() {
