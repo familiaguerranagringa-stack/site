@@ -181,9 +181,12 @@
   </header>
 
   <div class="panel">
-    <p class="panel-title">Regiões para pesquisar (marca onde quer buscar na próxima varredura)</p>
-    <div id="regioes-selecao"></div>
-    <p style="font-size:12px; color:var(--text-muted); margin:12px 0 0;">Selecionado automaticamente ao marcar/desmarcar — não precisa salvar.</p>
+    <button id="regioes-toggle" style="width:100%; display:flex; justify-content:space-between; align-items:center; background:none; border:none; padding:0; cursor:pointer; color:var(--text);">
+      <p class="panel-title" style="margin:0;">Regiões para pesquisar <span id="regioes-contagem" style="color:var(--text-muted); font-weight:400; text-transform:none; letter-spacing:normal;"></span></p>
+      <span id="regioes-seta" style="font-family:'Syne',sans-serif; color:var(--gold-soft); font-size:16px; transition:transform 0.2s;">▾</span>
+    </button>
+    <div id="regioes-selecao" style="max-height:0; overflow:hidden; transition:max-height 0.25s ease;"></div>
+    <p id="regioes-dica" style="font-size:12px; color:var(--text-muted); margin:0; display:none;">Marca/desmarca — salva sozinho, sem precisar de botão.</p>
   </div>
 
   <div class="panel">
@@ -245,7 +248,7 @@ async function carregarRegioesSelecionadas() {
   } catch {}
 
   const container = document.getElementById('regioes-selecao');
-  container.innerHTML = TODAS_REGIOES_UI.map(grupo => `
+  container.innerHTML = `<div style="padding-top:14px;">` + TODAS_REGIOES_UI.map(grupo => `
     <div style="margin-bottom:14px;">
       <p style="font-size:12px; color:var(--text-muted); margin:0 0 8px; text-transform:uppercase; letter-spacing:0.04em;">${grupo.grupo}</p>
       <div class="regioes-check">
@@ -254,10 +257,37 @@ async function carregarRegioesSelecionadas() {
         `).join('')}
       </div>
     </div>
-  `).join('');
+  `).join('') + `</div>`;
 
-  container.querySelectorAll('.regiao-scan-chk').forEach(el => el.addEventListener('change', salvarRegioesSelecionadas));
+  container.querySelectorAll('.regiao-scan-chk').forEach(el => el.addEventListener('change', () => {
+    salvarRegioesSelecionadas();
+    atualizarContagemRegioes();
+  }));
+
+  atualizarContagemRegioes();
 }
+
+function atualizarContagemRegioes() {
+  const n = document.querySelectorAll('.regiao-scan-chk:checked').length;
+  document.getElementById('regioes-contagem').textContent = `(${n} selecionada${n === 1 ? '' : 's'})`;
+}
+
+let regioesAbertas = false;
+document.getElementById('regioes-toggle').addEventListener('click', () => {
+  regioesAbertas = !regioesAbertas;
+  const painel = document.getElementById('regioes-selecao');
+  const seta = document.getElementById('regioes-seta');
+  const dica = document.getElementById('regioes-dica');
+  if (regioesAbertas) {
+    painel.style.maxHeight = painel.scrollHeight + 'px';
+    seta.style.transform = 'rotate(180deg)';
+    dica.style.display = 'block';
+  } else {
+    painel.style.maxHeight = '0';
+    seta.style.transform = 'rotate(0deg)';
+    dica.style.display = 'none';
+  }
+});
 
 async function salvarRegioesSelecionadas() {
   const marcadas = [...document.querySelectorAll('.regiao-scan-chk:checked')].map(el => el.value);
