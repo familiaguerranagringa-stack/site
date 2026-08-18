@@ -2364,7 +2364,7 @@ function delItemPessoal(tipo,id){
 }
 
 // ── CONTAS (Pessoal) ──
-const TIPOS_CONTA_PESSOAL=['IPTU','Água','Condomínio','Luz','Internet','Manutenção','Mesada','Telefone','Cartão','Transporte','Consórcio','Outros'];
+const TIPOS_CONTA_PESSOAL=['Aluguel','IPTU','Água','Condomínio','Luz','Internet','Manutenção','Mesada','Telefone','Cartão','Transporte','Consórcio','Outros'];
 function renderContasPessoal(){
   const modulos=montarModulosPessoal();
   const lst=load(ppkPeriodo('contas'));
@@ -2382,7 +2382,7 @@ function renderContasPessoal(){
         <tbody>
           ${linhas.length?linhas.map(r=>`<tr><td>${r.desc}</td><td class="neg">${fmt(r.valor)}</td><td class="data-cel">${r.vencimento?formatarDataBR(r.vencimento):'—'}</td><td class="data-cel">${r.dataPagamento?formatarDataBR(r.dataPagamento):'—'}</td><td>${r.forma||'—'}</td><td>${statusBadge({status:r.status,envio:r.vencimento})}</td><td class="dim" title="${(r.obs||'').replace(/"/g,'&quot;')}" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.obs||'—'}</td><td>${comprovanteChipRotulo(r.boleto,'📄 BOLETO')}</td><td>${comprovanteChipRotulo(r.comprovantePagamento,'🧾 COMPROV. 1')}</td><td>${comprovanteChipRotulo(r.comprovantePagamento2,'🧾 COMPROV. 2')}</td><td style="white-space:nowrap">${r.status!=='pago'?`<button class="btn-sm btn-ok" onclick="marcarContaPessoalPaga('${r.id}')" title="marcar pago">✓</button> `:''}<button class="btn-sm btn-ok" onclick="abrirEdicaoContaPessoal('${r.id}')">editar</button> <button class="btn-sm" onclick="delItemPessoal('contas','${r.id}')">excluir</button></td></tr>`).join(''):`<tr><td colspan="11"><div class="empty">Nenhuma conta lançada neste mês para este bloco.</div></td></tr>`}
         </tbody>
-        ${linhas.length?`<tfoot><tr class="tfoot"><td>Subtotal — ${mod.titulo}</td><td class="neg">${fmt(subtotal)}</td><td colspan="9"></td></tr></tfoot>`:''}
+        ${linhas.length?`<tfoot><tr class="tfoot"><td>Subtotal</td><td class="neg">${fmt(subtotal)}</td><td colspan="9"></td></tr></tfoot>`:''}
       </table></div>`}
     </div>`;
   };
