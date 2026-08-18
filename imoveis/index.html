@@ -88,6 +88,8 @@ html,body{min-height:100vh;background:var(--bg);color:var(--text);font-family:'D
 .sec-line{flex:1;height:1px;background:var(--border)}
 .sec-note{font-size:11px;color:var(--dim);margin:-8px 0 16px;line-height:1.6}
 .tbl-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:8px;margin-bottom:24px;background:var(--bg-card);box-shadow:0 1px 3px rgba(20,20,20,.04)}
+.tbl-wrap-noscroll{overflow-x:hidden!important}
+.tbl-wrap-noscroll::-webkit-scrollbar{display:none}
 table{width:100%;border-collapse:collapse;font-size:13px}
 th{background:var(--bg-section);padding:9px 14px;text-align:right;font-size:9px;font-weight:700;letter-spacing:.14em;color:var(--muted);text-transform:uppercase;border-bottom:1px solid var(--border);white-space:nowrap}
 th:first-child{text-align:left}
@@ -2195,9 +2197,9 @@ function renderDRE(){
 // ══════════════ MÓDULO GUERRA PESSOAL ══════════════
 function getCategoriasPessoal(){return load(ppk('categorias')).slice().sort((a,b)=>ordemNatural(a.nome,b.nome))}
 const BLOCOS_ORDEM_PESSOAL=[
-  {titulo:'Casa Conceição',match:['conceicao','conceição']},
-  {titulo:'Casa Marli',match:['marli']},
-  {titulo:'Casa Jenny',match:['jenny']},
+  {titulo:'Casa Conceição – Rua Coaraci Nunes',match:['conceicao','conceição']},
+  {titulo:'Casa Marli – Rua Afonso Pena Jr',match:['marli']},
+  {titulo:'Casa Jenny – Rua Helena',match:['jenny']},
   {titulo:'Outros IPTUs',match:['outros iptu','iptu']},
   {titulo:'Veículos Pessoais',match:['veiculo','veículo']},
   {titulo:'Maya Guerra',match:['maya']},
@@ -2374,13 +2376,13 @@ function renderContasPessoal(){
     <div class="form-card" style="margin-bottom:16px">
       <div class="sec-hdr"><h2>🏠 ${mod.titulo}</h2><div class="sec-line"></div></div>
       ${!mod.categorias.length?`<div class="sec-note" style="margin:0">Nenhuma categoria cadastrada neste bloco ainda. Assim que cadastrar uma categoria com esse nome, ela entra aqui automaticamente.</div>`:`
-      <div class="tbl-wrap" style="margin-bottom:0"><table style="table-layout:fixed;width:100%">
-        <colgroup><col style="width:13%"><col style="width:7%"><col style="width:7%"><col style="width:8%"><col style="width:8%"><col style="width:7%"><col style="width:8%"><col style="width:9%"><col style="width:8%"><col style="width:8%"><col style="width:8%"><col style="width:9%"></colgroup>
-        <thead><tr><th>Categoria/Unidade</th><th>Tipo</th><th>Valor</th><th class="data-cel">Vencimento</th><th class="data-cel">Data Pagto</th><th>Forma Pgto</th><th>Status</th><th>Obs</th><th>Boleto</th><th>Comprov. 1</th><th>Comprov. 2</th><th>Ações</th></tr></thead>
+      <div class="tbl-wrap tbl-wrap-noscroll" style="margin-bottom:0"><table style="table-layout:fixed;width:100%">
+        <colgroup><col style="width:9%"><col style="width:8%"><col style="width:9%"><col style="width:9%"><col style="width:8%"><col style="width:9%"><col style="width:10%"><col style="width:9%"><col style="width:9%"><col style="width:9%"><col style="width:11%"></colgroup>
+        <thead><tr><th>Tipo</th><th>Valor</th><th class="data-cel">Vencimento</th><th class="data-cel">Data Pagto</th><th>Forma Pgto</th><th>Status</th><th>Obs</th><th>Boleto</th><th>Comprov. 1</th><th>Comprov. 2</th><th>Ações</th></tr></thead>
         <tbody>
-          ${linhas.length?linhas.map(r=>`<tr><td>${categoriaNome(r.categoriaId)}</td><td>${r.desc}</td><td class="neg">${fmt(r.valor)}</td><td class="data-cel">${r.vencimento?formatarDataBR(r.vencimento):'—'}</td><td class="data-cel">${r.dataPagamento?formatarDataBR(r.dataPagamento):'—'}</td><td>${r.forma||'—'}</td><td>${statusBadge({status:r.status,envio:r.vencimento})}</td><td class="dim" title="${(r.obs||'').replace(/"/g,'&quot;')}" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.obs||'—'}</td><td>${comprovanteChipRotulo(r.boleto,'📄 BOLETO')}</td><td>${comprovanteChipRotulo(r.comprovantePagamento,'🧾 COMPROV. 1')}</td><td>${comprovanteChipRotulo(r.comprovantePagamento2,'🧾 COMPROV. 2')}</td><td style="white-space:nowrap">${r.status!=='pago'?`<button class="btn-sm btn-ok" onclick="marcarContaPessoalPaga('${r.id}')" title="marcar pago">✓</button> `:''}<button class="btn-sm btn-ok" onclick="abrirEdicaoContaPessoal('${r.id}')">editar</button> <button class="btn-sm" onclick="delItemPessoal('contas','${r.id}')">excluir</button></td></tr>`).join(''):`<tr><td colspan="12"><div class="empty">Nenhuma conta lançada neste mês para este bloco.</div></td></tr>`}
+          ${linhas.length?linhas.map(r=>`<tr><td>${r.desc}</td><td class="neg">${fmt(r.valor)}</td><td class="data-cel">${r.vencimento?formatarDataBR(r.vencimento):'—'}</td><td class="data-cel">${r.dataPagamento?formatarDataBR(r.dataPagamento):'—'}</td><td>${r.forma||'—'}</td><td>${statusBadge({status:r.status,envio:r.vencimento})}</td><td class="dim" title="${(r.obs||'').replace(/"/g,'&quot;')}" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.obs||'—'}</td><td>${comprovanteChipRotulo(r.boleto,'📄 BOLETO')}</td><td>${comprovanteChipRotulo(r.comprovantePagamento,'🧾 COMPROV. 1')}</td><td>${comprovanteChipRotulo(r.comprovantePagamento2,'🧾 COMPROV. 2')}</td><td style="white-space:nowrap">${r.status!=='pago'?`<button class="btn-sm btn-ok" onclick="marcarContaPessoalPaga('${r.id}')" title="marcar pago">✓</button> `:''}<button class="btn-sm btn-ok" onclick="abrirEdicaoContaPessoal('${r.id}')">editar</button> <button class="btn-sm" onclick="delItemPessoal('contas','${r.id}')">excluir</button></td></tr>`).join(''):`<tr><td colspan="11"><div class="empty">Nenhuma conta lançada neste mês para este bloco.</div></td></tr>`}
         </tbody>
-        ${linhas.length?`<tfoot><tr class="tfoot"><td>Subtotal — ${mod.titulo}</td><td></td><td class="neg">${fmt(subtotal)}</td><td colspan="9"></td></tr></tfoot>`:''}
+        ${linhas.length?`<tfoot><tr class="tfoot"><td>Subtotal — ${mod.titulo}</td><td class="neg">${fmt(subtotal)}</td><td colspan="9"></td></tr></tfoot>`:''}
       </table></div>`}
     </div>`;
   };
