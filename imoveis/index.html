@@ -201,6 +201,7 @@ tr:hover td{background:var(--bg-hover)}
         <span id="theme-toggle-label">⚔️ Darkness</span>
       </button>
       <button class="sb-item" onclick="syncManual()" style="width:100%;margin:0;color:var(--gold)">☁ Sincronizar</button>
+      <button class="sb-item" onclick="migrarAnexosAntigos()" style="width:100%;margin:2px 0 0;color:var(--dim);font-size:11px">🩹 Corrigir anexos antigos</button>
       <button class="sb-item" onclick="limparCacheLocal()" style="width:100%;margin:2px 0 0;color:var(--dim);font-size:11px">🧹 Limpar cache local</button>
       <button class="sb-item" onclick="doLogout()" style="width:100%;margin:4px 0 0;color:var(--dim)">↩ Sair</button>
     </div>
@@ -334,6 +335,51 @@ function syncFromFB(){
 function syncManual(){
   setSyncStatus('⟳ Sincronizando...','var(--amber)');
   syncFromFB().then(()=>{pushToFB();render();notify('✓ Sincronizado!','ok');});
+}
+async function migrarAnexosAntigos(){
+  if(!confirm('Isso procura comprovantes/boletos antigos que ainda estão guardados "pesados" (arquivo inteiro salvo localmente) e move só o arquivo pra nuvem, deixando uma referência leve no lugar. Pode levar alguns segundos. Continuar?'))return;
+  notify('Procurando anexos antigos, aguarde...','info');
+  const chaves=Object.keys(localStorage).filter(k=>k.startsWith('imoveisfg_')||k.startsWith('pessoalfg_'));
+  const valores={};
+  let encontrados=0,erros=0;
+  const uploads=[];
+  const achaEMigra=(obj)=>{
+    if(!obj||typeof obj!=='object')return;
+    if(Array.isArray(obj)){obj.forEach(achaEMigra);return;}
+    if(typeof obj.data==='string' && obj.data.startsWith('data:')){
+      encontrados++;
+      const fileId=uuid()+uuid();
+      const dataUrl=obj.data;
+      uploads.push(
+        _filesRef.child(fileId).set(dataUrl).then(()=>{delete obj.data;obj.fileId=fileId;}).catch(e=>{console.error('Erro ao migrar anexo:',e);erros++;})
+      );
+      return;
+    }
+    Object.keys(obj).forEach(kk=>achaEMigra(obj[kk]));
+  };
+  chaves.forEach(k=>{
+    try{
+      const val=JSON.parse(localStorage.getItem(k));
+      valores[k]=val;
+      achaEMigra(val);
+    }catch(e){/* ignora chaves que não são JSON válido */}
+  });
+  if(!encontrados){
+    notify('Nenhum anexo antigo encontrado — seus arquivos já estão todos no formato leve.','ok');
+    return;
+  }
+  await Promise.all(uploads);
+  chaves.forEach(k=>{
+    if(valores[k]===undefined)return;
+    try{
+      localStorage.setItem(k,JSON.stringify(valores[k]));
+    }catch(e){
+      console.error('Não coube localmente ainda, mas já foi pra nuvem:',k,e);
+    }
+  });
+  pushToFB();
+  notify(`${encontrados} anexo(s) migrado(s) — cache local bem mais leve agora`,'ok');
+  render();
 }
 function limparCacheLocal(){
   if(!confirm('Isso limpa só o cache local do navegador (não mexe em nada na nuvem). Os dados são recarregados do zero direto do Firebase. Continuar?'))return;
