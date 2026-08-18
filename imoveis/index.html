@@ -201,6 +201,7 @@ tr:hover td{background:var(--bg-hover)}
         <span id="theme-toggle-label">⚔️ Darkness</span>
       </button>
       <button class="sb-item" onclick="syncManual()" style="width:100%;margin:0;color:var(--gold)">☁ Sincronizar</button>
+      <button class="sb-item" onclick="limparCacheLocal()" style="width:100%;margin:2px 0 0;color:var(--dim);font-size:11px">🧹 Limpar cache local</button>
       <button class="sb-item" onclick="doLogout()" style="width:100%;margin:4px 0 0;color:var(--dim)">↩ Sair</button>
     </div>
   </aside>
@@ -333,6 +334,12 @@ function syncFromFB(){
 function syncManual(){
   setSyncStatus('⟳ Sincronizando...','var(--amber)');
   syncFromFB().then(()=>{pushToFB();render();notify('✓ Sincronizado!','ok');});
+}
+function limparCacheLocal(){
+  if(!confirm('Isso limpa só o cache local do navegador (não mexe em nada na nuvem). Os dados são recarregados do zero direto do Firebase. Continuar?'))return;
+  Object.keys(localStorage).filter(k=>k.startsWith('imoveisfg_')||k.startsWith('pessoalfg_')).forEach(k=>localStorage.removeItem(k));
+  notify('Cache local limpo — recarregando dados da nuvem...','ok');
+  syncFromFB().then(()=>{render();notify('✓ Dados recarregados','ok');});
 }
 
 // ── LOGIN ──
