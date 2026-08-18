@@ -2141,6 +2141,43 @@ function renderDRE(){
 // ── NAVEGAÇÃO ──
 // ══════════════ MÓDULO GUERRA PESSOAL ══════════════
 function getCategoriasPessoal(){return load(ppk('categorias')).slice().sort((a,b)=>ordemNatural(a.nome,b.nome))}
+const BLOCOS_ORDEM_PESSOAL=[
+  {titulo:'Casa Conceição',match:['conceicao','conceição']},
+  {titulo:'Casa Marli',match:['marli']},
+  {titulo:'Casa Jenny',match:['jenny']},
+  {titulo:'Outros IPTUs',match:['outros iptu','iptu']},
+  {titulo:'Veículos Pessoais',match:['veiculo','veículo']},
+  {titulo:'Maya Guerra',match:['maya']},
+  {titulo:'Miguel Guerra',match:['miguel']},
+  {titulo:'Julyana Guerra',match:['julyana']},
+  {titulo:'Leandro Guerra',match:['leandro']},
+  {titulo:'Julio Cesar Guerra',match:['julio cesar','júlio césar']},
+];
+function getBlocoTituloPessoal(cat){
+  if(!cat)return null;
+  // 1) campo Tipo da categoria, se bater exatamente com um bloco fixo
+  if(cat.tipo){
+    const nt=normTxt(cat.tipo);
+    const gExato=BLOCOS_ORDEM_PESSOAL.find(g=>normTxt(g.titulo)===nt||g.match.some(m=>nt.includes(normTxt(m))));
+    if(gExato)return gExato.titulo;
+  }
+  // 2) nome da categoria, por palavra-chave
+  const n=normTxt(cat.nome||'');
+  const g=BLOCOS_ORDEM_PESSOAL.find(g=>g.match.some(m=>n.includes(normTxt(m))));
+  return g?g.titulo:null;
+}
+function montarModulosPessoal(){
+  const cats=getCategoriasPessoal();
+  const usados=new Set();
+  const modulos=BLOCOS_ORDEM_PESSOAL.map(g=>{
+    const catsDoBloco=cats.filter(c=>getBlocoTituloPessoal(c)===g.titulo).sort((a,b)=>ordemNatural(a.nome,b.nome));
+    catsDoBloco.forEach(c=>usados.add(c.id));
+    return {titulo:g.titulo,categorias:catsDoBloco};
+  });
+  const orfaos=cats.filter(c=>!usados.has(c.id));
+  orfaos.forEach(c=>modulos.push({titulo:c.nome,categorias:[c]}));
+  return modulos;
+}
 function categoriaNome(id){const c=getCategoriasPessoal().find(x=>x.id===id);return c?c.nome:'—'}
 function selectCategoriasPessoal(id){
   const cats=getCategoriasPessoal();
@@ -2272,9 +2309,28 @@ function delItemPessoal(tipo,id){
 }
 
 // ── CONTAS (Pessoal) ──
+const TIPOS_CONTA_PESSOAL=['IPTU','Água','Condomínio','Luz','Internet','Manutenção','Mesada','Telefone','Cartão','Transporte','Consórcio','Outros'];
 function renderContasPessoal(){
-  const cats=getCategoriasPessoal();
-  const lst=load(ppkPeriodo('contas')).sort((a,b)=>ordemNatural(categoriaNome(a.categoriaId),categoriaNome(b.categoriaId)));
+  const modulos=montarModulosPessoal();
+  const lst=load(ppkPeriodo('contas'));
+  const tabelaModuloPessoal=(mod)=>{
+    const idsDoBloco=mod.categorias.map(c=>c.id);
+    const linhas=lst.filter(r=>idsDoBloco.includes(r.categoriaId)).sort((a,b)=>ordemNatural(categoriaNome(a.categoriaId),categoriaNome(b.categoriaId)));
+    const subtotal=linhas.reduce((s,r)=>s+(+r.valor||0),0);
+    return `
+    <div class="form-card" style="margin-bottom:16px">
+      <div class="sec-hdr"><h2>🏠 ${mod.titulo}</h2><div class="sec-line"></div></div>
+      ${!mod.categorias.length?`<div class="sec-note" style="margin:0">Nenhuma categoria cadastrada neste bloco ainda. Assim que cadastrar uma categoria com esse nome, ela entra aqui automaticamente.</div>`:`
+      <div class="tbl-wrap" style="margin-bottom:0"><table style="table-layout:fixed;width:100%">
+        <colgroup><col style="width:13%"><col style="width:7%"><col style="width:7%"><col style="width:8%"><col style="width:8%"><col style="width:7%"><col style="width:8%"><col style="width:9%"><col style="width:8%"><col style="width:8%"><col style="width:8%"><col style="width:9%"></colgroup>
+        <thead><tr><th>Categoria/Unidade</th><th>Tipo</th><th>Valor</th><th class="data-cel">Vencimento</th><th class="data-cel">Data Pagto</th><th>Forma Pgto</th><th>Status</th><th>Obs</th><th>Boleto</th><th>Comprov. 1</th><th>Comprov. 2</th><th>Ações</th></tr></thead>
+        <tbody>
+          ${linhas.length?linhas.map(r=>`<tr><td>${categoriaNome(r.categoriaId)}</td><td>${r.desc}</td><td class="neg">${fmt(r.valor)}</td><td class="data-cel">${r.vencimento?formatarDataBR(r.vencimento):'—'}</td><td class="data-cel">${r.dataPagamento?formatarDataBR(r.dataPagamento):'—'}</td><td>${r.forma||'—'}</td><td>${statusBadge({status:r.status,envio:r.vencimento})}</td><td class="dim" title="${(r.obs||'').replace(/"/g,'&quot;')}" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.obs||'—'}</td><td>${comprovanteChipRotulo(r.boleto,'📄 BOLETO')}</td><td>${comprovanteChipRotulo(r.comprovantePagamento,'🧾 COMPROV. 1')}</td><td>${comprovanteChipRotulo(r.comprovantePagamento2,'🧾 COMPROV. 2')}</td><td style="white-space:nowrap">${r.status!=='pago'?`<button class="btn-sm btn-ok" onclick="marcarContaPessoalPaga('${r.id}')" title="marcar pago">✓</button> `:''}<button class="btn-sm btn-ok" onclick="abrirEdicaoContaPessoal('${r.id}')">editar</button> <button class="btn-sm" onclick="delItemPessoal('contas','${r.id}')">excluir</button></td></tr>`).join(''):`<tr><td colspan="12"><div class="empty">Nenhuma conta lançada neste mês para este bloco.</div></td></tr>`}
+        </tbody>
+        ${linhas.length?`<tfoot><tr class="tfoot"><td>Subtotal — ${mod.titulo}</td><td></td><td class="neg">${fmt(subtotal)}</td><td colspan="9"></td></tr></tfoot>`:''}
+      </table></div>`}
+    </div>`;
+  };
   return `
   <div class="header-pagina" style="margin-bottom:0">
     <button id="btnToggleContaPessoal" class="btn-toggle-aba" onclick="toggleJanela('btnToggleContaPessoal','painelNovaContaPessoal','+ Nova Conta')">+ Nova Conta</button>
@@ -2285,7 +2341,8 @@ function renderContasPessoal(){
     <div class="sec-hdr"><h2>Nova Conta</h2><div class="sec-line"></div></div>
     <div class="fg">
       <div class="fl"><label>Categoria</label><select class="fi" id="pcn-cat">${selectCategoriasPessoal()}</select></div>
-      <div class="fl"><label>Especificação</label><input class="fi" id="pcn-desc" placeholder="Ex: Internet, Luz, Mesada..."></div>
+      <div class="fl"><label>Tipo / Especificação</label><select class="fi" id="pcn-desc" onchange="toggleOutroTipoPessoal()">${TIPOS_CONTA_PESSOAL.map(t=>`<option>${t}</option>`).join('')}</select></div>
+      <div class="fl" id="pcn-desc-outro-wrap" style="display:none"><label>Especifique</label><input class="fi" id="pcn-desc-outro" placeholder="Descreva o gasto"></div>
       <div class="fl"><label>Valor</label><input class="fi" id="pcn-val" type="number" step="0.01" placeholder="0,00"></div>
       <div class="fl"><label>Forma de Pagamento</label><select class="fi" id="pcn-forma"><option>Boleto</option><option>Pix</option><option>Dinheiro</option><option>Contra Cheque</option><option>Cartão</option></select></div>
       <div class="fl"><label>Data de Vencimento</label><input class="fi" id="pcn-venc" type="date" value="${today()}"></div>
@@ -2296,21 +2353,20 @@ function renderContasPessoal(){
       <div class="fl"><label>Anexar Comprovante de Pagamento <span style="color:var(--red)">*obrigatório</span></label><input class="fi" id="pcn-comprovante" type="file" accept=".pdf,image/*"></div>
     </div>
     <div class="rodape-acoes">
-      <div class="grupo-anexo">
-        <label>Boleto</label>
-        <input class="fi" type="file" id="pcn-boleto" accept=".pdf,image/*" style="width:180px">
+      <div class="grupo-anexo" style="flex-wrap:wrap">
+        <div><label>Boleto</label><input class="fi" type="file" id="pcn-boleto" accept=".pdf,image/*" style="width:170px"></div>
+        <div><label>Comprov. 2</label><input class="fi" type="file" id="pcn-comprovante2" accept=".pdf,image/*" style="width:170px"></div>
       </div>
       <button class="btn-submit-acao" onclick="addContaPessoal(this)">+ REGISTRAR</button>
     </div>
   </div>
   </div>
-  <div class="tbl-wrap"><table style="table-layout:fixed;width:100%">
-    <colgroup><col style="width:16%"><col style="width:16%"><col style="width:8%"><col style="width:9%"><col style="width:9%"><col style="width:9%"><col style="width:9%"><col style="width:9%"><col style="width:8%"><col style="width:7%"></colgroup>
-    <thead><tr><th>Categoria</th><th>Especificação</th><th>Valor</th><th>Forma</th><th class="data-cel">Vencimento</th><th class="data-cel">Data Pagto</th><th>Status</th><th>Obs</th><th>Comprov.</th><th>Ações</th></tr></thead>
-    <tbody>
-      ${lst.length?lst.map(r=>`<tr><td>${categoriaNome(r.categoriaId)}</td><td>${r.desc}</td><td class="neg">${fmt(r.valor)}</td><td>${r.forma||'—'}</td><td class="data-cel">${r.vencimento?formatarDataBR(r.vencimento):'—'}</td><td class="data-cel">${r.dataPagamento?formatarDataBR(r.dataPagamento):'—'}</td><td>${statusBadge({status:r.status,envio:r.vencimento})}</td><td class="dim" title="${(r.obs||'').replace(/"/g,'&quot;')}" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.obs||'—'}</td><td>${comprovanteChipRotulo(r.comprovantePagamento,'🧾 COMPROV.')}</td><td style="white-space:nowrap">${r.status!=='pago'?`<button class="btn-sm btn-ok" onclick="marcarContaPessoalPaga('${r.id}')" title="marcar pago">✓</button> `:''}<button class="btn-sm" onclick="delItemPessoal('contas','${r.id}')">excluir</button></td></tr>`).join(''):`<tr><td colspan="10"><div class="empty">Nenhuma conta lançada neste mês.</div></td></tr>`}
-    </tbody>
-  </table></div>`;
+  ${modulos.map(tabelaModuloPessoal).join('')}`;
+}
+function toggleOutroTipoPessoal(){
+  const sel=document.getElementById('pcn-desc');
+  const wrap=document.getElementById('pcn-desc-outro-wrap');
+  if(wrap)wrap.style.display=sel.value==='Outros'?'block':'none';
 }
 function toggleComprovantePgtoPessoal(){
   const status=document.getElementById('pcn-status').value;
@@ -2329,22 +2385,114 @@ function addContaPessoal(btn){
     notify('Status "Pago" exige o comprovante de pagamento anexado','err');
     return;
   }
-  const base={id:uuid(),categoriaId,desc:document.getElementById('pcn-desc').value.trim()||'Despesa',valor:+document.getElementById('pcn-val').value||0,forma:document.getElementById('pcn-forma').value,vencimento:document.getElementById('pcn-venc').value,status,obs:document.getElementById('pcn-obs').value.trim(),dataPagamento:status==='pago'?today():null};
+  const tipoSel=document.getElementById('pcn-desc').value;
+  const desc=tipoSel==='Outros'?(document.getElementById('pcn-desc-outro').value.trim()||'Outros'):tipoSel;
+  const base={id:uuid(),categoriaId,desc,valor:+document.getElementById('pcn-val').value||0,forma:document.getElementById('pcn-forma').value,vencimento:document.getElementById('pcn-venc').value,status,obs:document.getElementById('pcn-obs').value.trim(),dataPagamento:status==='pago'?today():null};
   const fBoleto=document.getElementById('pcn-boleto');
+  const fComp2=document.getElementById('pcn-comprovante2');
   const textoOriginal=btn?btn.textContent:null;
   if(btn){btn.disabled=true;btn.textContent='Enviando...';btn.style.opacity='0.6';}
   const restaurar=()=>{if(btn){btn.disabled=false;btn.textContent=textoOriginal;btn.style.opacity='1';}};
   lerArquivo(fBoleto,()=>nomeAutomatico(categoriaNome(categoriaId),base.desc+'-BOLETO'),(boleto)=>{
     base.boleto=boleto;
-    lerArquivo(fComp,()=>nomeAutomatico(categoriaNome(categoriaId),base.desc+'-COMPROVANTE'),(comp)=>{
+    lerArquivo(fComp,()=>nomeAutomatico(categoriaNome(categoriaId),base.desc+'-COMPROVANTE1'),(comp)=>{
       base.comprovantePagamento=comp;
-      const lst=load(ppkPeriodo('contas'));
-      lst.push(base);
-      save(ppkPeriodo('contas'),lst);
-      restaurar();
-      notify('Conta registrada','ok');render();
+      lerArquivo(fComp2,()=>nomeAutomatico(categoriaNome(categoriaId),base.desc+'-COMPROVANTE2'),(comp2)=>{
+        base.comprovantePagamento2=comp2;
+        const lst=load(ppkPeriodo('contas'));
+        lst.push(base);
+        save(ppkPeriodo('contas'),lst);
+        restaurar();
+        notify('Conta registrada','ok');render();
+      });
     });
   });
+}
+function abrirEdicaoContaPessoal(id){
+  const lst=load(ppkPeriodo('contas'));
+  const r=lst.find(x=>x.id===id);
+  if(!r)return;
+  document.getElementById('modal-root').innerHTML=`
+  <div class="modal-bg" onclick="if(event.target===this)fecharModal()">
+    <div class="modal">
+      <h2>Editar Conta Pessoal</h2>
+      <div class="fl" style="margin-bottom:12px"><label>Categoria</label><select class="fi" id="epc-cat">${selectCategoriasPessoal(r.categoriaId)}</select></div>
+      <div class="fg" style="grid-template-columns:1fr 1fr;margin-bottom:12px">
+        <div class="fl"><label>Tipo / Especificação</label><select class="fi" id="epc-desc">${TIPOS_CONTA_PESSOAL.map(t=>`<option${r.desc===t?' selected':''}>${t}</option>`).join('')}${TIPOS_CONTA_PESSOAL.includes(r.desc)?'':`<option selected>${(r.desc||'').replace(/"/g,'&quot;')}</option>`}</select></div>
+        <div class="fl"><label>Valor</label><input class="fi" id="epc-val" type="number" step="0.01" value="${r.valor||0}"></div>
+      </div>
+      <div class="fg" style="grid-template-columns:1fr 1fr;margin-bottom:12px">
+        <div class="fl"><label>Data de Vencimento</label><input class="fi" id="epc-venc" type="date" value="${r.vencimento||today()}"></div>
+        <div class="fl"><label>Forma de Pagamento</label><select class="fi" id="epc-forma"><option${!r.forma||r.forma==='Boleto'?' selected':''}>Boleto</option><option${r.forma==='Pix'?' selected':''}>Pix</option><option${r.forma==='Dinheiro'?' selected':''}>Dinheiro</option><option${r.forma==='Contra Cheque'?' selected':''}>Contra Cheque</option><option${r.forma==='Cartão'?' selected':''}>Cartão</option></select></div>
+      </div>
+      <div class="fl" style="margin-bottom:12px"><label>Status</label><select class="fi" id="epc-status" onchange="toggleComprovanteEdicaoPessoal()">${statusOptions(r.status)}</select></div>
+      <div class="fl" style="margin-bottom:12px"><label>Data de Pagamento</label><input class="fi" id="epc-data-pagamento" type="date" value="${r.dataPagamento||''}"></div>
+      <div id="epc-comprovante-wrap" style="display:${r.status==='pago'?'block':'none'}">
+        ${r.comprovantePagamento?`<div class="sec-note" style="margin:0 0 10px">Comprovante 1 já anexado: ${comprovanteChipRotulo(r.comprovantePagamento,'🧾 COMPROV. 1')}. Pode anexar outro abaixo pra substituir.</div>`:''}
+        <div class="fl" style="margin-bottom:12px"><label>Comprovante de Pagamento 1 ${r.comprovantePagamento?'(opcional)':'<span style="color:var(--red)">*obrigatório para status Pago</span>'}</label><input class="fi" id="epc-comprovante" type="file" accept=".pdf,image/*"></div>
+        ${r.comprovantePagamento2?`<div class="sec-note" style="margin:0 0 10px">Comprovante 2 já anexado: ${comprovanteChipRotulo(r.comprovantePagamento2,'🧾 COMPROV. 2')}.</div>`:''}
+        <div class="fl" style="margin-bottom:12px"><label>Comprovante de Pagamento 2</label><input class="fi" id="epc-comprovante2" type="file" accept=".pdf,image/*"></div>
+      </div>
+      <div id="epc-erro" style="font-size:12px;color:var(--red);margin-bottom:12px;display:none">Anexe o comprovante de pagamento para salvar como Pago.</div>
+      <div class="fl" style="margin-bottom:20px"><label>Observações</label><input class="fi" id="epc-obs" value="${(r.obs||'').replace(/"/g,'&quot;')}"></div>
+      <div style="display:flex;gap:10px">
+        <button class="btn-gold" style="flex:1" onclick="salvarEdicaoContaPessoal('${id}')">Salvar Alterações</button>
+        <button class="btn-ghost" onclick="fecharModal()">Cancelar</button>
+      </div>
+    </div>
+  </div>`;
+}
+function toggleComprovanteEdicaoPessoal(){
+  const status=document.getElementById('epc-status').value;
+  document.getElementById('epc-comprovante-wrap').style.display=status==='pago'?'block':'none';
+}
+function salvarEdicaoContaPessoal(id){
+  const lst=load(ppkPeriodo('contas'));
+  const r=lst.find(x=>x.id===id);
+  if(!r)return;
+  const novoStatus=document.getElementById('epc-status').value;
+  const fComp=document.getElementById('epc-comprovante');
+  if(novoStatus==='pago' && !r.comprovantePagamento && !fComp.files[0]){
+    document.getElementById('epc-erro').style.display='block';
+    notify('Anexe o comprovante de pagamento para salvar como Pago','err');
+    return;
+  }
+  const salvarResto=()=>{
+    r.categoriaId=document.getElementById('epc-cat').value;
+    r.desc=document.getElementById('epc-desc').value;
+    r.valor=+document.getElementById('epc-val').value||0;
+    r.vencimento=document.getElementById('epc-venc').value;
+    r.forma=document.getElementById('epc-forma').value;
+    const statusAnterior=r.status;
+    r.status=novoStatus;
+    const dataPagtoManual=document.getElementById('epc-data-pagamento').value;
+    if(dataPagtoManual)r.dataPagamento=dataPagtoManual;
+    else if(novoStatus==='pago' && statusAnterior!=='pago')r.dataPagamento=today();
+    r.obs=document.getElementById('epc-obs').value.trim();
+    save(ppkPeriodo('contas'),lst);
+    fecharModal();
+    if(novoStatus==='pago' && statusAnterior!=='pago')playSuccessSound();
+    notify('Conta atualizada','ok');render();
+  };
+  const fComp2=document.getElementById('epc-comprovante2');
+  if(fComp.files[0]){
+    lerArquivo(fComp,()=>nomeAutomatico(categoriaNome(r.categoriaId),r.desc+'-COMPROVANTE1'),(comp)=>{
+      if(comp)r.comprovantePagamento=comp;
+      if(fComp2.files[0]){
+        lerArquivo(fComp2,()=>nomeAutomatico(categoriaNome(r.categoriaId),r.desc+'-COMPROVANTE2'),(comp2)=>{
+          if(comp2)r.comprovantePagamento2=comp2;
+          salvarResto();
+        });
+      }else salvarResto();
+    });
+  }else if(fComp2.files[0]){
+    lerArquivo(fComp2,()=>nomeAutomatico(categoriaNome(r.categoriaId),r.desc+'-COMPROVANTE2'),(comp2)=>{
+      if(comp2)r.comprovantePagamento2=comp2;
+      salvarResto();
+    });
+  }else{
+    salvarResto();
+  }
 }
 function marcarContaPessoalPaga(id){
   document.getElementById('modal-root').innerHTML=`
