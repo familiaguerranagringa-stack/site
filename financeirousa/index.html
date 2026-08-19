@@ -801,6 +801,41 @@ function syncFromFB(){
       txGrama2.status='REVIEWED';
       saveAndSync();
     }
+    // Lote de despesas MM Guerra Empreendimentos: vandalismo Casa Ocala + itens não relacionados (shelving, jardinagem pré-aluguel, item guardado p/ próxima casa)
+    (function(){
+      const mmg2=DATA.entities.find(e=>(e.legalName||'').toUpperCase().includes('MM GUERRA EMPREENDIMENTOS'));
+      const ocala2=DATA.properties.find(p=>(p.name||'').toUpperCase().includes('OCALA'));
+      if(!mmg2) return;
+      let changed=false;
+      function byAmount(amt){
+        return DATA.transactions.find(t=>t.entityId===mmg2.id && Math.abs(Math.abs(t.amount)-amt)<0.01 && (!t.category||t.category===''||t.category==='CPA Review'));
+      }
+      function byConf(code){
+        return DATA.transactions.find(t=>(t.originalDescription||'').includes(code));
+      }
+      function apply(t,cat,cpaCat,note,tagProperty){
+        if(!t) return;
+        t.category=cat;
+        t.cpaCategory=cpaCat;
+        t.userDescription=note;
+        t.status='REVIEWED';
+        if(tagProperty && ocala2) t.propertyId=ocala2.id;
+        changed=true;
+      }
+      apply(byAmount(1347.78),'Expense','Expense — Vandalism Repair: Refrigerator Replacement (avaliar com CPA se deve ser Fixed Asset/depreciável)','Geladeira nova comprada por causa do vandalismo na Casa Ocala.',true);
+      apply(byAmount(153.66),'Fixed Asset','Fixed Asset — Frente de fogão comprada, guardada em estoque para a próxima casa (NÃO é despesa da Casa Ocala)','Frente do fogão comprada (quebrou), mas guardada para uso na próxima casa — não relacionada ao vandalismo da Casa Ocala.',false);
+      apply(byAmount(700.00),'Expense','Expense — Vandalism Repair: Stove & Microwave Replacement (avaliar com CPA se deve ser Fixed Asset/depreciável)','Fogão e micro-ondas novos comprados por causa do vandalismo na Casa Ocala.',true);
+      apply(byAmount(1327.48),'Expense','Expense — Vandalism Repair: Door & Window Installation Labor','Mão de obra para instalar portas e janelas danificadas pelo vandalismo na Casa Ocala.',true);
+      apply(byAmount(67.88),'Expense','Expense — Vandalism Repair: Mirror Replacement','Espelho comprado por causa do vandalismo na Casa Ocala.',true);
+      apply(byConf('ypuyhxaea'),'Expense','Expense — Vandalism Repair: Drywall, Texture & Paint (Empire Construction LLC)','Reparo de drywall, textura e pintura por causa do vandalismo — Empire Construction LLC (1ª parcela).',true);
+      apply(byConf('vei8oz28q'),'Expense','Expense — Vandalism Repair: Drywall, Texture & Paint (Empire Construction LLC)','Reparo de drywall, textura e pintura por causa do vandalismo — Empire Construction LLC (2ª parcela).',true);
+      apply(byConf('xkj8dout5'),'Expense','Expense — Closet/Pantry Shelving Installation (AD Services and Solutions LLC)','Instalação de grades/prateleiras no closet e na despensa — AD Services and Solutions LLC. Não relacionado ao vandalismo.',true);
+      apply(byConf('wa4m9pssv'),'Expense','Expense — Closet/Pantry Shelving Installation (AD Services and Solutions LLC)','Instalação de grades/prateleiras no closet e na despensa — AD Services and Solutions LLC. Não relacionado ao vandalismo.',true);
+      apply(byConf('xml8ja6lv'),'Expense','Expense — Closet/Pantry Shelving Installation (AD Services and Solutions LLC)','Instalação de grades/prateleiras no closet e na despensa — AD Services and Solutions LLC. Não relacionado ao vandalismo.',true);
+      apply(byConf('vyolj3kuj'),'Expense','Expense — Landscaping: Pre-Rental Lawn Prep (DKW Repair LLC)','Serviço de jardinagem (abaixar grama) antes de alugar a Casa Ocala — DKW Repair LLC. Não relacionado ao vandalismo.',true);
+      apply(byConf('ue4fu7oe5'),'Expense','Expense — Landscaping: Pre-Rental Lawn Prep (DKW Repair LLC)','Serviço de jardinagem (abaixar grama) antes de alugar a Casa Ocala — DKW Repair LLC. Não relacionado ao vandalismo.',true);
+      if(changed) saveAndSync();
+    })();
     // Zelle $240 para SHINEHOME LLC — limpeza da empresa (Familia Guerra Investing), serviço pontual, sem regra automática
     let txShine=DATA.transactions.find(t=>(t.originalDescription||'').includes('oaa3kcxu5'));
     if(txShine && (!txShine.category || txShine.category==='CPA Review')){
