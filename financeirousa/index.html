@@ -811,7 +811,7 @@ function syncFromFB(){
         return DATA.transactions.find(t=>t.entityId===mmg2.id && Math.abs(Math.abs(t.amount)-amt)<0.01 && (!t.category||t.category===''||t.category==='CPA Review'));
       }
       function byConf(code){
-        return DATA.transactions.find(t=>(t.originalDescription||'').includes(code));
+        return DATA.transactions.find(t=>(t.originalDescription||'').toUpperCase().includes(code.toUpperCase()));
       }
       function apply(t,cat,cpaCat,note,tagProperty){
         if(!t) return;
@@ -835,6 +835,32 @@ function syncFromFB(){
       apply(byConf('vyolj3kuj'),'Expense','Expense — Landscaping: Pre-Rental Lawn Prep (DKW Repair LLC)','Serviço de jardinagem (abaixar grama) antes de alugar a Casa Ocala — DKW Repair LLC. Não relacionado ao vandalismo.',true);
       apply(byConf('ue4fu7oe5'),'Expense','Expense — Landscaping: Pre-Rental Lawn Prep (DKW Repair LLC)','Serviço de jardinagem (abaixar grama) antes de alugar a Casa Ocala — DKW Repair LLC. Não relacionado ao vandalismo.',true);
       if(changed) saveAndSync();
+    })();
+    // Fallback: 2ª parcela Empire Construction ($1.500, vandalismo) e DKW Repair ($50, lawn) — caso o conf# tenha caractere ambíguo (O/0, 1/l) e não tenha batido acima
+    (function(){
+      const mmg3=DATA.entities.find(e=>(e.legalName||'').toUpperCase().includes('MM GUERRA EMPREENDIMENTOS'));
+      const ocala3=DATA.properties.find(p=>(p.name||'').toUpperCase().includes('OCALA'));
+      if(!mmg3) return;
+      let changed3=false;
+      let txEmpire2=DATA.transactions.find(t=>t.entityId===mmg3.id && (t.originalDescription||'').toUpperCase().includes('EMPIRE CONSTRUCTION') && Math.abs(Math.abs(t.amount)-1500.00)<0.01 && t.status!=='REVIEWED');
+      if(txEmpire2){
+        txEmpire2.category='Expense';
+        txEmpire2.cpaCategory='Expense — Vandalism Repair: Drywall, Texture & Paint (Empire Construction LLC)';
+        txEmpire2.userDescription='Reparo de drywall, textura e pintura por causa do vandalismo — Empire Construction LLC (2ª parcela).';
+        txEmpire2.status='REVIEWED';
+        if(ocala3) txEmpire2.propertyId=ocala3.id;
+        changed3=true;
+      }
+      let txDkw50=DATA.transactions.find(t=>t.entityId===mmg3.id && (t.originalDescription||'').toUpperCase().includes('DKW') && Math.abs(Math.abs(t.amount)-50.00)<0.01 && t.status!=='REVIEWED');
+      if(txDkw50){
+        txDkw50.category='Expense';
+        txDkw50.cpaCategory='Expense — Landscaping: Pre-Rental Lawn Prep (DKW Repair LLC)';
+        txDkw50.userDescription='Serviço de jardinagem (abaixar grama) antes de alugar a Casa Ocala — DKW Repair LLC, mesma natureza da parcela de $100. Não relacionado ao vandalismo.';
+        txDkw50.status='REVIEWED';
+        if(ocala3) txDkw50.propertyId=ocala3.id;
+        changed3=true;
+      }
+      if(changed3) saveAndSync();
     })();
     // Zelle $240 para SHINEHOME LLC — limpeza da empresa (Familia Guerra Investing), serviço pontual, sem regra automática
     let txShine=DATA.transactions.find(t=>(t.originalDescription||'').includes('oaa3kcxu5'));
