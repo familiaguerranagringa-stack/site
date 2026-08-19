@@ -2120,6 +2120,7 @@ function renderDash(){
     return {imovel:p.imovel,liquido:p.liquido,despesas:despesasContas,saldo:p.liquido-despesasContas};
   });
   const totalDespesasPagas=linhasCalc.reduce((s,p)=>s+p.despesas,0);
+  const totalDespesasPendentes=repassesMes.filter(r=>r.status!=='pago').reduce((s,r)=>s+(+r.valor||0),0);
   const totalSaldoImoveis=linhasCalc.reduce((s,p)=>s+p.saldo,0);
   const disponivelAposPessoalNovo=totalSaldoImoveis-c.totalTransf;
   const blocoModulo=(mod)=>{
@@ -2145,8 +2146,7 @@ function renderDash(){
   <div class="kpi-grid">
     <div class="kpi"><div class="kpi-accent" style="background:var(--gold)"></div><div class="kpi-label">Líquido Recebido</div><div class="kpi-value pos">${fmt(c.totalLiquido)}</div></div>
     <div class="kpi"><div class="kpi-accent" style="background:var(--red)"></div><div class="kpi-label">Despesas do Mês (Pago)</div><div class="kpi-value neg">${fmt(totalDespesasPagas)}</div></div>
-    <div class="kpi"><div class="kpi-accent" style="background:var(--amber)"></div><div class="kpi-label">Condomínio Pendente</div><div class="kpi-value" style="color:var(--amber)">${fmt(c.totalCondPend)}</div></div>
-    <div class="kpi"><div class="kpi-accent" style="background:var(--red)"></div><div class="kpi-label">IPTU Recebido a Pagar</div><div class="kpi-value" style="color:var(--red)">${fmt(c.totalIptuAPagar)}</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--amber)"></div><div class="kpi-label">Despesas do Mês (A Pagar)</div><div id="cardTotalDespesasPendente" class="kpi-value" style="color:#e55353">${fmt(totalDespesasPendentes)}</div></div>
     <div class="kpi"><div class="kpi-accent" style="background:var(--blue)"></div><div class="kpi-label">Saldo Imóveis</div><div class="kpi-value ${vc(totalSaldoImoveis)}">${fmt(totalSaldoImoveis)}</div></div>
     <div class="kpi"><div class="kpi-accent" style="background:var(--dim)"></div><div class="kpi-label">Transferido p/ Pessoal</div><div class="kpi-value neg">${fmt(c.totalTransf)}</div></div>
     <div class="kpi"><div class="kpi-accent" style="background:var(--green)"></div><div class="kpi-label">Disponível Após Pessoal</div><div class="kpi-value ${vc(disponivelAposPessoalNovo)}">${fmt(disponivelAposPessoalNovo)}</div></div>
