@@ -34,7 +34,8 @@ html,body{min-height:100vh;background:var(--bg);color:var(--text);font-family:'D
 .sb-logo-eye{font-family:'Syne',sans-serif;font-size:9px;font-weight:700;letter-spacing:.22em;color:var(--gold);text-transform:uppercase;margin-bottom:4px}
 .sb-logo-name{font-family:'Syne',sans-serif;font-size:15px;font-weight:800;color:var(--text);line-height:1.1}
 .sb-logo-sub{font-size:10px;color:var(--dim);margin-top:2px}
-.sb-section{padding:12px 18px 4px;font-size:9px;font-weight:700;letter-spacing:.18em;color:var(--dim);text-transform:uppercase}
+.sb-section{padding:12px 18px 4px;font-size:9px;font-weight:700;letter-spacing:.18em;color:var(--dim);text-transform:uppercase;margin-top:6px;border-top:1px solid var(--border-lite)}
+.sb-section:first-of-type{border-top:none;margin-top:0}
 .sb-item{display:flex;align-items:center;gap:10px;padding:9px 14px;margin:1px 8px;border-radius:6px;cursor:pointer;transition:all .15s;color:var(--muted);font-size:12px;font-weight:500;border:none;background:none;width:calc(100% - 16px);text-align:left;font-family:'DM Sans',sans-serif}
 .sb-item:hover{background:var(--bg-hover);color:var(--text)}
 .sb-item.active{background:var(--gold-bg);color:var(--gold);border:1px solid var(--gold-dim)}
@@ -117,18 +118,26 @@ tr:hover td{background:var(--bg-hover)}
     </div>
     <div class="sb-section">Navegação</div>
     <button class="sb-item" data-nav="home" onclick="goTab('home')">🏠 Home</button>
-    <button class="sb-item" data-nav="entities" onclick="goTab('entities')">🏢 Business — Empresas</button>
-    <button class="sb-item" data-nav="accounts" onclick="goTab('accounts')">💳 Business — Contas</button>
-    <button class="sb-item" data-nav="import" onclick="goTab('import')">📥 Business — Import</button>
-    <button class="sb-item" data-nav="review" onclick="goTab('review')">⚡ Business — Quick Review</button>
-    <button class="sb-item" data-nav="ledger" onclick="goTab('ledger')">📒 Business — Transações</button>
-    <button class="sb-item" data-nav="personal" onclick="goTab('personal')">👤 Personal — Contas</button>
-    <button class="sb-item" data-nav="pimport" onclick="goTab('pimport')">👤 Personal — Import</button>
-    <button class="sb-item" data-nav="preview" onclick="goTab('preview')">👤 Personal — Quick Review</button>
-    <button class="sb-item" data-nav="pledger" onclick="goTab('pledger')">👤 Personal — Transações</button>
-    <button class="sb-item" data-nav="properties" onclick="goTab('properties')">🏘️ Properties</button>
-    <button class="sb-item" data-nav="presumo" onclick="goTab('presumo')">📊 Personal — Resumo</button>
-    <button class="sb-item" data-nav="wealth" onclick="goTab('wealth')">📊 Wealth</button>
+
+    <div class="sb-section">🏢 Business</div>
+    <button class="sb-item" data-nav="entities" onclick="goTab('entities')">Empresas</button>
+    <button class="sb-item" data-nav="accounts" onclick="goTab('accounts')">Contas</button>
+    <button class="sb-item" data-nav="import" onclick="goTab('import')">Import</button>
+    <button class="sb-item" data-nav="review" onclick="goTab('review')">Quick Review</button>
+    <button class="sb-item" data-nav="ledger" onclick="goTab('ledger')">Transações</button>
+
+    <div class="sb-section">👤 Personal</div>
+    <button class="sb-item" data-nav="personal" onclick="goTab('personal')">Contas</button>
+    <button class="sb-item" data-nav="pimport" onclick="goTab('pimport')">Import</button>
+    <button class="sb-item" data-nav="preview" onclick="goTab('preview')">Quick Review</button>
+    <button class="sb-item" data-nav="pledger" onclick="goTab('pledger')">Transações</button>
+    <button class="sb-item" data-nav="presumo" onclick="goTab('presumo')">Resumo</button>
+
+    <div class="sb-section">🏘️ Properties</div>
+    <button class="sb-item" data-nav="properties" onclick="goTab('properties')">Imóveis</button>
+
+    <div class="sb-section">📊 Wealth</div>
+    <button class="sb-item" data-nav="wealth" onclick="goTab('wealth')">Patrimônio</button>
     <div class="sb-bottom">
       <div id="sync-status">• Online</div>
       <button class="btn-ghost" style="width:100%;margin-top:8px" onclick="doLogout()">Sair</button>
