@@ -374,12 +374,13 @@ function syncFromFB(){
     let mmgForProp=DATA.entities.find(e=>(e.legalName||'').toUpperCase().includes('MM GUERRA EMPREENDIMENTOS'));
     let ocalaProp=DATA.properties.find(p=>(p.name||'').toUpperCase().includes('OCALA'));
     if(mmgForProp && !ocalaProp){
-      ocalaProp={id:uuid(),name:'Casa Ocala',address:'Ocala, FL (endereço a detalhar)',entityId:mmgForProp.id,
+      ocalaProp={id:uuid(),name:'Casa Ocala',address:'Ocala, FL (endereço a detalhar)',entityId:mmgForProp.id,acquisitionType:'Built',
         notes:'⚠️ HISTÓRICO DE VANDALISMO: o imóvel já sofreu vandalismo, gerando gastos de reparo. Ver transações classificadas como "Vandalism Repair" para o detalhamento.'};
       DATA.properties.push(ocalaProp);
       saveAndSync();
     } else if(ocalaProp && !(ocalaProp.notes||'').includes('VANDALISMO')){
       ocalaProp.notes=(ocalaProp.notes?ocalaProp.notes+' | ':'')+'⚠️ HISTÓRICO DE VANDALISMO: o imóvel já sofreu vandalismo, gerando gastos de reparo. Ver transações classificadas como "Vandalism Repair" para o detalhamento.';
+      if(!ocalaProp.acquisitionType) ocalaProp.acquisitionType='Built';
       saveAndSync();
     }
     // Tagueamento retroativo: transações já classificadas de aluguel/utilities da MM Guerra Empreendimentos → Casa Ocala
@@ -1789,10 +1790,24 @@ function renderProperties(c){
           </select>
         </div>
       </div>
-      <div class="sec-hdr" style="margin-top:14px"><h2 style="font-size:9px">Compra</h2><div class="sec-line"></div></div>
+      <div class="sec-hdr" style="margin-top:14px"><h2 style="font-size:9px">Aquisição</h2><div class="sec-line"></div></div>
       <div class="fg">
+        <div class="fl"><label>Tipo</label>
+          <select class="fi" onchange="updProperty('${p.id}','acquisitionType',this.value)">
+            <option value="Purchased" ${p.acquisitionType!=='Built'?'selected':''}>Comprado</option>
+            <option value="Built" ${p.acquisitionType==='Built'?'selected':''}>Construído</option>
+          </select>
+        </div>
+        ${p.acquisitionType==='Built' ? `
+        <div class="fl"><label>Data de Compra do Terreno</label><input class="fi" type="date" value="${esc(p.landPurchaseDate||'')}" onchange="updProperty('${p.id}','landPurchaseDate',this.value)"></div>
+        <div class="fl"><label>Custo do Terreno</label><input class="fi" value="${esc(p.landCost||'')}" placeholder="$" onchange="updProperty('${p.id}','landCost',this.value)"></div>
+        <div class="fl"><label>Início da Construção</label><input class="fi" type="date" value="${esc(p.constructionStart||'')}" onchange="updProperty('${p.id}','constructionStart',this.value)"></div>
+        <div class="fl"><label>Conclusão da Construção</label><input class="fi" type="date" value="${esc(p.constructionEnd||'')}" onchange="updProperty('${p.id}','constructionEnd',this.value)"></div>
+        <div class="fl"><label>Custo Total de Construção</label><input class="fi" value="${esc(p.constructionCost||'')}" placeholder="$" onchange="updProperty('${p.id}','constructionCost',this.value)"></div>
+        ` : `
         <div class="fl"><label>Data da Compra</label><input class="fi" type="date" value="${esc(p.purchaseDate||'')}" onchange="updProperty('${p.id}','purchaseDate',this.value)"></div>
         <div class="fl"><label>Preço de Compra</label><input class="fi" value="${esc(p.purchasePrice||'')}" placeholder="$" onchange="updProperty('${p.id}','purchasePrice',this.value)"></div>
+        `}
         <div class="fl"><label>Valor Estimado Atual</label><input class="fi" value="${esc(p.currentValue||'')}" placeholder="$" onchange="updProperty('${p.id}','currentValue',this.value)"></div>
       </div>
       <div class="sec-hdr" style="margin-top:14px"><h2 style="font-size:9px">Financiamento (se houver)</h2><div class="sec-line"></div></div>
