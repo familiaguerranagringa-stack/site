@@ -127,6 +127,7 @@ tr:hover td{background:var(--bg-hover)}
     <button class="sb-item" data-nav="preview" onclick="goTab('preview')">👤 Personal — Quick Review</button>
     <button class="sb-item" data-nav="pledger" onclick="goTab('pledger')">👤 Personal — Transações</button>
     <button class="sb-item" data-nav="properties" onclick="goTab('properties')">🏘️ Properties</button>
+    <button class="sb-item" data-nav="presumo" onclick="goTab('presumo')">📊 Personal — Resumo</button>
     <button class="sb-item" data-nav="wealth" onclick="goTab('wealth')">📊 Wealth</button>
     <div class="sb-bottom">
       <div id="sync-status">• Online</div>
@@ -187,7 +188,8 @@ const DATA={
   personalAccounts:[],     // contas pessoais (banco/cartão/KAST/cash) — nunca misturado com Business
   personalTransactions:[], // transações pessoais importadas
   personalRules:[],        // regras aprendidas pra classificação pessoal
-  monthlyChecklist:{}      // { 'YYYY-MM': { itemId: true/false } } — checklist de atualização mensal de extratos
+  monthlyChecklist:{},     // { 'YYYY-MM': { itemId: true/false } } — checklist de atualização mensal de extratos
+  properties:[]            // imóveis de aluguel: { id, name, address, entityId }
 };
 
 function load(k){try{return JSON.parse(localStorage.getItem(k)||'[]')}catch(e){return []}}
@@ -201,6 +203,7 @@ function saveLocal(){
   localStorage.setItem('finusa_personalTransactions',JSON.stringify(DATA.personalTransactions));
   localStorage.setItem('finusa_personalRules',JSON.stringify(DATA.personalRules));
   localStorage.setItem('finusa_monthlyChecklist',JSON.stringify(DATA.monthlyChecklist));
+  localStorage.setItem('finusa_properties',JSON.stringify(DATA.properties));
 }
 function saveAndSync(){
   saveLocal();
@@ -210,7 +213,7 @@ function pushToFB(){
   clearTimeout(_syncTimer);
   _syncTimer=setTimeout(()=>{
     setSyncStatus('⟳ Salvando...','var(--amber)');
-    _dbRef.set({entities:DATA.entities,accounts:DATA.accounts,transactions:DATA.transactions,rules:DATA.rules,personalAccounts:DATA.personalAccounts,personalTransactions:DATA.personalTransactions,personalRules:DATA.personalRules,monthlyChecklist:DATA.monthlyChecklist,_ts:Date.now()}).then(()=>{
+    _dbRef.set({entities:DATA.entities,accounts:DATA.accounts,transactions:DATA.transactions,rules:DATA.rules,personalAccounts:DATA.personalAccounts,personalTransactions:DATA.personalTransactions,personalRules:DATA.personalRules,monthlyChecklist:DATA.monthlyChecklist,properties:DATA.properties,_ts:Date.now()}).then(()=>{
       setSyncStatus('✓ Salvo','var(--green)');
       setTimeout(()=>setSyncStatus('• Online','var(--green)'),2000);
     }).catch(e=>{
@@ -352,6 +355,7 @@ function syncFromFB(){
       DATA.personalTransactions=rec.personalTransactions||[];
       DATA.personalRules=rec.personalRules||[];
       DATA.monthlyChecklist=rec.monthlyChecklist||{};
+      DATA.properties=rec.properties||[];
       saveLocal();
       setSyncStatus('✓ Sincronizado','var(--green)');
     } else {
@@ -363,7 +367,30 @@ function syncFromFB(){
       DATA.personalTransactions=load('finusa_personalTransactions');
       DATA.personalRules=load('finusa_personalRules');
       DATA.monthlyChecklist=loadObj('finusa_monthlyChecklist');
+      DATA.properties=load('finusa_properties');
       setSyncStatus('• Online (vazio)','var(--green)');
+    }
+    // Imóvel de Ocala (aluguel via TurboTenant) — registrado na MM Guerra Empreendimentos LLC
+    let mmgForProp=DATA.entities.find(e=>(e.legalName||'').toUpperCase().includes('MM GUERRA EMPREENDIMENTOS'));
+    let ocalaProp=DATA.properties.find(p=>(p.name||'').toUpperCase().includes('OCALA'));
+    if(mmgForProp && !ocalaProp){
+      ocalaProp={id:uuid(),name:'Casa Ocala',address:'Ocala, FL (endereço a detalhar)',entityId:mmgForProp.id};
+      DATA.properties.push(ocalaProp);
+      saveAndSync();
+    }
+    // Tagueamento retroativo: transações já classificadas de aluguel/utilities da MM Guerra Empreendimentos → Casa Ocala
+    if(ocalaProp){
+      let tagFix=false;
+      DATA.transactions.forEach(t=>{
+        if(t.entityId===mmgForProp.id && !t.propertyId){
+          const cc=(t.cpaCategory||'');
+          if(cc.includes('Rental Income') || cc.includes('Utilities - Electricity') || cc.includes('Utilities - Water/Sewer')){
+            t.propertyId=ocalaProp.id;
+            tagFix=true;
+          }
+        }
+      });
+      if(tagFix) saveAndSync();
     }
     // Cheque de $17.000 (BKOFAMERICA BC) — entrada do Jet Ski Seadoo GTX 325 Limited 2026. Correção pontual, sem regra automática.
     let txJetski=DATA.personalTransactions.find(t=>Math.abs(Math.abs(t.amount)-17000)<0.01 && (t.originalDescription||'').toUpperCase().includes('BKOFAMERICA'));
@@ -877,6 +904,7 @@ function syncFromFB(){
     DATA.personalTransactions=load('finusa_personalTransactions');
     DATA.personalRules=load('finusa_personalRules');
     DATA.monthlyChecklist=loadObj('finusa_monthlyChecklist');
+    DATA.properties=load('finusa_properties');
     dedupeEntities();
     let gfe=DATA.entities.find(e=>(e.legalName||'').toUpperCase().includes('GUERRA FAMILY EMPIRE'));
     if(!gfe){
@@ -925,7 +953,7 @@ document.getElementById('l-user').addEventListener('keydown',e=>{if(e.key==='Ent
 
 // ── NAVEGAÇÃO ──
 const ST={tab:'home'};
-const TITLES={home:'Home',entities:'Business — Empresas',accounts:'Business — Contas',import:'Business — Import',review:'Business — Quick Review',ledger:'Business — Transações',personal:'Personal — Contas',pimport:'Personal — Import',preview:'Personal — Quick Review',pledger:'Personal — Transações',properties:'Properties',wealth:'Wealth'};
+const TITLES={home:'Home',entities:'Business — Empresas',accounts:'Business — Contas',import:'Business — Import',review:'Business — Quick Review',ledger:'Business — Transações',personal:'Personal — Contas',pimport:'Personal — Import',preview:'Personal — Quick Review',pledger:'Personal — Transações',properties:'Properties',presumo:'Personal — Resumo',wealth:'Wealth'};
 function goTab(tab){
   ST.tab=tab;
   document.querySelectorAll('.sb-item').forEach(b=>b.classList.toggle('active',b.dataset.nav===tab));
@@ -949,7 +977,8 @@ function render(){
   if(ST.tab==='pimport') return renderPersonalImport(c);
   if(ST.tab==='preview') return renderPersonalReview(c);
   if(ST.tab==='pledger') return renderPersonalLedger(c);
-  if(ST.tab==='properties') return renderPlaceholder(c,'Properties','Módulo de Imóveis de Aluguel (EUA) — Property Profile, Rental Income, Expenses, Mortgage Split, Performance. Chega na próxima fase do MVP.');
+  if(ST.tab==='properties') return renderProperties(c);
+  if(ST.tab==='presumo') return renderPersonalResumo(c);
   if(ST.tab==='wealth') return renderPlaceholder(c,'Wealth','Módulo de Patrimônio Consolidado (Net Worth) — reservado para Phase 4.');
 }
 
@@ -1713,6 +1742,120 @@ function renderPersonalLedger(c){
   `;
 }
 
+// ══════════════════════════════════════════════════════════
+// PROPERTIES — imóveis de aluguel, com receita/despesa separada por imóvel
+// ══════════════════════════════════════════════════════════
+
+function addProperty(){
+  if(!DATA.entities.length){notify('Cadastre uma empresa antes de adicionar um imóvel.','err');return;}
+  DATA.properties.push({id:uuid(),name:'',address:'',entityId:DATA.entities[0].id});
+  saveAndSync();
+  render();
+}
+function removeProperty(id){
+  DATA.properties=DATA.properties.filter(p=>p.id!==id);
+  DATA.transactions.forEach(t=>{if(t.propertyId===id) delete t.propertyId;});
+  saveAndSync();
+  render();
+}
+function updProperty(id,field,val){
+  const p=DATA.properties.find(p=>p.id===id);
+  if(p){p[field]=val;saveAndSync();}
+  render();
+}
+function propertyFinancials(propId){
+  const txs=DATA.transactions.filter(t=>t.propertyId===propId);
+  const income=txs.filter(t=>t.amount>0).reduce((s,t)=>s+t.amount,0);
+  const expense=txs.filter(t=>t.amount<0).reduce((s,t)=>s+Math.abs(t.amount),0);
+  return {income,expense,net:income-expense,count:txs.length};
+}
+
+function renderProperties(c){
+  const rows=DATA.properties.map(p=>{
+    const ent=DATA.entities.find(e=>e.id===p.entityId);
+    const fin=propertyFinancials(p.id);
+    return `
+    <div class="form-card">
+      <div class="fg">
+        <div class="fl"><label>Nome do Imóvel</label><input class="fi" value="${esc(p.name)}" placeholder="Ex: Casa Ocala" onchange="updProperty('${p.id}','name',this.value)"></div>
+        <div class="fl"><label>Endereço</label><input class="fi" value="${esc(p.address)}" onchange="updProperty('${p.id}','address',this.value)"></div>
+        <div class="fl"><label>Empresa dona</label>
+          <select class="fi" onchange="updProperty('${p.id}','entityId',this.value)">
+            ${DATA.entities.map(e=>`<option value="${e.id}" ${e.id===p.entityId?'selected':''}>${esc(e.legalName)||'(sem nome)'}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+      <div class="kpi-grid" style="margin-top:10px;margin-bottom:0">
+        <div class="kpi"><div class="kpi-accent" style="background:var(--green)"></div><div class="kpi-label">Receita (Rental Income)</div><div class="kpi-value" style="color:var(--green)">+$${fin.income.toLocaleString('en-US',{minimumFractionDigits:2})}</div></div>
+        <div class="kpi"><div class="kpi-accent" style="background:var(--red)"></div><div class="kpi-label">Despesas</div><div class="kpi-value" style="color:var(--red)">-$${fin.expense.toLocaleString('en-US',{minimumFractionDigits:2})}</div></div>
+        <div class="kpi"><div class="kpi-accent" style="background:${fin.net>=0?'var(--green)':'var(--red)'}"></div><div class="kpi-label">Líquido (Net Cash Flow)</div><div class="kpi-value" style="color:${fin.net>=0?'var(--green)':'var(--red)'}">${fin.net>=0?'+':'-'}$${Math.abs(fin.net).toLocaleString('en-US',{minimumFractionDigits:2})}</div></div>
+      </div>
+      <div style="margin-top:10px;font-size:11px;color:var(--dim)">${fin.count} transação(ões) vinculada(s) a este imóvel</div>
+      <button class="btn-sm" style="margin-top:8px" onclick="removeProperty('${p.id}')">Remover Imóvel</button>
+    </div>`;
+  }).join('');
+
+  // Portfólio consolidado (quando houver 2+ imóveis)
+  let portfolioBox='';
+  if(DATA.properties.length>1){
+    const totalIncome=DATA.properties.reduce((s,p)=>s+propertyFinancials(p.id).income,0);
+    const totalExpense=DATA.properties.reduce((s,p)=>s+propertyFinancials(p.id).expense,0);
+    portfolioBox=`
+      <div class="sec-hdr"><h2>Portfolio Dashboard</h2><div class="sec-line"></div></div>
+      <div class="kpi-grid">
+        <div class="kpi"><div class="kpi-accent" style="background:var(--gold)"></div><div class="kpi-label">Número de Imóveis</div><div class="kpi-value">${DATA.properties.length}</div></div>
+        <div class="kpi"><div class="kpi-accent" style="background:var(--green)"></div><div class="kpi-label">Receita Total (todos imóveis)</div><div class="kpi-value" style="color:var(--green)">+$${totalIncome.toLocaleString('en-US',{minimumFractionDigits:2})}</div></div>
+        <div class="kpi"><div class="kpi-accent" style="background:var(--red)"></div><div class="kpi-label">Despesa Total (todos imóveis)</div><div class="kpi-value" style="color:var(--red)">-$${totalExpense.toLocaleString('en-US',{minimumFractionDigits:2})}</div></div>
+      </div>
+    `;
+  }
+
+  document.getElementById('content').innerHTML=`
+    <div class="sec-hdr"><h2>Properties — Imóveis de Aluguel</h2><div class="sec-line"></div><button class="btn-gold" onclick="addProperty()">+ Novo Imóvel</button></div>
+    <div class="sec-note">Vincule transações a um imóvel na tela de edição em Business → Transações (campo "Imóvel"). Isso separa receita e despesa de cada casa automaticamente.</div>
+    ${portfolioBox}
+    ${rows||'<div class="empty"><div style="font-size:28px">🏘️</div><div>Nenhum imóvel cadastrado ainda.</div></div>'}
+  `;
+}
+
+// ══════════════════════════════════════════════════════════
+// PERSONAL RESUMO — entrada vs saída, salário, aluguéis, filtros
+// ══════════════════════════════════════════════════════════
+function renderPersonalResumo(c){
+  // Salário (Income > W-2 Salary) — todas as transações pessoais
+  const salaryTxs=DATA.personalTransactions.filter(t=>t.category==='Income > W-2 Salary');
+  const totalSalary=salaryTxs.reduce((s,t)=>s+t.amount,0);
+
+  // Aluguéis recebidos — soma de receita (Rental Income) de todos os imóveis cadastrados
+  const totalRental=DATA.properties.reduce((s,p)=>s+propertyFinancials(p.id).income,0);
+
+  // Despesas pessoais (tudo que é negativo na conta pessoal, exceto Transfer — pra não contar pagamento de fatura)
+  const personalExpenseTxs=DATA.personalTransactions.filter(t=>t.amount<0 && t.category!=='Financial > Transfer');
+  const totalPersonalExpense=personalExpenseTxs.reduce((s,t)=>s+Math.abs(t.amount),0);
+
+  // Entrada total pessoal (tudo positivo na conta pessoal)
+  const personalIncomeTxs=DATA.personalTransactions.filter(t=>t.amount>0);
+  const totalPersonalIncome=personalIncomeTxs.reduce((s,t)=>s+t.amount,0);
+
+  const net=totalPersonalIncome-totalPersonalExpense;
+
+  document.getElementById('content').innerHTML=`
+    <div class="sec-hdr"><h2>Resumo Pessoal</h2><div class="sec-line"></div></div>
+    <div class="sec-note">Resumo geral de entradas e saídas. Clique em qualquer card para ver as transações relacionadas.</div>
+    <div class="kpi-grid">
+      <div class="kpi" onclick="goTab('pledger')"><div class="kpi-accent" style="background:var(--green)"></div><div class="kpi-label">Total Entradas (Conta Pessoal)</div><div class="kpi-value" style="color:var(--green)">+$${totalPersonalIncome.toLocaleString('en-US',{minimumFractionDigits:2})}</div><div class="kpi-sub">${personalIncomeTxs.length} transação(ões)</div></div>
+      <div class="kpi" onclick="goTab('pledger')"><div class="kpi-accent" style="background:var(--red)"></div><div class="kpi-label">Total Saídas (Conta Pessoal)</div><div class="kpi-value" style="color:var(--red)">-$${totalPersonalExpense.toLocaleString('en-US',{minimumFractionDigits:2})}</div><div class="kpi-sub">${personalExpenseTxs.length} transação(ões) · exclui pagamento de fatura</div></div>
+      <div class="kpi"><div class="kpi-accent" style="background:${net>=0?'var(--green)':'var(--red)'}"></div><div class="kpi-label">Saldo (Entrada − Saída)</div><div class="kpi-value" style="color:${net>=0?'var(--green)':'var(--red)'}">${net>=0?'+':'-'}$${Math.abs(net).toLocaleString('en-US',{minimumFractionDigits:2})}</div><div class="kpi-sub">${net>=0?'Ganhando mais do que gasta':'Gastando mais do que ganha'}</div></div>
+    </div>
+
+    <div class="sec-hdr"><h2>Por Fonte</h2><div class="sec-line"></div></div>
+    <div class="kpi-grid">
+      <div class="kpi"><div class="kpi-accent" style="background:var(--blue)"></div><div class="kpi-label">Salário Total (até hoje)</div><div class="kpi-value">$${totalSalary.toLocaleString('en-US',{minimumFractionDigits:2})}</div><div class="kpi-sub">${salaryTxs.length} pagamento(s) — Outside Lounge</div></div>
+      <div class="kpi" onclick="goTab('properties')"><div class="kpi-accent" style="background:var(--gold)"></div><div class="kpi-label">Aluguéis Recebidos (todos imóveis)</div><div class="kpi-value">$${totalRental.toLocaleString('en-US',{minimumFractionDigits:2})}</div><div class="kpi-sub">${DATA.properties.length} imóvel(is) cadastrado(s)</div></div>
+    </div>
+  `;
+}
+
 function esc(s){return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 
 // ── CATEGORIAS DE NEGÓCIO (User Category) — conforme definido no projeto ──
@@ -2240,6 +2383,8 @@ function saveEditTx(id){
   t.category=document.getElementById('edit-cat-'+id).value;
   t.cpaCategory=document.getElementById('edit-cpa-'+id).value;
   t.userDescription=document.getElementById('edit-note-'+id).value;
+  const propEl=document.getElementById('edit-prop-'+id);
+  if(propEl){ t.propertyId=propEl.value||undefined; }
   if(t.category==='CPA Review'){
     t.status='CPA_REVIEW';
   } else {
@@ -2310,6 +2455,13 @@ function renderLedger(c){
             <div class="fl"><label>CPA / Accounting Category</label><input class="fi" id="edit-cpa-${t.id}" value="${esc(t.cpaCategory)}"></div>
           </div>
           <div class="fl" style="margin-top:10px"><label>User Description (nota)</label><input class="fi" id="edit-note-${t.id}" value="${esc(t.userDescription)}"></div>
+          ${DATA.properties.some(p=>p.entityId===t.entityId) ? `
+          <div class="fl" style="margin-top:10px"><label>Imóvel (opcional)</label>
+            <select class="fi" id="edit-prop-${t.id}">
+              <option value="">Nenhum</option>
+              ${DATA.properties.filter(p=>p.entityId===t.entityId).map(p=>`<option value="${p.id}" ${t.propertyId===p.id?'selected':''}>${esc(p.name)||'(sem nome)'}</option>`).join('')}
+            </select>
+          </div>` : ''}
           <div style="margin-top:12px">
             <button class="btn-gold" onclick="saveEditTx('${t.id}')">Salvar</button>
             <button class="btn-ghost" style="margin-left:8px" onclick="cancelEditTx()">Cancelar</button>
