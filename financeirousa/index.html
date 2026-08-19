@@ -2023,6 +2023,10 @@ function detectPropertyPatterns(desc){
   if(compact.includes('TYLMARION')){
     return {category:'Expense',cpaCategory:'Utilities - Water/Sewer Convenience Fee (Marion County FL, via Tyler Technologies)',userDescription:'Taxa de conveniência/processamento cobrada pela Tyler Technologies (processadora de pagamento por cartão) sobre a conta de água/esgoto de Marion County FL. Não é conta nova, é a taxa referente ao pagamento da conta.'};
   }
+  // Débito ACH da Tyler Tech vinculado ao ID de conta 0000070577 (identificador da MM Guerra junto à Tyler Tech para essa mesma conta de água de Marion County) — mais específico que "TYLER TECH" sozinho, que a Tyler processa pagamento pra vários órgãos públicos diferentes
+  if(compact.includes('TYLERTECH') && compact.includes('SERVICEFEE') && d.includes('0000070577')){
+    return {category:'Expense',cpaCategory:'Utilities - Water/Sewer Convenience Fee (Marion County FL, via Tyler Technologies)',userDescription:'Taxa de conveniência/processamento cobrada pela Tyler Technologies via débito ACH (ID de conta 0000070577), referente à conta de água/esgoto de Marion County FL. Mesma natureza da taxa cobrada no cartão (TYL*MARION).'};
+  }
   return null;
 }
 // ── DETECÇÃO AUTOMÁTICA: seguro da casa de Ocala (Security First Insurance, apólice FL00185503-01) ──
