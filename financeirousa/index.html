@@ -2020,6 +2020,9 @@ function detectPropertyPatterns(desc){
   if(compact.includes('MARIONCOUNTY')){
     return {category:'Expense',cpaCategory:'Utilities - Water/Sewer',userDescription:'Conta de água/esgoto — Marion County FL'};
   }
+  if(compact.includes('TYLMARION')){
+    return {category:'Expense',cpaCategory:'Utilities - Water/Sewer Convenience Fee (Marion County FL, via Tyler Technologies)',userDescription:'Taxa de conveniência/processamento cobrada pela Tyler Technologies (processadora de pagamento por cartão) sobre a conta de água/esgoto de Marion County FL. Não é conta nova, é a taxa referente ao pagamento da conta.'};
+  }
   return null;
 }
 // ── DETECÇÃO AUTOMÁTICA: seguro da casa de Ocala (Security First Insurance, apólice FL00185503-01) ──
