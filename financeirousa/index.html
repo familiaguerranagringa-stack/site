@@ -374,8 +374,12 @@ function syncFromFB(){
     let mmgForProp=DATA.entities.find(e=>(e.legalName||'').toUpperCase().includes('MM GUERRA EMPREENDIMENTOS'));
     let ocalaProp=DATA.properties.find(p=>(p.name||'').toUpperCase().includes('OCALA'));
     if(mmgForProp && !ocalaProp){
-      ocalaProp={id:uuid(),name:'Casa Ocala',address:'Ocala, FL (endereço a detalhar)',entityId:mmgForProp.id};
+      ocalaProp={id:uuid(),name:'Casa Ocala',address:'Ocala, FL (endereço a detalhar)',entityId:mmgForProp.id,
+        notes:'⚠️ HISTÓRICO DE VANDALISMO: o imóvel já sofreu vandalismo, gerando gastos de reparo. Ver transações classificadas como "Vandalism Repair" para o detalhamento.'};
       DATA.properties.push(ocalaProp);
+      saveAndSync();
+    } else if(ocalaProp && !(ocalaProp.notes||'').includes('VANDALISMO')){
+      ocalaProp.notes=(ocalaProp.notes?ocalaProp.notes+' | ':'')+'⚠️ HISTÓRICO DE VANDALISMO: o imóvel já sofreu vandalismo, gerando gastos de reparo. Ver transações classificadas como "Vandalism Repair" para o detalhamento.';
       saveAndSync();
     }
     // Tagueamento retroativo: transações já classificadas de aluguel/utilities da MM Guerra Empreendimentos → Casa Ocala
@@ -1785,7 +1789,34 @@ function renderProperties(c){
           </select>
         </div>
       </div>
-      <div class="kpi-grid" style="margin-top:10px;margin-bottom:0">
+      <div class="sec-hdr" style="margin-top:14px"><h2 style="font-size:9px">Compra</h2><div class="sec-line"></div></div>
+      <div class="fg">
+        <div class="fl"><label>Data da Compra</label><input class="fi" type="date" value="${esc(p.purchaseDate||'')}" onchange="updProperty('${p.id}','purchaseDate',this.value)"></div>
+        <div class="fl"><label>Preço de Compra</label><input class="fi" value="${esc(p.purchasePrice||'')}" placeholder="$" onchange="updProperty('${p.id}','purchasePrice',this.value)"></div>
+        <div class="fl"><label>Valor Estimado Atual</label><input class="fi" value="${esc(p.currentValue||'')}" placeholder="$" onchange="updProperty('${p.id}','currentValue',this.value)"></div>
+      </div>
+      <div class="sec-hdr" style="margin-top:14px"><h2 style="font-size:9px">Financiamento (se houver)</h2><div class="sec-line"></div></div>
+      <div class="fg">
+        <div class="fl"><label>Saldo Devedor</label><input class="fi" value="${esc(p.mortgageBalance||'')}" placeholder="$" onchange="updProperty('${p.id}','mortgageBalance',this.value)"></div>
+        <div class="fl"><label>Taxa de Juros</label><input class="fi" value="${esc(p.interestRate||'')}" placeholder="%" onchange="updProperty('${p.id}','interestRate',this.value)"></div>
+        <div class="fl"><label>Parcela Mensal</label><input class="fi" value="${esc(p.monthlyPayment||'')}" placeholder="$" onchange="updProperty('${p.id}','monthlyPayment',this.value)"></div>
+      </div>
+      <div class="sec-hdr" style="margin-top:14px"><h2 style="font-size:9px">Aluguel</h2><div class="sec-line"></div></div>
+      <div class="fg">
+        <div class="fl"><label>Inquilino</label><input class="fi" value="${esc(p.tenant||'')}" onchange="updProperty('${p.id}','tenant',this.value)"></div>
+        <div class="fl"><label>Aluguel Mensal</label><input class="fi" value="${esc(p.monthlyRent||'')}" placeholder="$" onchange="updProperty('${p.id}','monthlyRent',this.value)"></div>
+        <div class="fl"><label>Depósito de Segurança</label><input class="fi" value="${esc(p.securityDeposit||'')}" placeholder="$" onchange="updProperty('${p.id}','securityDeposit',this.value)"></div>
+        <div class="fl"><label>Início do Contrato</label><input class="fi" type="date" value="${esc(p.leaseStart||'')}" onchange="updProperty('${p.id}','leaseStart',this.value)"></div>
+        <div class="fl"><label>Fim do Contrato</label><input class="fi" type="date" value="${esc(p.leaseEnd||'')}" onchange="updProperty('${p.id}','leaseEnd',this.value)"></div>
+      </div>
+      <div class="sec-hdr" style="margin-top:14px"><h2 style="font-size:9px">Seguro & Property Tax</h2><div class="sec-line"></div></div>
+      <div class="fg">
+        <div class="fl"><label>Seguradora</label><input class="fi" value="${esc(p.insuranceCompany||'')}" placeholder="Ex: Security First Insurance" onchange="updProperty('${p.id}','insuranceCompany',this.value)"></div>
+        <div class="fl"><label>Prêmio Anual do Seguro</label><input class="fi" value="${esc(p.insurancePremium||'')}" placeholder="$" onchange="updProperty('${p.id}','insurancePremium',this.value)"></div>
+        <div class="fl"><label>Property Tax Anual</label><input class="fi" value="${esc(p.propertyTax||'')}" placeholder="$" onchange="updProperty('${p.id}','propertyTax',this.value)"></div>
+      </div>
+      <div class="fl" style="margin-top:10px"><label>Notes</label><textarea class="fi" rows="2" onchange="updProperty('${p.id}','notes',this.value)">${esc(p.notes||'')}</textarea></div>
+      <div class="kpi-grid" style="margin-top:14px;margin-bottom:0">
         <div class="kpi"><div class="kpi-accent" style="background:var(--green)"></div><div class="kpi-label">Receita (Rental Income)</div><div class="kpi-value" style="color:var(--green)">+$${fin.income.toLocaleString('en-US',{minimumFractionDigits:2})}</div></div>
         <div class="kpi"><div class="kpi-accent" style="background:var(--red)"></div><div class="kpi-label">Despesas</div><div class="kpi-value" style="color:var(--red)">-$${fin.expense.toLocaleString('en-US',{minimumFractionDigits:2})}</div></div>
         <div class="kpi"><div class="kpi-accent" style="background:${fin.net>=0?'var(--green)':'var(--red)'}"></div><div class="kpi-label">Líquido (Net Cash Flow)</div><div class="kpi-value" style="color:${fin.net>=0?'var(--green)':'var(--red)'}">${fin.net>=0?'+':'-'}$${Math.abs(fin.net).toLocaleString('en-US',{minimumFractionDigits:2})}</div></div>
