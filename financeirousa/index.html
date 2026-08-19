@@ -660,7 +660,7 @@ function syncFromFB(){
     let retro=false;
     DATA.transactions.forEach(t=>{
       if(t.status==='UNREVIEWED' && !t.category){
-        const guess=detectWireContributionFromBrazil(t.originalDescription)||detectMemberDistribution(t.originalDescription)||detectIntercompanyContribution(t.originalDescription)||detectPropertyPatterns(t.originalDescription)||detectSecurityFirstInsurance(t.originalDescription)||detectBofaMaintenanceFee(t.originalDescription,t.amount)||detectChkg7968InternalTransfer(t.originalDescription)||detectVixConstructionPayment(t.originalDescription,t.amount)||detectMarichellLandscaping(t.originalDescription)||detectTMobilePersonal(t.originalDescription)||detectSpectrumInternet(t.originalDescription)||detectOrangeCountyUtilities(t.originalDescription)||detectLakesOfWindermereHOA(t.originalDescription)||detectPaschoalLandscaping(t.originalDescription)||detectLucianoLMagic(t.originalDescription)||detectCreditCardBillPayment(t.originalDescription);
+        const guess=detectWireContributionFromBrazil(t.originalDescription)||detectMemberDistribution(t.originalDescription)||detectIntercompanyContribution(t.originalDescription)||detectPropertyPatterns(t.originalDescription)||detectSecurityFirstInsurance(t.originalDescription)||detectBofaMaintenanceFee(t.originalDescription,t.amount)||detectChkg7968InternalTransfer(t.originalDescription)||detectVixConstructionPayment(t.originalDescription,t.amount)||detectMarichellLandscaping(t.originalDescription)||detectTMobilePersonal(t.originalDescription)||detectSpectrumInternet(t.originalDescription)||detectOrangeCountyUtilities(t.originalDescription)||detectLakesOfWindermereHOA(t.originalDescription,t.amount)||detectPaschoalLandscaping(t.originalDescription)||detectLucianoLMagic(t.originalDescription)||detectCreditCardBillPayment(t.originalDescription);
         if(guess){
           t.category=guess.category;
           t.cpaCategory=guess.cpaCategory;
@@ -671,7 +671,7 @@ function syncFromFB(){
       }
       // Recupera transações marcadas como CPA Review que na verdade batem com um padrão conhecido (ex: Duke Energy)
       if(t.status==='CPA_REVIEW'){
-        const guess2=detectPropertyPatterns(t.originalDescription)||detectSecurityFirstInsurance(t.originalDescription)||detectBofaMaintenanceFee(t.originalDescription,t.amount)||detectChkg7968InternalTransfer(t.originalDescription)||detectVixConstructionPayment(t.originalDescription,t.amount)||detectMarichellLandscaping(t.originalDescription)||detectTMobilePersonal(t.originalDescription)||detectSpectrumInternet(t.originalDescription)||detectOrangeCountyUtilities(t.originalDescription)||detectLakesOfWindermereHOA(t.originalDescription)||detectPaschoalLandscaping(t.originalDescription)||detectLucianoLMagic(t.originalDescription)||detectCreditCardBillPayment(t.originalDescription);
+        const guess2=detectPropertyPatterns(t.originalDescription)||detectSecurityFirstInsurance(t.originalDescription)||detectBofaMaintenanceFee(t.originalDescription,t.amount)||detectChkg7968InternalTransfer(t.originalDescription)||detectVixConstructionPayment(t.originalDescription,t.amount)||detectMarichellLandscaping(t.originalDescription)||detectTMobilePersonal(t.originalDescription)||detectSpectrumInternet(t.originalDescription)||detectOrangeCountyUtilities(t.originalDescription)||detectLakesOfWindermereHOA(t.originalDescription,t.amount)||detectPaschoalLandscaping(t.originalDescription)||detectLucianoLMagic(t.originalDescription)||detectCreditCardBillPayment(t.originalDescription);
         if(guess2){
           t.category=guess2.category;
           t.cpaCategory=guess2.cpaCategory;
@@ -750,7 +750,7 @@ function syncFromFB(){
         if(t.status!=='REVIEWED') t.status='AI_SUGGESTED';
         bofaFix=true;
       }
-      const hoaGuess=detectLakesOfWindermereHOA(t.originalDescription);
+      const hoaGuess=detectLakesOfWindermereHOA(t.originalDescription,t.amount);
       if(hoaGuess && t.cpaCategory!==hoaGuess.cpaCategory){
         t.category=hoaGuess.category;
         t.cpaCategory=hoaGuess.cpaCategory;
@@ -861,6 +861,19 @@ function syncFromFB(){
         changed3=true;
       }
       if(changed3) saveAndSync();
+    })();
+    // Lakes of Windermere $161,46 (4/13/26) — compra avulsa: 2 controles de portão ($100) + 2 cartões de piscina/chaves de banheiro ($56) + taxa de cartão ($5,46). NÃO é a taxa trimestral do HOA (essa é a única exceção, o resto do histórico continua sendo condomínio normal)
+    (function(){
+      const fgh=DATA.entities.find(e=>(e.legalName||'').toUpperCase().includes('FAMILIA GUERRA HOLDING'));
+      if(!fgh) return;
+      let txLakes=DATA.transactions.find(t=>t.entityId===fgh.id && Math.abs(Math.abs(t.amount)-161.46)<0.01 && (t.category==='CPA Review' || t.cpaCategory==='Personal Expense Paid by Business — HOA Fee (Personal Residence, Quarterly)'));
+      if(txLakes){
+        txLakes.category='Personal Expense Paid by Business';
+        txLakes.cpaCategory='Personal Expense Paid by Business — HOA: Gate Remotes & Pool/Restroom Access Cards (Lakes of Windermere, one-time)';
+        txLakes.userDescription='Compra avulsa na Lakes of Windermere (residência pessoal): 2 controles de portão ($100,00) + 2 cartões de piscina/2 chaves de banheiro ($56,00) + taxa de cartão ($5,46) = $161,46. NÃO é a taxa trimestral do HOA.';
+        txLakes.status='REVIEWED';
+        saveAndSync();
+      }
     })();
     // Zelle $240 para SHINEHOME LLC — limpeza da empresa (Familia Guerra Investing), serviço pontual, sem regra automática
     let txShine=DATA.transactions.find(t=>(t.originalDescription||'').includes('oaa3kcxu5'));
@@ -2133,10 +2146,12 @@ function detectOrangeCountyUtilities(desc){
 }
 
 // ── DETECÇÃO AUTOMÁTICA: Lakes of Windermere HOA — taxa de condomínio da casa (pagamento trimestral) ──
-function detectLakesOfWindermereHOA(desc){
+function detectLakesOfWindermereHOA(desc,amount){
   const d=(desc||'').toUpperCase();
   const compact=d.replace(/[^A-Z]/g,'');
   if(!compact.includes('LAKESOFWIND')) return null;
+  // Exceção pontual: $161,46 em 4/13/26 foi compra avulsa (2 controles de portão + 2 cartões de piscina/chaves de banheiro), NÃO é a taxa trimestral — não reclassificar como HOA
+  if(amount!==undefined && amount!==null && Math.abs(Math.abs(amount)-161.46)<0.01) return null;
   return {
     category:'Personal Expense Paid by Business',
     cpaCategory:'Personal Expense Paid by Business — HOA Fee (Personal Residence, Quarterly)',
@@ -2346,7 +2361,7 @@ function processImportRows(rows){
     const tmobileGuess=(!rule && !wireGuess && !distGuess && !intercoGuess && !propGuess && !secGuess && !bofaGuess && !chkgGuess && !vixGuess && !marichellGuess)?detectTMobilePersonal(p.description):null;
     const spectrumGuess=(!rule && !wireGuess && !distGuess && !intercoGuess && !propGuess && !secGuess && !bofaGuess && !chkgGuess && !vixGuess && !marichellGuess && !tmobileGuess)?detectSpectrumInternet(p.description):null;
     const orangeCoGuess=(!rule && !wireGuess && !distGuess && !intercoGuess && !propGuess && !secGuess && !bofaGuess && !chkgGuess && !vixGuess && !marichellGuess && !tmobileGuess && !spectrumGuess)?detectOrangeCountyUtilities(p.description):null;
-    const hoaGuess=(!rule && !wireGuess && !distGuess && !intercoGuess && !propGuess && !secGuess && !bofaGuess && !chkgGuess && !vixGuess && !marichellGuess && !tmobileGuess && !spectrumGuess && !orangeCoGuess)?detectLakesOfWindermereHOA(p.description):null;
+    const hoaGuess=(!rule && !wireGuess && !distGuess && !intercoGuess && !propGuess && !secGuess && !bofaGuess && !chkgGuess && !vixGuess && !marichellGuess && !tmobileGuess && !spectrumGuess && !orangeCoGuess)?detectLakesOfWindermereHOA(p.description,p.amount):null;
     const paschoalGuess=(!rule && !wireGuess && !distGuess && !intercoGuess && !propGuess && !secGuess && !bofaGuess && !chkgGuess && !vixGuess && !marichellGuess && !tmobileGuess && !spectrumGuess && !orangeCoGuess && !hoaGuess)?detectPaschoalLandscaping(p.description):null;
     const lucianoGuess=(!rule && !wireGuess && !distGuess && !intercoGuess && !propGuess && !secGuess && !bofaGuess && !chkgGuess && !vixGuess && !marichellGuess && !tmobileGuess && !spectrumGuess && !orangeCoGuess && !hoaGuess && !paschoalGuess)?detectLucianoLMagic(p.description):null;
     const ccBillGuess=(!rule && !wireGuess && !distGuess && !intercoGuess && !propGuess && !secGuess && !bofaGuess && !chkgGuess && !vixGuess && !marichellGuess && !tmobileGuess && !spectrumGuess && !orangeCoGuess && !hoaGuess && !paschoalGuess && !lucianoGuess)?detectCreditCardBillPayment(p.description):null;
