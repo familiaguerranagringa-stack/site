@@ -1004,6 +1004,19 @@ function syncFromFB(){
       txJuros.status='REVIEWED';
       saveAndSync();
     }
+    // $2,99 "ACCT INTEGRATORS DES:Assn Dues" (Familia Guerra Holding, 1/30/26) — mensalidade de associação processada pela Accounting Integrators LLC (processadora de cobrança, ex: NASE), no nome de Julyana Soares. Valor baixo, avaliado pelo usuário como sem risco. Sem regra automática — se aparecer de novo com valor maior, é sinal de alerta pra contestar com o banco.
+    (function(){
+      const fgh8=DATA.entities.find(e=>(e.legalName||'').toUpperCase().includes('FAMILIA GUERRA HOLDING'));
+      if(!fgh8) return;
+      let txAcct=DATA.transactions.find(t=>t.entityId===fgh8.id && (t.originalDescription||'').toUpperCase().includes('ACCT INTEGRATORS') && Math.abs(Math.abs(t.amount)-2.99)<0.01 && t.status!=='REVIEWED');
+      if(txAcct){
+        txAcct.category='Personal Expense Paid by Business';
+        txAcct.cpaCategory='Personal Expense Paid by Business — Membership/Association Dues (Low-Value, Unconfirmed Origin)';
+        txAcct.userDescription='Cobrança ACH de $2,99 via Accounting Integrators LLC (processadora de cobrança de mensalidades de associações, ex: NASE), no nome de Julyana Soares. Origem exata não confirmada — valor baixo, avaliado pelo usuário como sem risco em 30/01/26. ⚠️ Se aparecer de novo com valor maior ou crescente, considerar contestar com o banco (padrão relatado de cobrança-teste antes de fraude maior).';
+        txAcct.status='REVIEWED';
+        saveAndSync();
+      }
+    })();
     // Decolumber LLC (Familia Guerra Holding) — resolve direto as 2 pendentes existentes ($450 e $280, material de MDF)
     (function(){
       const fgh7=DATA.entities.find(e=>(e.legalName||'').toUpperCase().includes('FAMILIA GUERRA HOLDING'));
