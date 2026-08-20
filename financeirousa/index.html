@@ -660,7 +660,7 @@ function syncFromFB(){
     let retro=false;
     DATA.transactions.forEach(t=>{
       if(t.status==='UNREVIEWED' && !t.category){
-        const guess=detectWireContributionFromBrazil(t.originalDescription)||detectMemberDistribution(t.originalDescription)||detectIntercompanyContribution(t.originalDescription)||detectPropertyPatterns(t.originalDescription)||detectSecurityFirstInsurance(t.originalDescription)||detectBofaMaintenanceFee(t.originalDescription,t.amount)||detectChkg7968InternalTransfer(t.originalDescription)||detectVixConstructionPayment(t.originalDescription,t.amount)||detectMarichellLandscaping(t.originalDescription)||detectTMobilePersonal(t.originalDescription)||detectSpectrumInternet(t.originalDescription)||detectOrangeCountyUtilities(t.originalDescription)||detectLakesOfWindermereHOA(t.originalDescription,t.amount)||detectPaschoalLandscaping(t.originalDescription)||detectMoriahBestServices(t.originalDescription)||detectLucianoLMagic(t.originalDescription)||detectCreditCardBillPayment(t.originalDescription);
+        const guess=detectWireContributionFromBrazil(t.originalDescription)||detectMemberDistribution(t.originalDescription)||detectIntercompanyContribution(t.originalDescription)||detectPropertyPatterns(t.originalDescription)||detectSecurityFirstInsurance(t.originalDescription)||detectBofaMaintenanceFee(t.originalDescription,t.amount)||detectChkg7968InternalTransfer(t.originalDescription)||detectVixConstructionPayment(t.originalDescription,t.amount)||detectMarichellLandscaping(t.originalDescription)||detectTMobilePersonal(t.originalDescription)||detectSpectrumInternet(t.originalDescription)||detectOrangeCountyUtilities(t.originalDescription)||detectLakesOfWindermereHOA(t.originalDescription,t.amount)||detectPaschoalLandscaping(t.originalDescription)||detectMoriahBestServices(t.originalDescription)||detectBlessedBrave(t.originalDescription)||detectLucianoLMagic(t.originalDescription)||detectCreditCardBillPayment(t.originalDescription);
         if(guess){
           t.category=guess.category;
           t.cpaCategory=guess.cpaCategory;
@@ -671,7 +671,7 @@ function syncFromFB(){
       }
       // Recupera transações marcadas como CPA Review que na verdade batem com um padrão conhecido (ex: Duke Energy)
       if(t.status==='CPA_REVIEW'){
-        const guess2=detectPropertyPatterns(t.originalDescription)||detectSecurityFirstInsurance(t.originalDescription)||detectBofaMaintenanceFee(t.originalDescription,t.amount)||detectChkg7968InternalTransfer(t.originalDescription)||detectVixConstructionPayment(t.originalDescription,t.amount)||detectMarichellLandscaping(t.originalDescription)||detectTMobilePersonal(t.originalDescription)||detectSpectrumInternet(t.originalDescription)||detectOrangeCountyUtilities(t.originalDescription)||detectLakesOfWindermereHOA(t.originalDescription,t.amount)||detectPaschoalLandscaping(t.originalDescription)||detectMoriahBestServices(t.originalDescription)||detectLucianoLMagic(t.originalDescription)||detectCreditCardBillPayment(t.originalDescription);
+        const guess2=detectPropertyPatterns(t.originalDescription)||detectSecurityFirstInsurance(t.originalDescription)||detectBofaMaintenanceFee(t.originalDescription,t.amount)||detectChkg7968InternalTransfer(t.originalDescription)||detectVixConstructionPayment(t.originalDescription,t.amount)||detectMarichellLandscaping(t.originalDescription)||detectTMobilePersonal(t.originalDescription)||detectSpectrumInternet(t.originalDescription)||detectOrangeCountyUtilities(t.originalDescription)||detectLakesOfWindermereHOA(t.originalDescription,t.amount)||detectPaschoalLandscaping(t.originalDescription)||detectMoriahBestServices(t.originalDescription)||detectBlessedBrave(t.originalDescription)||detectLucianoLMagic(t.originalDescription)||detectCreditCardBillPayment(t.originalDescription);
         if(guess2){
           t.category=guess2.category;
           t.cpaCategory=guess2.cpaCategory;
@@ -771,6 +771,14 @@ function syncFromFB(){
         t.category=moriahGuess.category;
         t.cpaCategory=moriahGuess.cpaCategory;
         if(!t.userDescription || t.status!=='REVIEWED') t.userDescription=moriahGuess.userDescription;
+        if(t.status!=='REVIEWED') t.status='AI_SUGGESTED';
+        bofaFix=true;
+      }
+      const blessedGuess=detectBlessedBrave(t.originalDescription);
+      if(blessedGuess && t.cpaCategory!==blessedGuess.cpaCategory){
+        t.category=blessedGuess.category;
+        t.cpaCategory=blessedGuess.cpaCategory;
+        if(!t.userDescription || t.status!=='REVIEWED') t.userDescription=blessedGuess.userDescription;
         if(t.status!=='REVIEWED') t.status='AI_SUGGESTED';
         bofaFix=true;
       }
@@ -988,6 +996,22 @@ function syncFromFB(){
       txJuros.status='REVIEWED';
       saveAndSync();
     }
+    // Blessed & Brave General Service LLC (Familia Guerra Holding) — resolve direto a pendente existente de $1.000 (Zelle memo "Reparo eletrica")
+    (function(){
+      const fgh6=DATA.entities.find(e=>(e.legalName||'').toUpperCase().includes('FAMILIA GUERRA HOLDING'));
+      if(!fgh6) return;
+      let txBlessed=DATA.transactions.find(t=>t.entityId===fgh6.id && Math.abs(Math.abs(t.amount)-1000.00)<0.01 && (t.originalDescription||'').toUpperCase().includes('REPARO ELETRICA') && t.status!=='REVIEWED');
+      if(txBlessed){
+        const g=detectBlessedBrave(txBlessed.originalDescription);
+        if(g){
+          txBlessed.category=g.category;
+          txBlessed.cpaCategory=g.cpaCategory;
+          txBlessed.userDescription=g.userDescription;
+          txBlessed.status='REVIEWED';
+          saveAndSync();
+        }
+      }
+    })();
     // Obra da cobertura/área gourmet em casa: porta dos fundos (Lansing BP Ordo) + mão de obra e descarte de entulho (AD Services and Solutions LLC) — Familia Guerra Holding
     (function(){
       const fgh5=DATA.entities.find(e=>(e.legalName||'').toUpperCase().includes('FAMILIA GUERRA HOLDING'));
@@ -2288,6 +2312,18 @@ function detectLucianoLMagic(desc){
   };
 }
 
+// ── DETECÇÃO AUTOMÁTICA: Blessed & Brave General Service LLC — eletricista novo contratado para corrigir o erro da LMagic (vários pagamentos previstos) ──
+function detectBlessedBrave(desc){
+  const d=(desc||'').toUpperCase();
+  const compact=d.replace(/[^A-Z]/g,'');
+  if(!compact.includes('BLESSED') && !compact.includes('BRAVE') && !compact.includes('REPAROELETRICA')) return null;
+  return {
+    category:'Personal Expense Paid by Business',
+    cpaCategory:'Personal Expense Paid by Business — Electrical Repair (Personal Residence) — Correcting Prior Contractor Defect',
+    userDescription:'Pagamento a Blessed & Brave General Service LLC — reparo elétrico da casa para corrigir o serviço malfeito da LMagic Service Corp (empresa que será acionada judicialmente). Vários pagamentos previstos a essa empresa.'
+  };
+}
+
 // ── DETECÇÃO AUTOMÁTICA GERAL: pagamento de fatura de cartão de crédito — nunca é despesa nova, em qualquer empresa/conta ──
 function detectCreditCardBillPayment(desc){
   const d=(desc||'').toUpperCase();
@@ -2469,9 +2505,10 @@ function processImportRows(rows){
     const hoaGuess=(!rule && !wireGuess && !distGuess && !intercoGuess && !propGuess && !secGuess && !bofaGuess && !chkgGuess && !vixGuess && !marichellGuess && !tmobileGuess && !spectrumGuess && !orangeCoGuess)?detectLakesOfWindermereHOA(p.description,p.amount):null;
     const paschoalGuess=(!rule && !wireGuess && !distGuess && !intercoGuess && !propGuess && !secGuess && !bofaGuess && !chkgGuess && !vixGuess && !marichellGuess && !tmobileGuess && !spectrumGuess && !orangeCoGuess && !hoaGuess)?detectPaschoalLandscaping(p.description):null;
     const moriahGuess=(!rule && !wireGuess && !distGuess && !intercoGuess && !propGuess && !secGuess && !bofaGuess && !chkgGuess && !vixGuess && !marichellGuess && !tmobileGuess && !spectrumGuess && !orangeCoGuess && !hoaGuess && !paschoalGuess)?detectMoriahBestServices(p.description):null;
-    const lucianoGuess=(!rule && !wireGuess && !distGuess && !intercoGuess && !propGuess && !secGuess && !bofaGuess && !chkgGuess && !vixGuess && !marichellGuess && !tmobileGuess && !spectrumGuess && !orangeCoGuess && !hoaGuess && !paschoalGuess && !moriahGuess)?detectLucianoLMagic(p.description):null;
-    const ccBillGuess=(!rule && !wireGuess && !distGuess && !intercoGuess && !propGuess && !secGuess && !bofaGuess && !chkgGuess && !vixGuess && !marichellGuess && !tmobileGuess && !spectrumGuess && !orangeCoGuess && !hoaGuess && !paschoalGuess && !moriahGuess && !lucianoGuess)?detectCreditCardBillPayment(p.description):null;
-    const guess=wireGuess||distGuess||intercoGuess||propGuess||secGuess||bofaGuess||chkgGuess||vixGuess||marichellGuess||tmobileGuess||spectrumGuess||orangeCoGuess||hoaGuess||paschoalGuess||moriahGuess||lucianoGuess||ccBillGuess;
+    const blessedGuess=(!rule && !wireGuess && !distGuess && !intercoGuess && !propGuess && !secGuess && !bofaGuess && !chkgGuess && !vixGuess && !marichellGuess && !tmobileGuess && !spectrumGuess && !orangeCoGuess && !hoaGuess && !paschoalGuess && !moriahGuess)?detectBlessedBrave(p.description):null;
+    const lucianoGuess=(!rule && !wireGuess && !distGuess && !intercoGuess && !propGuess && !secGuess && !bofaGuess && !chkgGuess && !vixGuess && !marichellGuess && !tmobileGuess && !spectrumGuess && !orangeCoGuess && !hoaGuess && !paschoalGuess && !moriahGuess && !blessedGuess)?detectLucianoLMagic(p.description):null;
+    const ccBillGuess=(!rule && !wireGuess && !distGuess && !intercoGuess && !propGuess && !secGuess && !bofaGuess && !chkgGuess && !vixGuess && !marichellGuess && !tmobileGuess && !spectrumGuess && !orangeCoGuess && !hoaGuess && !paschoalGuess && !moriahGuess && !blessedGuess && !lucianoGuess)?detectCreditCardBillPayment(p.description):null;
+    const guess=wireGuess||distGuess||intercoGuess||propGuess||secGuess||bofaGuess||chkgGuess||vixGuess||marichellGuess||tmobileGuess||spectrumGuess||orangeCoGuess||hoaGuess||paschoalGuess||moriahGuess||blessedGuess||lucianoGuess||ccBillGuess;
     toAdd.push({
       id:uuid(),
       entityId:IMP.entityId,
