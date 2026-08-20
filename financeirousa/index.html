@@ -910,7 +910,7 @@ function syncFromFB(){
         txFocco.category='Fixed Asset';
         txFocco.cpaCategory='Fixed Asset — Construction Cost: Casa Ocala (Focco Construction Design — Electrical/Mechanical/Plumbing, INV 8127-8129)';
         txFocco.userDescription='Pagamento à Focco Construction Design — faturas INV 8127 (elétrica), INV 8128 (mecânica), INV 8129 (hidráulica) da obra da Casa Ocala. Restante da obra foi pago em 2025; esse pagamento específico veio atrasado, em 2026. ⚠️ CONFIRMAR COM CPA: capitalizar (Fixed Asset) ou tratar como despesa dedutível do ano corrente — o imóvel já está em uso/alugado, então esse pagamento tardio pode ter tratamento diferente do resto da obra.';
-        txFocco.status='CPA Review';
+        txFocco.status='CPA_REVIEW';
         if(ocala4) txFocco.propertyId=ocala4.id;
         saveAndSync();
       }
