@@ -429,11 +429,27 @@ function syncFromFB(){
     let pRetro=false;
     DATA.personalTransactions.forEach(t=>{
       if(t.status==='UNREVIEWED' && !t.category){
-        const g=detectPersonalDistributionFromBusiness(t.originalDescription)||detectOutsideLoungePayroll(t.originalDescription)||detectChaseCreditCardPayment(t.originalDescription)||detectBestBuyCreditCardPayment(t.originalDescription)||detectOhMyBossPetGrooming(t.originalDescription)||detectRokkasMarket(t.originalDescription)||detectPublix(t.originalDescription)||detectBotecoDoManolo(t.originalDescription)||detectSamsClubAnnualFee(t.originalDescription)||detectCostco(t.originalDescription);
+        const g=detectPersonalDistributionFromBusiness(t.originalDescription)||detectOutsideLoungePayroll(t.originalDescription)||detectChaseCreditCardPayment(t.originalDescription)||detectBestBuyCreditCardPayment(t.originalDescription)||detectOhMyBossPetGrooming(t.originalDescription)||detectRokkasMarket(t.originalDescription)||detectPublix(t.originalDescription)||detectBotecoDoManolo(t.originalDescription)||detectSamsClubAnnualFee(t.originalDescription)||detectCostco(t.originalDescription)||detectWalmart(t.originalDescription)||detectDoorDash(t.originalDescription)||detectVoxImmigration(t.originalDescription)||detectShein(t.originalDescription);
         if(g){ t.category=g.category; if(!t.userDescription) t.userDescription=g.userDescription; t.status='AI_SUGGESTED'; pRetro=true; }
       }
     });
     if(pRetro) saveAndSync();
+    // Walmart, DoorDash, Vox Immigration, Shein — resolve direto qualquer pendente já existente (classificação sempre automática daqui pra frente)
+    (function(){
+      let changedObv=false;
+      DATA.personalTransactions.forEach(t=>{
+        if(t.status!=='REVIEWED'){
+          const g=detectWalmart(t.originalDescription)||detectDoorDash(t.originalDescription)||detectVoxImmigration(t.originalDescription)||detectShein(t.originalDescription);
+          if(g){
+            t.category=g.category;
+            t.userDescription=g.userDescription;
+            t.status='REVIEWED';
+            changedObv=true;
+          }
+        }
+      });
+      if(changedObv) saveAndSync();
+    })();
     // Conta conjunta pessoal (Leandro + Julyana) — Bank of America •9064
     if(!DATA.personalAccounts.some(a=>(a.accountNumber==='898151699064')||(a.name||'').includes('9064'))){
       DATA.personalAccounts.push({
@@ -1808,6 +1824,46 @@ function detectOutsideLoungePayroll(desc){
   };
 }
 
+function detectWalmart(desc){
+  const d=(desc||'').toUpperCase();
+  const compact=d.replace(/[^A-Z]/g,'');
+  if(!compact.includes('WALMART') && !compact.includes('WALMARTCOM')) return null;
+  return {
+    category:'Food > Grocery',
+    userDescription:'Walmart — compras do dia a dia (mercado/casa).'
+  };
+}
+
+function detectDoorDash(desc){
+  const d=(desc||'').toUpperCase();
+  const compact=d.replace(/[^A-Z]/g,'');
+  if(!compact.includes('DOORDASH')) return null;
+  return {
+    category:'Food > Delivery',
+    userDescription:'DoorDash — delivery de comida.'
+  };
+}
+
+function detectVoxImmigration(desc){
+  const d=(desc||'').toUpperCase();
+  const compact=d.replace(/[^A-Z]/g,'');
+  if(!compact.includes('VOXIMMIGRATION') && !compact.includes('VOXIMIGRATION')) return null;
+  return {
+    category:'Other > Legal/Immigration',
+    userDescription:'Vox Immigration — processo de imigração EB3 no nome da Julyana.'
+  };
+}
+
+function detectShein(desc){
+  const d=(desc||'').toUpperCase();
+  const compact=d.replace(/[^A-Z]/g,'');
+  if(!compact.includes('SHEIN')) return null;
+  return {
+    category:'Shopping > Clothes',
+    userDescription:'Shein — compras de roupas/moda.'
+  };
+}
+
 function detectPersonalDistributionFromBusiness(desc){
   const d=(desc||'').toUpperCase();
   const empresa=GRUPO_EMPRESAS.find(nome=>d.includes(nome));
@@ -1877,7 +1933,11 @@ function processPersonalImportRows(rows){
     const manoloGuess=(!rule && !distGuess && !payrollGuess && !chaseGuess && !bestBuyGuess && !ohMyBossGuess && !rokkasGuess && !publixGuess)?detectBotecoDoManolo(p.description):null;
     const samsGuess=(!rule && !distGuess && !payrollGuess && !chaseGuess && !bestBuyGuess && !ohMyBossGuess && !rokkasGuess && !publixGuess && !manoloGuess)?detectSamsClubAnnualFee(p.description):null;
     const costcoGuess=(!rule && !distGuess && !payrollGuess && !chaseGuess && !bestBuyGuess && !ohMyBossGuess && !rokkasGuess && !publixGuess && !manoloGuess && !samsGuess)?detectCostco(p.description):null;
-    const pGuess=distGuess||payrollGuess||chaseGuess||bestBuyGuess||ohMyBossGuess||rokkasGuess||publixGuess||manoloGuess||samsGuess||costcoGuess;
+    const walmartGuess=(!rule && !distGuess && !payrollGuess && !chaseGuess && !bestBuyGuess && !ohMyBossGuess && !rokkasGuess && !publixGuess && !manoloGuess && !samsGuess && !costcoGuess)?detectWalmart(p.description):null;
+    const doordashGuess=(!rule && !distGuess && !payrollGuess && !chaseGuess && !bestBuyGuess && !ohMyBossGuess && !rokkasGuess && !publixGuess && !manoloGuess && !samsGuess && !costcoGuess && !walmartGuess)?detectDoorDash(p.description):null;
+    const voxGuess=(!rule && !distGuess && !payrollGuess && !chaseGuess && !bestBuyGuess && !ohMyBossGuess && !rokkasGuess && !publixGuess && !manoloGuess && !samsGuess && !costcoGuess && !walmartGuess && !doordashGuess)?detectVoxImmigration(p.description):null;
+    const sheinGuess=(!rule && !distGuess && !payrollGuess && !chaseGuess && !bestBuyGuess && !ohMyBossGuess && !rokkasGuess && !publixGuess && !manoloGuess && !samsGuess && !costcoGuess && !walmartGuess && !doordashGuess && !voxGuess)?detectShein(p.description):null;
+    const pGuess=distGuess||payrollGuess||chaseGuess||bestBuyGuess||ohMyBossGuess||rokkasGuess||publixGuess||manoloGuess||samsGuess||costcoGuess||walmartGuess||doordashGuess||voxGuess||sheinGuess;
     toAdd.push({
       id:uuid(), accountId:PIMP.accountId, date:p.date,
       originalDescription:p.description, userDescription:rule?'':(pGuess?pGuess.userDescription:''),
