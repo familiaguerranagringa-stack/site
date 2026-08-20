@@ -954,8 +954,8 @@ function syncFromFB(){
       saveAndSync();
     }
     // Saída $2.400 (Familia Guerra Holding) — devolução de zelle recebido errado na conta errada
-    let txDevol=DATA.transactions.find(t=>(t.originalDescription||'').includes('h6i9lxyd9'));
-    if(txDevol && (!txDevol.category || txDevol.category==='')){
+    let txDevol=DATA.transactions.find(t=>(t.originalDescription||'').toUpperCase().includes('H6I9LXYD9'));
+    if(txDevol && (!txDevol.category || txDevol.category==='' || txDevol.category==='CPA Review')){
       txDevol.category='Refund';
       txDevol.cpaCategory='Refund — Return of Erroneous Zelle Payment (Received in Wrong Account)';
       txDevol.userDescription='Devolução de valor recebido por engano nessa conta (Zelle enviado errado por IMPORT FL LLC) — não é despesa real da Familia Guerra Holding LLC.';
@@ -963,7 +963,7 @@ function syncFromFB(){
       saveAndSync();
     }
     // Entrada $2.400 (Familia Guerra Holding) — pagamento errado recebido (mesma data da devolução) — fecha o ciclo do erro
-    let txErrado=DATA.transactions.find(t=>(t.originalDescription||'').includes('T1256YCRV'));
+    let txErrado=DATA.transactions.find(t=>(t.originalDescription||'').toUpperCase().includes('T1256YCRV'));
     if(txErrado && (!txErrado.category || txErrado.category==='CPA Review')){
       txErrado.category='Refund';
       txErrado.cpaCategory='Refund — Erroneous Zelle Payment Received (Returned Same Day)';
@@ -972,7 +972,7 @@ function syncFromFB(){
       saveAndSync();
     }
     // Entrada $2.400 (Familia Guerra Investing) — juros de empréstimo (Sala Icon), pago corretamente após a correção do erro acima
-    let txJuros=DATA.transactions.find(t=>(t.originalDescription||'').includes('T12CQ48L9'));
+    let txJuros=DATA.transactions.find(t=>(t.originalDescription||'').toUpperCase().includes('T12CQ48L9'));
     if(txJuros && (!txJuros.category || txJuros.category==='CPA Review')){
       txJuros.category='Interest Income';
       txJuros.cpaCategory='Interest Income — Loan Interest (Sala Icon)';
@@ -980,9 +980,23 @@ function syncFromFB(){
       txJuros.status='REVIEWED';
       saveAndSync();
     }
+    // Zelle $180 para Jessica Graciliano — limpeza avulsa da casa (residência pessoal), sem regra automática (serviço pontual, não recorrente)
+    (function(){
+      const fgh2=DATA.entities.find(e=>(e.legalName||'').toUpperCase().includes('FAMILIA GUERRA HOLDING'));
+      if(!fgh2) return;
+      let txJessica=DATA.transactions.find(t=>t.entityId===fgh2.id && (t.originalDescription||'').toUpperCase().includes('GRACILIANO') && Math.abs(Math.abs(t.amount)-180.00)<0.01);
+      if(!txJessica) txJessica=DATA.transactions.find(t=>t.entityId===fgh2.id && Math.abs(Math.abs(t.amount)-180.00)<0.01 && (!t.category || t.category==='' || t.category==='CPA Review'));
+      if(txJessica){
+        txJessica.category='Personal Expense Paid by Business';
+        txJessica.cpaCategory='Personal Expense Paid by Business — House Cleaning (Personal Residence, one-time)';
+        txJessica.userDescription='Pagamento a Jessica Graciliano (esposa do Luciano, do LMagic Service Corp — obra com disputa em andamento) por serviço de limpeza avulsa da casa. Residência pessoal, serviço pontual, não recorrente.';
+        txJessica.status='REVIEWED';
+        saveAndSync();
+      }
+    })();
     // Zelle $950 para WINNER CARPENTRY BUILDER LLC — espelho de vidro para a sala de jantar (residência pessoal), sem regra automática (pedido pontual do usuário)
-    let txWinner=DATA.transactions.find(t=>(t.originalDescription||'').includes('acxe6wt6u'));
-    if(txWinner && (!txWinner.category || txWinner.category==='')){
+    let txWinner=DATA.transactions.find(t=>(t.originalDescription||'').toUpperCase().includes('ACXE6WT6U'));
+    if(txWinner && (!txWinner.category || txWinner.category==='' || txWinner.category==='CPA Review')){
       txWinner.category='Personal Expense Paid by Business';
       txWinner.cpaCategory='Personal Expense Paid by Business — Home Furnishings/Decor (Personal Residence)';
       txWinner.userDescription='Espelho de vidro para a sala de jantar da casa — vidraçaria/marcenaria (Winner Carpentry Builder LLC), residência pessoal (Familia Guerra Holding LLC).';
