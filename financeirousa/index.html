@@ -1291,6 +1291,40 @@ function syncFromFB(){
       });
       if(changedMFC) saveAndSync();
     })();
+    // Varredura geral: QUALQUER transação do cartão •9278 (Investing) ainda positiva e que não seja um crédito
+    // legítimo conhecido (cash back, pagamento de fatura, estorno explícito) — mesmo bug de sinal invertido,
+    // provavelmente afetou outras compras já importadas antes da correção do parser (ex: postos de gasolina)
+    (function(){
+      const investingEnt9=DATA.entities.find(e=>(e.legalName||'').toUpperCase().includes('FAMILIA GUERRA INVESTING'));
+      if(!investingEnt9) return;
+      const cartao9278=DATA.accounts.find(a=>a.entityId===investingEnt9.id && (a.name||'').includes('9278'));
+      if(!cartao9278) return;
+      let changedSweep=false;
+      DATA.transactions.forEach(t=>{
+        if(t.accountId!==cartao9278.id || !(t.amount>0)) return;
+        const d=(t.originalDescription||'').toUpperCase();
+        const compact=d.replace(/[^A-Z]/g,'');
+        // Não mexe se já é um crédito legítimo conhecido
+        const ehCreditoLegitimo = compact.includes('CASHBACK') || compact.includes('CASHREWARD') || compact.includes('PAYMENT') || compact.includes('AUTOPAY') || compact.includes('THANKYOU') || compact.includes('REFUND') || compact.includes('CREDIT') || compact.includes('RETURN') || compact.includes('REVERSAL') || compact.includes('DISPUTE');
+        if(ehCreditoLegitimo) return;
+        // Vira negativo (compra) e tenta classificar pelo padrão do estabelecimento, se reconhecido
+        t.amount=-Math.abs(t.amount);
+        const fuel=detectGasStationFuel(t.originalDescription);
+        if(fuel){
+          t.category=fuel.category;
+          t.cpaCategory=fuel.cpaCategory;
+          t.userDescription=fuel.userDescription+' (Correção de sinal — extrato original trazia Amount sempre positivo, direção real numa coluna separada que o sistema não lia antes.)';
+          t.status='REVIEWED';
+        } else {
+          t.category='';
+          t.cpaCategory='';
+          t.userDescription='⚠️ Correção de sinal (era positivo, virou negativo) — o extrato original desse cartão traz Amount sempre positivo, com a direção real numa coluna separada (Transaction Type D/C) que o sistema não lia antes dessa correção. Classificar normalmente.';
+          t.status='CPA_REVIEW';
+        }
+        changedSweep=true;
+      });
+      if(changedSweep) saveAndSync();
+    })();
     // Água/luz da residência (Windermere) pagas pela Familia Guerra Investing LLC — home office (orientação do CPA Diego), sobrescreve o tratamento genérico de Duke Energy/Orange County
     (function(){
       const investingEnt6=DATA.entities.find(e=>(e.legalName||'').toUpperCase().includes('FAMILIA GUERRA INVESTING'));
