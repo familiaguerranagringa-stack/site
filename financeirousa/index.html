@@ -1085,6 +1085,36 @@ function syncFromFB(){
         saveAndSync();
       }
     })();
+    // Obra da casa (residência pessoal) paga pela Familia Guerra Investing LLC — $177,00 e $50,00 saída
+    // 2x $4.000,00 entrada — juros também, sem nada na observação bancária (identificado só pelo valor)
+    (function(){
+      const investingEnt4=DATA.entities.find(e=>(e.legalName||'').toUpperCase().includes('FAMILIA GUERRA INVESTING'));
+      if(!investingEnt4) return;
+      let changedInv2=false;
+      function fixInv2(amt,cat,cpaCat,note){
+        const t=DATA.transactions.find(t=>t.entityId===investingEnt4.id && Math.abs(Math.abs(t.amount)-amt)<0.01 && t.status!=='REVIEWED');
+        if(t){
+          t.category=cat;
+          t.cpaCategory=cpaCat;
+          t.userDescription=note;
+          t.status='REVIEWED';
+          changedInv2=true;
+        }
+      }
+      fixInv2(177.00,'Personal Expense Paid by Business','Personal Expense Paid by Business — Home Improvement (Personal Residence)','Obra da casa (residência pessoal), paga pela Familia Guerra Investing LLC.');
+      fixInv2(50.00,'Personal Expense Paid by Business','Personal Expense Paid by Business — Home Improvement (Personal Residence)','Obra da casa (residência pessoal), paga pela Familia Guerra Investing LLC.');
+      // Duas entradas de $4.000 de juros, sem texto identificador na observação bancária — resolve todas as pendentes desse valor
+      DATA.transactions.forEach(t=>{
+        if(t.entityId===investingEnt4.id && t.status!=='REVIEWED' && t.amount>0 && Math.abs(t.amount-4000.00)<0.01){
+          t.category='Interest Income';
+          t.cpaCategory='Interest/Investment Income — Origem não identificada na descrição bancária (contrato a especificar)';
+          t.userDescription='Recebimento de $4.000 — juros/investimento, mas quem enviou o Zelle não preencheu a observação, então a origem exata não pôde ser identificada pelo texto. Confirmar com o usuário de qual contrato/contraparte é, quando possível.';
+          t.status='REVIEWED';
+          changedInv2=true;
+        }
+      });
+      if(changedInv2) saveAndSync();
+    })();
     // Cash Back do cartão de crédito — resolve direto qualquer pendente em qualquer empresa (não é receita de negócio)
     (function(){
       let changedCB=false;
