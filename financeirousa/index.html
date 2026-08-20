@@ -693,7 +693,7 @@ function syncFromFB(){
     let retro=false;
     DATA.transactions.forEach(t=>{
       if(t.status==='UNREVIEWED' && !t.category){
-        const guess=detectWireContributionFromBrazil(t.originalDescription)||detectMemberDistribution(t.originalDescription)||detectIntercompanyContribution(t.originalDescription)||detectPropertyPatterns(t.originalDescription)||detectSecurityFirstInsurance(t.originalDescription)||detectBofaMaintenanceFee(t.originalDescription,t.amount)||detectChkg7968InternalTransfer(t.originalDescription)||detectVixConstructionPayment(t.originalDescription,t.amount)||detectMarichellLandscaping(t.originalDescription)||detectTMobilePersonal(t.originalDescription)||detectSpectrumInternet(t.originalDescription)||detectOrangeCountyUtilities(t.originalDescription)||detectLakesOfWindermereHOA(t.originalDescription,t.amount)||detectPaschoalLandscaping(t.originalDescription)||detectMoriahBestServices(t.originalDescription)||detectBlessedBrave(t.originalDescription)||detectCashBack(t.originalDescription)||detectDecolumber(t.originalDescription)||detectGasStationFuel(t.originalDescription)||detectInvestingIncomeSources(t.originalDescription)||detectLucianoLMagic(t.originalDescription)||detectCreditCardBillPayment(t.originalDescription);
+        const guess=detectWireContributionFromBrazil(t.originalDescription)||detectMemberDistribution(t.originalDescription)||detectIntercompanyContribution(t.originalDescription)||detectPropertyPatterns(t.originalDescription)||detectSecurityFirstInsurance(t.originalDescription)||detectBofaMaintenanceFee(t.originalDescription,t.amount)||detectChkg7968InternalTransfer(t.originalDescription)||detectVixConstructionPayment(t.originalDescription,t.amount)||detectMarichellLandscaping(t.originalDescription)||detectTMobilePersonal(t.originalDescription)||detectSpectrumInternet(t.originalDescription)||detectOrangeCountyUtilities(t.originalDescription)||detectLakesOfWindermereHOA(t.originalDescription,t.amount)||detectPaschoalLandscaping(t.originalDescription)||detectMoriahBestServices(t.originalDescription)||detectBlessedBrave(t.originalDescription)||detectCashBack(t.originalDescription)||detectAmazonBusinessRefund(t.originalDescription,t.amount)||detectDecolumber(t.originalDescription)||detectGasStationFuel(t.originalDescription)||detectInvestingIncomeSources(t.originalDescription)||detectLucianoLMagic(t.originalDescription)||detectCreditCardBillPayment(t.originalDescription);
         if(guess){
           t.category=guess.category;
           t.cpaCategory=guess.cpaCategory;
@@ -704,7 +704,7 @@ function syncFromFB(){
       }
       // Recupera transações marcadas como CPA Review que na verdade batem com um padrão conhecido (ex: Duke Energy)
       if(t.status==='CPA_REVIEW'){
-        const guess2=detectPropertyPatterns(t.originalDescription)||detectSecurityFirstInsurance(t.originalDescription)||detectBofaMaintenanceFee(t.originalDescription,t.amount)||detectChkg7968InternalTransfer(t.originalDescription)||detectVixConstructionPayment(t.originalDescription,t.amount)||detectMarichellLandscaping(t.originalDescription)||detectTMobilePersonal(t.originalDescription)||detectSpectrumInternet(t.originalDescription)||detectOrangeCountyUtilities(t.originalDescription)||detectLakesOfWindermereHOA(t.originalDescription,t.amount)||detectPaschoalLandscaping(t.originalDescription)||detectMoriahBestServices(t.originalDescription)||detectBlessedBrave(t.originalDescription)||detectCashBack(t.originalDescription)||detectDecolumber(t.originalDescription)||detectGasStationFuel(t.originalDescription)||detectInvestingIncomeSources(t.originalDescription)||detectLucianoLMagic(t.originalDescription)||detectCreditCardBillPayment(t.originalDescription);
+        const guess2=detectPropertyPatterns(t.originalDescription)||detectSecurityFirstInsurance(t.originalDescription)||detectBofaMaintenanceFee(t.originalDescription,t.amount)||detectChkg7968InternalTransfer(t.originalDescription)||detectVixConstructionPayment(t.originalDescription,t.amount)||detectMarichellLandscaping(t.originalDescription)||detectTMobilePersonal(t.originalDescription)||detectSpectrumInternet(t.originalDescription)||detectOrangeCountyUtilities(t.originalDescription)||detectLakesOfWindermereHOA(t.originalDescription,t.amount)||detectPaschoalLandscaping(t.originalDescription)||detectMoriahBestServices(t.originalDescription)||detectBlessedBrave(t.originalDescription)||detectCashBack(t.originalDescription)||detectAmazonBusinessRefund(t.originalDescription,t.amount)||detectDecolumber(t.originalDescription)||detectGasStationFuel(t.originalDescription)||detectInvestingIncomeSources(t.originalDescription)||detectLucianoLMagic(t.originalDescription)||detectCreditCardBillPayment(t.originalDescription);
         if(guess2){
           t.category=guess2.category;
           t.cpaCategory=guess2.cpaCategory;
@@ -1253,6 +1253,20 @@ function syncFromFB(){
         }
       });
       if(changed4) saveAndSync();
+    })();
+    // Amazon Digital $6,75 (conf# 2M4N07CK3, 1/21/26, Familia Guerra Investing, cartão •9278) — reembolso, resolve direto
+    (function(){
+      const investingEnt7=DATA.entities.find(e=>(e.legalName||'').toUpperCase().includes('FAMILIA GUERRA INVESTING'));
+      if(!investingEnt7) return;
+      let txAmzn=DATA.transactions.find(t=>t.entityId===investingEnt7.id && (t.originalDescription||'').toUpperCase().includes('2M4N07CK3'));
+      if(!txAmzn) txAmzn=DATA.transactions.find(t=>t.entityId===investingEnt7.id && (t.originalDescription||'').toUpperCase().includes('AMAZON') && Math.abs(t.amount-6.75)<0.01 && t.status!=='REVIEWED');
+      if(txAmzn && txAmzn.status!=='REVIEWED'){
+        txAmzn.category='Refund';
+        txAmzn.cpaCategory='Refund — Amazon Refund';
+        txAmzn.userDescription='Reembolso da Amazon (Amazon Digital) — provavelmente devolução/cancelamento de compra anterior.';
+        txAmzn.status='REVIEWED';
+        saveAndSync();
+      }
     })();
     // Água/luz da residência (Windermere) pagas pela Familia Guerra Investing LLC — home office (orientação do CPA Diego), sobrescreve o tratamento genérico de Duke Energy/Orange County
     (function(){
@@ -2668,6 +2682,19 @@ function detectCashBack(desc){
   };
 }
 
+// ── DETECÇÃO AUTOMÁTICA: Amazon no cartão de crédito da empresa — só classifica automático quando é ENTRADA (reembolso). Compra (saída) fica manual, pois pode ser negócio ou pessoal ──
+function detectAmazonBusinessRefund(desc,amount){
+  const d=(desc||'').toUpperCase();
+  const compact=d.replace(/[^A-Z]/g,'');
+  if(!compact.includes('AMAZON') && !compact.includes('AMZN')) return null;
+  if(!(amount>0)) return null;
+  return {
+    category:'Refund',
+    cpaCategory:'Refund — Amazon Refund',
+    userDescription:'Reembolso da Amazon (entrada no cartão de crédito da empresa) — provavelmente devolução/cancelamento de compra anterior.'
+  };
+}
+
 // ── DETECÇÃO AUTOMÁTICA: Decolumber LLC — material de MDF para a obra da cobertura/área gourmet em casa ──
 function detectDecolumber(desc){
   const d=(desc||'').toUpperCase();
@@ -2923,12 +2950,13 @@ function processImportRows(rows){
     const moriahGuess=(!rule && !wireGuess && !distGuess && !intercoGuess && !homeOfficeGuess && !propGuess && !secGuess && !bofaGuess && !chkgGuess && !vixGuess && !marichellGuess && !tmobileGuess && !spectrumGuess && !orangeCoGuess && !hoaGuess && !paschoalGuess)?detectMoriahBestServices(p.description):null;
     const blessedGuess=(!rule && !wireGuess && !distGuess && !intercoGuess && !homeOfficeGuess && !propGuess && !secGuess && !bofaGuess && !chkgGuess && !vixGuess && !marichellGuess && !tmobileGuess && !spectrumGuess && !orangeCoGuess && !hoaGuess && !paschoalGuess && !moriahGuess)?detectBlessedBrave(p.description):null;
     const cashBackGuess=(!rule && !wireGuess && !distGuess && !intercoGuess && !homeOfficeGuess && !propGuess && !secGuess && !bofaGuess && !chkgGuess && !vixGuess && !marichellGuess && !tmobileGuess && !spectrumGuess && !orangeCoGuess && !hoaGuess && !paschoalGuess && !moriahGuess && !blessedGuess)?detectCashBack(p.description):null;
-    const decolumberGuess=(!rule && !wireGuess && !distGuess && !intercoGuess && !homeOfficeGuess && !propGuess && !secGuess && !bofaGuess && !chkgGuess && !vixGuess && !marichellGuess && !tmobileGuess && !spectrumGuess && !orangeCoGuess && !hoaGuess && !paschoalGuess && !moriahGuess && !blessedGuess && !cashBackGuess)?detectDecolumber(p.description):null;
-    const gasFuelGuess=(!rule && !wireGuess && !distGuess && !intercoGuess && !homeOfficeGuess && !propGuess && !secGuess && !bofaGuess && !chkgGuess && !vixGuess && !marichellGuess && !tmobileGuess && !spectrumGuess && !orangeCoGuess && !hoaGuess && !paschoalGuess && !moriahGuess && !blessedGuess && !cashBackGuess && !decolumberGuess)?detectGasStationFuel(p.description):null;
-    const investIncomeGuess=(!rule && !wireGuess && !distGuess && !intercoGuess && !homeOfficeGuess && !propGuess && !secGuess && !bofaGuess && !chkgGuess && !vixGuess && !marichellGuess && !tmobileGuess && !spectrumGuess && !orangeCoGuess && !hoaGuess && !paschoalGuess && !moriahGuess && !blessedGuess && !decolumberGuess && !gasFuelGuess)?detectInvestingIncomeSources(p.description):null;
-    const lucianoGuess=(!rule && !wireGuess && !distGuess && !intercoGuess && !homeOfficeGuess && !propGuess && !secGuess && !bofaGuess && !chkgGuess && !vixGuess && !marichellGuess && !tmobileGuess && !spectrumGuess && !orangeCoGuess && !hoaGuess && !paschoalGuess && !moriahGuess && !blessedGuess && !decolumberGuess && !gasFuelGuess && !investIncomeGuess)?detectLucianoLMagic(p.description):null;
-    const ccBillGuess=(!rule && !wireGuess && !distGuess && !intercoGuess && !homeOfficeGuess && !propGuess && !secGuess && !bofaGuess && !chkgGuess && !vixGuess && !marichellGuess && !tmobileGuess && !spectrumGuess && !orangeCoGuess && !hoaGuess && !paschoalGuess && !moriahGuess && !blessedGuess && !decolumberGuess && !gasFuelGuess && !investIncomeGuess && !lucianoGuess)?detectCreditCardBillPayment(p.description):null;
-    const guess=wireGuess||distGuess||intercoGuess||homeOfficeGuess||propGuess||secGuess||bofaGuess||chkgGuess||vixGuess||marichellGuess||tmobileGuess||spectrumGuess||orangeCoGuess||hoaGuess||paschoalGuess||moriahGuess||blessedGuess||cashBackGuess||decolumberGuess||gasFuelGuess||investIncomeGuess||lucianoGuess||ccBillGuess;
+    const amazonRefundGuess=(!rule && !wireGuess && !distGuess && !intercoGuess && !homeOfficeGuess && !propGuess && !secGuess && !bofaGuess && !chkgGuess && !vixGuess && !marichellGuess && !tmobileGuess && !spectrumGuess && !orangeCoGuess && !hoaGuess && !paschoalGuess && !moriahGuess && !blessedGuess && !cashBackGuess)?detectAmazonBusinessRefund(p.description,p.amount):null;
+    const decolumberGuess=(!rule && !wireGuess && !distGuess && !intercoGuess && !homeOfficeGuess && !propGuess && !secGuess && !bofaGuess && !chkgGuess && !vixGuess && !marichellGuess && !tmobileGuess && !spectrumGuess && !orangeCoGuess && !hoaGuess && !paschoalGuess && !moriahGuess && !blessedGuess && !cashBackGuess && !amazonRefundGuess)?detectDecolumber(p.description):null;
+    const gasFuelGuess=(!rule && !wireGuess && !distGuess && !intercoGuess && !homeOfficeGuess && !propGuess && !secGuess && !bofaGuess && !chkgGuess && !vixGuess && !marichellGuess && !tmobileGuess && !spectrumGuess && !orangeCoGuess && !hoaGuess && !paschoalGuess && !moriahGuess && !blessedGuess && !cashBackGuess && !amazonRefundGuess && !decolumberGuess)?detectGasStationFuel(p.description):null;
+    const investIncomeGuess=(!rule && !wireGuess && !distGuess && !intercoGuess && !homeOfficeGuess && !propGuess && !secGuess && !bofaGuess && !chkgGuess && !vixGuess && !marichellGuess && !tmobileGuess && !spectrumGuess && !orangeCoGuess && !hoaGuess && !paschoalGuess && !moriahGuess && !blessedGuess && !amazonRefundGuess && !decolumberGuess && !gasFuelGuess)?detectInvestingIncomeSources(p.description):null;
+    const lucianoGuess=(!rule && !wireGuess && !distGuess && !intercoGuess && !homeOfficeGuess && !propGuess && !secGuess && !bofaGuess && !chkgGuess && !vixGuess && !marichellGuess && !tmobileGuess && !spectrumGuess && !orangeCoGuess && !hoaGuess && !paschoalGuess && !moriahGuess && !blessedGuess && !amazonRefundGuess && !decolumberGuess && !gasFuelGuess && !investIncomeGuess)?detectLucianoLMagic(p.description):null;
+    const ccBillGuess=(!rule && !wireGuess && !distGuess && !intercoGuess && !homeOfficeGuess && !propGuess && !secGuess && !bofaGuess && !chkgGuess && !vixGuess && !marichellGuess && !tmobileGuess && !spectrumGuess && !orangeCoGuess && !hoaGuess && !paschoalGuess && !moriahGuess && !blessedGuess && !amazonRefundGuess && !decolumberGuess && !gasFuelGuess && !investIncomeGuess && !lucianoGuess)?detectCreditCardBillPayment(p.description):null;
+    const guess=wireGuess||distGuess||intercoGuess||homeOfficeGuess||propGuess||secGuess||bofaGuess||chkgGuess||vixGuess||marichellGuess||tmobileGuess||spectrumGuess||orangeCoGuess||hoaGuess||paschoalGuess||moriahGuess||blessedGuess||cashBackGuess||amazonRefundGuess||decolumberGuess||gasFuelGuess||investIncomeGuess||lucianoGuess||ccBillGuess;
     toAdd.push({
       id:uuid(),
       entityId:IMP.entityId,
