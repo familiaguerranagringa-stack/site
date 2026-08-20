@@ -439,7 +439,7 @@ function syncFromFB(){
       let changedObv=false;
       DATA.personalTransactions.forEach(t=>{
         if(t.status!=='REVIEWED'){
-          const g=detectWalmart(t.originalDescription)||detectDoorDash(t.originalDescription)||detectVoxImmigration(t.originalDescription)||detectShein(t.originalDescription)||detectMarshalls(t.originalDescription)||detectAppleCom(t.originalDescription);
+          const g=detectWalmart(t.originalDescription)||detectDoorDash(t.originalDescription)||detectVoxImmigration(t.originalDescription)||detectShein(t.originalDescription)||detectMarshalls(t.originalDescription)||detectAppleCom(t.originalDescription)||detectBotecoDoManolo(t.originalDescription);
           if(g){
             t.category=g.category;
             t.userDescription=g.userDescription;
@@ -1767,7 +1767,7 @@ function detectPublix(desc){
 function detectBotecoDoManolo(desc){
   const d=(desc||'').toUpperCase();
   const compact=d.replace(/[^A-Z]/g,'');
-  if(!compact.includes('BOTECODOMANOLO') && !compact.includes('BOTECOMANOLO')) return null;
+  if(!compact.includes('BOTECODOMANOLO') && !compact.includes('BOTECOMANOLO') && !compact.includes('BOTECODOMAN')) return null;
   return {
     category:'Food > Restaurant',
     userDescription:'Boteco do Manolo — restaurante.'
