@@ -429,7 +429,7 @@ function syncFromFB(){
     let pRetro=false;
     DATA.personalTransactions.forEach(t=>{
       if(t.status==='UNREVIEWED' && !t.category){
-        const g=detectPersonalDistributionFromBusiness(t.originalDescription)||detectOutsideLoungePayroll(t.originalDescription)||detectChaseCreditCardPayment(t.originalDescription)||detectBestBuyCreditCardPayment(t.originalDescription)||detectOhMyBossPetGrooming(t.originalDescription)||detectRokkasMarket(t.originalDescription)||detectPublix(t.originalDescription)||detectBotecoDoManolo(t.originalDescription)||detectSamsClubAnnualFee(t.originalDescription)||detectCostco(t.originalDescription)||detectWalmart(t.originalDescription)||detectDoorDash(t.originalDescription)||detectVoxImmigration(t.originalDescription)||detectShein(t.originalDescription);
+        const g=detectPersonalDistributionFromBusiness(t.originalDescription)||detectOutsideLoungePayroll(t.originalDescription)||detectChaseCreditCardPayment(t.originalDescription)||detectBestBuyCreditCardPayment(t.originalDescription)||detectOhMyBossPetGrooming(t.originalDescription)||detectRokkasMarket(t.originalDescription)||detectPublix(t.originalDescription)||detectBotecoDoManolo(t.originalDescription)||detectSamsClubAnnualFee(t.originalDescription)||detectCostco(t.originalDescription)||detectWalmart(t.originalDescription)||detectDoorDash(t.originalDescription)||detectVoxImmigration(t.originalDescription)||detectShein(t.originalDescription)||detectMarshalls(t.originalDescription)||detectAppleCom(t.originalDescription);
         if(g){ t.category=g.category; if(!t.userDescription) t.userDescription=g.userDescription; t.status='AI_SUGGESTED'; pRetro=true; }
       }
     });
@@ -439,7 +439,7 @@ function syncFromFB(){
       let changedObv=false;
       DATA.personalTransactions.forEach(t=>{
         if(t.status!=='REVIEWED'){
-          const g=detectWalmart(t.originalDescription)||detectDoorDash(t.originalDescription)||detectVoxImmigration(t.originalDescription)||detectShein(t.originalDescription);
+          const g=detectWalmart(t.originalDescription)||detectDoorDash(t.originalDescription)||detectVoxImmigration(t.originalDescription)||detectShein(t.originalDescription)||detectMarshalls(t.originalDescription)||detectAppleCom(t.originalDescription);
           if(g){
             t.category=g.category;
             t.userDescription=g.userDescription;
@@ -1864,6 +1864,26 @@ function detectShein(desc){
   };
 }
 
+function detectMarshalls(desc){
+  const d=(desc||'').toUpperCase();
+  const compact=d.replace(/[^A-Z]/g,'');
+  if(!compact.includes('MARSHALLS')) return null;
+  return {
+    category:'Shopping > Clothes',
+    userDescription:'Marshalls — loja de roupas.'
+  };
+}
+
+function detectAppleCom(desc){
+  const d=(desc||'').toUpperCase();
+  const compact=d.replace(/[^A-Z]/g,'');
+  if(!compact.includes('APPLECOM')) return null;
+  return {
+    category:'Subscriptions > Apps',
+    userDescription:'Apple.com — armazenamento em nuvem (iCloud) e outros serviços/assinaturas Apple.'
+  };
+}
+
 function detectPersonalDistributionFromBusiness(desc){
   const d=(desc||'').toUpperCase();
   const empresa=GRUPO_EMPRESAS.find(nome=>d.includes(nome));
@@ -1937,7 +1957,9 @@ function processPersonalImportRows(rows){
     const doordashGuess=(!rule && !distGuess && !payrollGuess && !chaseGuess && !bestBuyGuess && !ohMyBossGuess && !rokkasGuess && !publixGuess && !manoloGuess && !samsGuess && !costcoGuess && !walmartGuess)?detectDoorDash(p.description):null;
     const voxGuess=(!rule && !distGuess && !payrollGuess && !chaseGuess && !bestBuyGuess && !ohMyBossGuess && !rokkasGuess && !publixGuess && !manoloGuess && !samsGuess && !costcoGuess && !walmartGuess && !doordashGuess)?detectVoxImmigration(p.description):null;
     const sheinGuess=(!rule && !distGuess && !payrollGuess && !chaseGuess && !bestBuyGuess && !ohMyBossGuess && !rokkasGuess && !publixGuess && !manoloGuess && !samsGuess && !costcoGuess && !walmartGuess && !doordashGuess && !voxGuess)?detectShein(p.description):null;
-    const pGuess=distGuess||payrollGuess||chaseGuess||bestBuyGuess||ohMyBossGuess||rokkasGuess||publixGuess||manoloGuess||samsGuess||costcoGuess||walmartGuess||doordashGuess||voxGuess||sheinGuess;
+    const marshallsGuess=(!rule && !distGuess && !payrollGuess && !chaseGuess && !bestBuyGuess && !ohMyBossGuess && !rokkasGuess && !publixGuess && !manoloGuess && !samsGuess && !costcoGuess && !walmartGuess && !doordashGuess && !voxGuess && !sheinGuess)?detectMarshalls(p.description):null;
+    const appleGuess=(!rule && !distGuess && !payrollGuess && !chaseGuess && !bestBuyGuess && !ohMyBossGuess && !rokkasGuess && !publixGuess && !manoloGuess && !samsGuess && !costcoGuess && !walmartGuess && !doordashGuess && !voxGuess && !sheinGuess && !marshallsGuess)?detectAppleCom(p.description):null;
+    const pGuess=distGuess||payrollGuess||chaseGuess||bestBuyGuess||ohMyBossGuess||rokkasGuess||publixGuess||manoloGuess||samsGuess||costcoGuess||walmartGuess||doordashGuess||voxGuess||sheinGuess||marshallsGuess||appleGuess;
     toAdd.push({
       id:uuid(), accountId:PIMP.accountId, date:p.date,
       originalDescription:p.description, userDescription:rule?'':(pGuess?pGuess.userDescription:''),
