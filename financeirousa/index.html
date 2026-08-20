@@ -1017,6 +1017,18 @@ function syncFromFB(){
       });
       saveAndSync();
     }
+    // Cartão de crédito Bank of America da Familia Guerra Investing LLC (terminação •9278) — titular Leandro Guerra Marino Fiuza de Castro
+    (function(){
+      const investingEnt5=DATA.entities.find(e=>(e.legalName||'').toUpperCase().includes('FAMILIA GUERRA INVESTING'));
+      if(investingEnt5 && !DATA.accounts.some(a=>a.entityId===investingEnt5.id && (a.name||'').includes('9278'))){
+        DATA.accounts.push({
+          id:uuid(), entityId:investingEnt5.id,
+          name:'Bank of America Credit Card •9278',
+          type:'Credit Card', currency:'USD'
+        });
+        saveAndSync();
+      }
+    })();
     // Pagamento de fatura de cartão de crédito ($529,07, GFE) — nunca é despesa nova, é Transfer
     let txCC529=DATA.transactions.find(t=>(t.originalDescription||'').toUpperCase().includes('CREDIT CARD BILL PAYMENT') && Math.abs(Math.abs(t.amount)-529.07)<0.01);
     if(txCC529 && (!txCC529.category || txCC529.category==='CPA Review')){
