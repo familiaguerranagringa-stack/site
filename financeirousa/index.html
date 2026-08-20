@@ -980,6 +980,19 @@ function syncFromFB(){
       txJuros.status='REVIEWED';
       saveAndSync();
     }
+    // $54,29 "Floors and Tiles" — material para a obra da cobertura/área gourmet aqui de casa (residência pessoal), sem regra automática
+    (function(){
+      const fgh3=DATA.entities.find(e=>(e.legalName||'').toUpperCase().includes('FAMILIA GUERRA HOLDING'));
+      if(!fgh3) return;
+      let txFloors=DATA.transactions.find(t=>t.entityId===fgh3.id && Math.abs(Math.abs(t.amount)-54.29)<0.01 && (!t.category || t.category==='' || t.category==='CPA Review'));
+      if(txFloors){
+        txFloors.category='Personal Expense Paid by Business';
+        txFloors.cpaCategory='Personal Expense Paid by Business — Home Improvement Materials: Outdoor Covered Structure (Personal Residence)';
+        txFloors.userDescription='Compra na Floors and Tiles — material (piso/azulejo) para a obra da cobertura/área gourmet da casa (residência pessoal, Familia Guerra Holding LLC). Não relacionado à Casa Ocala.';
+        txFloors.status='REVIEWED';
+        saveAndSync();
+      }
+    })();
     // Zelle $180 para Jessica Graciliano — limpeza avulsa da casa (residência pessoal), sem regra automática (serviço pontual, não recorrente)
     (function(){
       const fgh2=DATA.entities.find(e=>(e.legalName||'').toUpperCase().includes('FAMILIA GUERRA HOLDING'));
