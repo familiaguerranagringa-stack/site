@@ -906,7 +906,7 @@ function syncFromFB(){
       if(!mmg4) return;
       let txFocco=DATA.transactions.find(t=>t.entityId===mmg4.id && (t.originalDescription||'').toUpperCase().includes('YHIHB77GI'));
       if(!txFocco) txFocco=DATA.transactions.find(t=>t.entityId===mmg4.id && (t.originalDescription||'').toUpperCase().includes('FOCCO') && Math.abs(Math.abs(t.amount)-4700.00)<0.01);
-      if(txFocco){
+      if(txFocco && txFocco.status!=='REVIEWED'){
         txFocco.category='Fixed Asset';
         txFocco.cpaCategory='Fixed Asset — Construction Cost: Casa Ocala (Focco Construction Design — Electrical/Mechanical/Plumbing, INV 8127-8129)';
         txFocco.userDescription='Pagamento à Focco Construction Design — faturas INV 8127 (elétrica), INV 8128 (mecânica), INV 8129 (hidráulica) da obra da Casa Ocala. Restante da obra foi pago em 2025; esse pagamento específico veio atrasado, em 2026. ⚠️ CONFIRMAR COM CPA: capitalizar (Fixed Asset) ou tratar como despesa dedutível do ano corrente — o imóvel já está em uso/alugado, então esse pagamento tardio pode ter tratamento diferente do resto da obra.';
@@ -1125,7 +1125,7 @@ function syncFromFB(){
       if(!fgh2) return;
       let txJessica=DATA.transactions.find(t=>t.entityId===fgh2.id && (t.originalDescription||'').toUpperCase().includes('GRACILIANO') && Math.abs(Math.abs(t.amount)-180.00)<0.01);
       if(!txJessica) txJessica=DATA.transactions.find(t=>t.entityId===fgh2.id && Math.abs(Math.abs(t.amount)-180.00)<0.01 && (!t.category || t.category==='' || t.category==='CPA Review'));
-      if(txJessica){
+      if(txJessica && txJessica.status!=='REVIEWED'){
         txJessica.category='Personal Expense Paid by Business';
         txJessica.cpaCategory='Personal Expense Paid by Business — House Cleaning (Personal Residence, one-time)';
         txJessica.userDescription='Pagamento a Jessica Graciliano (esposa do Luciano, do LMagic Service Corp — obra com disputa em andamento) por serviço de limpeza avulsa da casa. Residência pessoal, serviço pontual, não recorrente.';
