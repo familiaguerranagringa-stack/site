@@ -641,6 +641,23 @@ function syncFromFB(){
       tx301k.userDescription='Transferência recebida da Familia Guerra Investing LLC — usada para aplicar $500.000 em CD (renda fixa, equivalente a Selic no Brasil)';
       saveAndSync();
     }
+    if(tx301k && tx301k.status!=='REVIEWED' && (tx301k.cpaCategory||'').includes('Intercompany Transfer — from Familia Guerra Investing LLC')){
+      tx301k.status='REVIEWED';
+      saveAndSync();
+    }
+    // Transferência de saída (-$301.299,85, 04/06/26) da Familia Guerra Investing LLC para a Guerra Family Empire LLC — a ponta que nunca tinha sido corrigida
+    (function(){
+      const investingEnt=DATA.entities.find(e=>(e.legalName||'').toUpperCase().includes('FAMILIA GUERRA INVESTING'));
+      if(!investingEnt) return;
+      let txOut301k=DATA.transactions.find(t=>t.entityId===investingEnt.id && Math.abs(Math.abs(t.amount)-301299.85)<0.01 && t.status!=='REVIEWED');
+      if(txOut301k){
+        txOut301k.category='Intercompany Transfer';
+        txOut301k.cpaCategory='Intercompany Transfer — to Guerra Family Empire LLC';
+        txOut301k.userDescription='Transferência enviada para a Guerra Family Empire LLC — usada para aplicar $500.000 em CD (renda fixa) na holding. Ponta de saída correspondente à entrada de mesmo valor na GFE.';
+        txOut301k.status='REVIEWED';
+        saveAndSync();
+      }
+    })();
     // Transferência de $500.000 da Checking para o CD (mesma empresa, apenas troca de conta)
     let tx500k=DATA.transactions.find(t=>(t.originalDescription||'').includes('4049230953'));
     if(tx500k && (!tx500k.category || tx500k.category==='')){
@@ -1004,6 +1021,27 @@ function syncFromFB(){
       txJuros.status='REVIEWED';
       saveAndSync();
     }
+    // Viagem Miami (Iate) — $1.000,00 e $60,00 (06/29/26, Familia Guerra Investing) — passeio pago para conversar sobre negócios com clientes promissores
+    // Kumon — $152,50 (02/23/26, Familia Guerra Investing) — pago errado pela empresa, é despesa pessoal (Kumon dos filhos); a partir de agora será pago pela pessoa física
+    (function(){
+      const investingEnt2=DATA.entities.find(e=>(e.legalName||'').toUpperCase().includes('FAMILIA GUERRA INVESTING'));
+      if(!investingEnt2) return;
+      let changedInv=false;
+      function fixInv(amt,cat,cpaCat,note){
+        const t=DATA.transactions.find(t=>t.entityId===investingEnt2.id && Math.abs(Math.abs(t.amount)-amt)<0.01 && t.status!=='REVIEWED');
+        if(t){
+          t.category=cat;
+          t.cpaCategory=cpaCat;
+          t.userDescription=note;
+          t.status='REVIEWED';
+          changedInv=true;
+        }
+      }
+      fixInv(1000.00,'Business Expense','Business Expense — Client Entertainment/Development (Miami Boat Trip) — CONFIRMAR COM CPA: tratamento de dedutibilidade de despesas de entretenimento com clientes mudou nas regras fiscais dos EUA, pode ter limitação ou não ser dedutível','Passeio de iate em Miami pago para conversar sobre negócios com clientes promissores. ⚠️ Confirmar com o CPA o tratamento fiscal correto — regras de dedutibilidade de "entertainment" mudaram e podem limitar ou impedir a dedução, mesmo sendo de fato uma despesa de negócio.');
+      fixInv(60.00,'Business Expense','Business Expense — Client Entertainment/Development (Miami Boat Trip) — CONFIRMAR COM CPA: tratamento de dedutibilidade de despesas de entretenimento com clientes mudou nas regras fiscais dos EUA, pode ter limitação ou não ser dedutível','Passeio de iate em Miami pago para conversar sobre negócios com clientes promissores (valor complementar). ⚠️ Confirmar com o CPA o tratamento fiscal correto.');
+      fixInv(152.50,'Personal Expense Paid by Business','Personal Expense Paid by Business — Childrens Education (Kumon) — Paid in Error','Mensalidade do Kumon dos filhos, paga por engano pela Familia Guerra Investing LLC — é despesa pessoal, não de negócio. A partir de agora será paga pela pessoa física.');
+      if(changedInv) saveAndSync();
+    })();
     // Zelle $120 para LACAZA COUNTERTOPS INC (conf# avwegs26n) — mármore para a porta de entrada da casa, obra (residência pessoal), sem regra automática (item pontual)
     (function(){
       const fgh9=DATA.entities.find(e=>(e.legalName||'').toUpperCase().includes('FAMILIA GUERRA HOLDING'));
