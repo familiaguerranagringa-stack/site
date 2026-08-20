@@ -1852,11 +1852,13 @@ function renderPersonalLedger(c){
         ${DATA.personalAccounts.map(a=>`<option value="${a.id}" ${PLEDGER_FILTER_ACCOUNT===a.id?'selected':''}>${esc(a.name)||'(sem nome)'} (${DATA.personalTransactions.filter(t=>t.accountId===a.id).length})</option>`).join('')}
       </select>
       <select class="fi" style="width:220px;margin-left:10px" onchange="PLEDGER_FILTER_STATUS=this.value;render()">
-        <option value="">Todos os status (${DATA.personalTransactions.length})</option>
-        <option value="REVIEWED" ${PLEDGER_FILTER_STATUS==='REVIEWED'?'selected':''}>Reviewed (${DATA.personalTransactions.filter(t=>t.status==='REVIEWED').length})</option>
-        <option value="AI_SUGGESTED" ${PLEDGER_FILTER_STATUS==='AI_SUGGESTED'?'selected':''}>AI Suggested (${DATA.personalTransactions.filter(t=>t.status==='AI_SUGGESTED').length})</option>
-        <option value="UNREVIEWED" ${PLEDGER_FILTER_STATUS==='UNREVIEWED'?'selected':''}>Unreviewed (${DATA.personalTransactions.filter(t=>t.status==='UNREVIEWED').length})</option>
-        <option value="CPA_REVIEW" ${PLEDGER_FILTER_STATUS==='CPA_REVIEW'?'selected':''}>CPA Review — pendente (${DATA.personalTransactions.filter(t=>t.status==='CPA_REVIEW').length})</option>
+        ${(()=>{const pbase=PLEDGER_FILTER_ACCOUNT?DATA.personalTransactions.filter(t=>t.accountId===PLEDGER_FILTER_ACCOUNT):DATA.personalTransactions;return `
+        <option value="">Todos os status (${pbase.length})</option>
+        <option value="REVIEWED" ${PLEDGER_FILTER_STATUS==='REVIEWED'?'selected':''}>Reviewed (${pbase.filter(t=>t.status==='REVIEWED').length})</option>
+        <option value="AI_SUGGESTED" ${PLEDGER_FILTER_STATUS==='AI_SUGGESTED'?'selected':''}>AI Suggested (${pbase.filter(t=>t.status==='AI_SUGGESTED').length})</option>
+        <option value="UNREVIEWED" ${PLEDGER_FILTER_STATUS==='UNREVIEWED'?'selected':''}>Unreviewed (${pbase.filter(t=>t.status==='UNREVIEWED').length})</option>
+        <option value="CPA_REVIEW" ${PLEDGER_FILTER_STATUS==='CPA_REVIEW'?'selected':''}>CPA Review — pendente (${pbase.filter(t=>t.status==='CPA_REVIEW').length})</option>
+        `;})()}
       </select>
     </div>
     <div class="fl" style="max-width:420px;margin-bottom:14px">
@@ -2675,11 +2677,13 @@ function renderLedger(c){
         ${DATA.entities.map(e=>`<option value="${e.id}" ${LEDGER_FILTER_ENTITY===e.id?'selected':''}>${esc(e.legalName)||'(sem nome)'} (${DATA.transactions.filter(t=>t.entityId===e.id).length})</option>`).join('')}
       </select>
       <select class="fi" style="width:220px;margin-left:10px" onchange="LEDGER_FILTER_STATUS=this.value;render()">
-        <option value="">Todos os status (${DATA.transactions.length})</option>
-        <option value="REVIEWED" ${LEDGER_FILTER_STATUS==='REVIEWED'?'selected':''}>Reviewed (${DATA.transactions.filter(t=>t.status==='REVIEWED').length})</option>
-        <option value="AI_SUGGESTED" ${LEDGER_FILTER_STATUS==='AI_SUGGESTED'?'selected':''}>AI Suggested (${DATA.transactions.filter(t=>t.status==='AI_SUGGESTED').length})</option>
-        <option value="UNREVIEWED" ${LEDGER_FILTER_STATUS==='UNREVIEWED'?'selected':''}>Unreviewed (${DATA.transactions.filter(t=>t.status==='UNREVIEWED').length})</option>
-        <option value="CPA_REVIEW" ${LEDGER_FILTER_STATUS==='CPA_REVIEW'?'selected':''}>CPA Review — pendente (${DATA.transactions.filter(t=>t.status==='CPA_REVIEW').length})</option>
+        ${(()=>{const base=LEDGER_FILTER_ENTITY?DATA.transactions.filter(t=>t.entityId===LEDGER_FILTER_ENTITY):DATA.transactions;return `
+        <option value="">Todos os status (${base.length})</option>
+        <option value="REVIEWED" ${LEDGER_FILTER_STATUS==='REVIEWED'?'selected':''}>Reviewed (${base.filter(t=>t.status==='REVIEWED').length})</option>
+        <option value="AI_SUGGESTED" ${LEDGER_FILTER_STATUS==='AI_SUGGESTED'?'selected':''}>AI Suggested (${base.filter(t=>t.status==='AI_SUGGESTED').length})</option>
+        <option value="UNREVIEWED" ${LEDGER_FILTER_STATUS==='UNREVIEWED'?'selected':''}>Unreviewed (${base.filter(t=>t.status==='UNREVIEWED').length})</option>
+        <option value="CPA_REVIEW" ${LEDGER_FILTER_STATUS==='CPA_REVIEW'?'selected':''}>CPA Review — pendente (${base.filter(t=>t.status==='CPA_REVIEW').length})</option>
+        `;})()}
       </select>
     </div>
     <div class="fl" style="max-width:420px;margin-bottom:14px">
