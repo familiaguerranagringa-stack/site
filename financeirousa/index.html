@@ -1004,6 +1004,20 @@ function syncFromFB(){
       txJuros.status='REVIEWED';
       saveAndSync();
     }
+    // Zelle $120 para LACAZA COUNTERTOPS INC (conf# avwegs26n) — mármore para a porta de entrada da casa, obra (residência pessoal), sem regra automática (item pontual)
+    (function(){
+      const fgh9=DATA.entities.find(e=>(e.legalName||'').toUpperCase().includes('FAMILIA GUERRA HOLDING'));
+      if(!fgh9) return;
+      let txLacaza=DATA.transactions.find(t=>t.entityId===fgh9.id && (t.originalDescription||'').toUpperCase().includes('AVWEGS26N'));
+      if(!txLacaza) txLacaza=DATA.transactions.find(t=>t.entityId===fgh9.id && (t.originalDescription||'').toUpperCase().includes('LACAZA') && Math.abs(Math.abs(t.amount)-120.00)<0.01);
+      if(txLacaza && txLacaza.status!=='REVIEWED'){
+        txLacaza.category='Personal Expense Paid by Business';
+        txLacaza.cpaCategory='Personal Expense Paid by Business — Home Improvement Materials: Marble, Front Entry Door (Personal Residence)';
+        txLacaza.userDescription='Lacaza Countertops Inc — mármore para a porta de entrada da casa, obra da residência pessoal (Familia Guerra Holding LLC).';
+        txLacaza.status='REVIEWED';
+        saveAndSync();
+      }
+    })();
     // $2,99 "ACCT INTEGRATORS DES:Assn Dues" (Familia Guerra Holding, 1/30/26) — mensalidade de associação processada pela Accounting Integrators LLC (processadora de cobrança, ex: NASE), no nome de Julyana Soares. Valor baixo, avaliado pelo usuário como sem risco. Sem regra automática — se aparecer de novo com valor maior, é sinal de alerta pra contestar com o banco.
     (function(){
       const fgh8=DATA.entities.find(e=>(e.legalName||'').toUpperCase().includes('FAMILIA GUERRA HOLDING'));
