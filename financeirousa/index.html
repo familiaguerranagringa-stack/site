@@ -1254,19 +1254,42 @@ function syncFromFB(){
       });
       if(changed4) saveAndSync();
     })();
-    // Amazon Digital $6,75 (conf# 2M4N07CK3, 1/21/26, Familia Guerra Investing, cartão •9278) — reembolso, resolve direto
+    // CORREÇÃO DE ERRO MEU: a Amazon Digital $6,75 (conf# 2M4N07CK3) foi classificada errado como reembolso antes de eu descobrir
+    // que o extrato desse cartão vem com Amount sempre positivo + coluna "Transaction Type" separada (D=Debit). É uma
+    // compra de conteúdo digital (Kindle/Prime/etc), não um reembolso. Revertendo e corrigindo o sinal.
     (function(){
       const investingEnt7=DATA.entities.find(e=>(e.legalName||'').toUpperCase().includes('FAMILIA GUERRA INVESTING'));
       if(!investingEnt7) return;
-      let txAmzn=DATA.transactions.find(t=>t.entityId===investingEnt7.id && (t.originalDescription||'').toUpperCase().includes('2M4N07CK3'));
-      if(!txAmzn) txAmzn=DATA.transactions.find(t=>t.entityId===investingEnt7.id && (t.originalDescription||'').toUpperCase().includes('AMAZON') && Math.abs(t.amount-6.75)<0.01 && t.status!=='REVIEWED');
-      if(txAmzn && txAmzn.status!=='REVIEWED'){
-        txAmzn.category='Refund';
-        txAmzn.cpaCategory='Refund — Amazon Refund';
-        txAmzn.userDescription='Reembolso da Amazon (Amazon Digital) — provavelmente devolução/cancelamento de compra anterior.';
-        txAmzn.status='REVIEWED';
-        saveAndSync();
-      }
+      let changedAmzn=false;
+      DATA.transactions.forEach(t=>{
+        if(t.entityId===investingEnt7.id && (t.originalDescription||'').toUpperCase().includes('AMAZON DIGI') && t.amount>0){
+          t.amount=-Math.abs(t.amount);
+          t.category='Personal Expense Paid by Business';
+          t.cpaCategory='Personal Expense Paid by Business — Digital Media/Entertainment (Amazon Digital)';
+          t.userDescription='Amazon Digital — compra de conteúdo digital (Kindle/Prime/livro/app, categoria Amusement and Entertainment). Correção: estava classificada errado como reembolso, na verdade é uma compra (Transaction Type = D no extrato original). Provavelmente uso pessoal no cartão da empresa — confirmar com o usuário.';
+          t.status='CPA_REVIEW';
+          changedAmzn=true;
+        }
+      });
+      if(changedAmzn) saveAndSync();
+    })();
+    // My French Cafe e qualquer outra transação do cartão •9278 da Investing que tenha entrado com sinal invertido
+    // (mesmo bug: extrato traz Amount sempre positivo, sistema não lia a coluna Transaction Type D/C antes desse fix)
+    (function(){
+      const investingEnt8=DATA.entities.find(e=>(e.legalName||'').toUpperCase().includes('FAMILIA GUERRA INVESTING'));
+      if(!investingEnt8) return;
+      let changedMFC=false;
+      DATA.transactions.forEach(t=>{
+        if(t.entityId===investingEnt8.id && (t.originalDescription||'').toUpperCase().includes('MY FRENCH CAFE') && t.amount>0){
+          t.amount=-Math.abs(t.amount);
+          t.category='Personal Expense Paid by Business';
+          t.cpaCategory='Personal Expense Paid by Business — Restaurant (My French Cafe)';
+          t.userDescription='My French Cafe — cafeteria que o usuário frequenta, é gasto, não entrada. Correção de sinal: o extrato original trazia o valor sempre positivo (Amount) com a direção real numa coluna separada (Transaction Type = D), que o sistema não lia antes desse fix.';
+          t.status='CPA_REVIEW';
+          changedMFC=true;
+        }
+      });
+      if(changedMFC) saveAndSync();
     })();
     // Água/luz da residência (Windermere) pagas pela Familia Guerra Investing LLC — home office (orientação do CPA Diego), sobrescreve o tratamento genérico de Duke Energy/Orange County
     (function(){
@@ -2008,6 +2031,7 @@ function processPersonalImportRows(rows){
   const descIdx=header.findIndex(x=>x.includes('description'));
   const amtIdx=header.findIndex(x=>x.includes('amount'));
   const balIdx=header.findIndex(x=>x.includes('bal'));
+  const typeIdx=header.findIndex(x=>x.includes('transaction type'));
 
   const parsed=[];
   for(let i=headerIdx+1;i<rows.length;i++){
@@ -2015,9 +2039,15 @@ function processPersonalImportRows(rows){
     if(!r || !r[dateIdx]) continue;
     const desc=(r[descIdx]||'').toString().trim();
     const amtRaw=(r[amtIdx]||'').toString().replace(/,/g,'').replace(/"/g,'').trim();
-    const amt=parseFloat(amtRaw);
+    let amt=parseFloat(amtRaw);
     if(desc.toLowerCase().startsWith('beginning balance')) continue;
     if(isNaN(amt) || amt===0) continue;
+    // Extratos de cartão de crédito às vezes trazem Amount sempre positivo + coluna "Transaction Type" (D/C) separada
+    if(typeIdx>=0){
+      const tipo=(r[typeIdx]||'').toString().trim().toUpperCase();
+      if(tipo==='D' || tipo==='DEBIT'){ amt=-Math.abs(amt); }
+      else if(tipo==='C' || tipo==='CREDIT'){ amt=Math.abs(amt); }
+    }
     parsed.push({date:(r[dateIdx]||'').toString().trim(),description:desc,amount:amt,balance:balIdx>=0?(r[balIdx]||'').toString().trim():''});
   }
   if(!parsed.length){notify('Nenhuma transação válida encontrada no arquivo.','err');return;}
@@ -2902,6 +2932,7 @@ function processImportRows(rows){
   const descIdx=header.findIndex(x=>x.includes('description'));
   const amtIdx=header.findIndex(x=>x.includes('amount'));
   const balIdx=header.findIndex(x=>x.includes('bal'));
+  const typeIdx=header.findIndex(x=>x.includes('transaction type'));
 
   const parsed=[];
   for(let i=headerIdx+1;i<rows.length;i++){
@@ -2909,9 +2940,17 @@ function processImportRows(rows){
     if(!r || !r[dateIdx]) continue;
     const desc=(r[descIdx]||'').toString().trim();
     const amtRaw=(r[amtIdx]||'').toString().replace(/,/g,'').replace(/"/g,'').trim();
-    const amt=parseFloat(amtRaw);
+    let amt=parseFloat(amtRaw);
     if(desc.toLowerCase().startsWith('beginning balance')) continue; // não é transação
     if(isNaN(amt) || amt===0) continue; // ignora linhas sem valor (ex: fee waiver $0.00)
+    // Alguns extratos de cartão de crédito (ex: Bank of America) trazem o valor sempre positivo na coluna Amount,
+    // e usam uma coluna separada "Transaction Type" (D=Debit/saída, C=Credit/entrada) para indicar a direção.
+    // Sem essa correção, toda compra do cartão entraria como se fosse receita.
+    if(typeIdx>=0){
+      const tipo=(r[typeIdx]||'').toString().trim().toUpperCase();
+      if(tipo==='D' || tipo==='DEBIT'){ amt=-Math.abs(amt); }
+      else if(tipo==='C' || tipo==='CREDIT'){ amt=Math.abs(amt); }
+    }
     parsed.push({
       date:(r[dateIdx]||'').toString().trim(),
       description:desc,
