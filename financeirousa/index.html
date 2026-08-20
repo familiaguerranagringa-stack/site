@@ -988,6 +988,27 @@ function syncFromFB(){
       txJuros.status='REVIEWED';
       saveAndSync();
     }
+    // Obra da cobertura/área gourmet em casa: porta dos fundos (Lansing BP Ordo) + mão de obra e descarte de entulho (AD Services and Solutions LLC) — Familia Guerra Holding
+    (function(){
+      const fgh5=DATA.entities.find(e=>(e.legalName||'').toUpperCase().includes('FAMILIA GUERRA HOLDING'));
+      if(!fgh5) return;
+      let changed5=false;
+      function fixByAmount(amt,cpaCat,note){
+        const t=DATA.transactions.find(t=>t.entityId===fgh5.id && Math.abs(Math.abs(t.amount)-amt)<0.01 && t.status!=='REVIEWED');
+        if(t){
+          t.category='Personal Expense Paid by Business';
+          t.cpaCategory=cpaCat;
+          t.userDescription=note;
+          t.status='REVIEWED';
+          changed5=true;
+        }
+      }
+      fixByAmount(3269.58,'Personal Expense Paid by Business — Home Improvement Materials: Back Door to Backyard, Outdoor Covered Structure (Personal Residence)','Lansing BP Ordo — porta dos fundos que dá para o quintal, obra da cobertura/área gourmet da casa (residência pessoal, Familia Guerra Holding LLC).');
+      fixByAmount(3179.59,'Personal Expense Paid by Business — Home Improvement Materials: Back Door to Backyard, Outdoor Covered Structure (Personal Residence)','Lansing BP Ordo — porta dos fundos que dá para o quintal, obra da cobertura/área gourmet da casa (residência pessoal, Familia Guerra Holding LLC).');
+      fixByAmount(350.00,'Personal Expense Paid by Business — Home Improvement Labor: Debris Removal, Outdoor Covered Structure (Personal Residence)','AD Services and Solutions LLC — mão de obra para recolher entulho da obra da cobertura/área gourmet da casa (residência pessoal, Familia Guerra Holding LLC).');
+      fixByAmount(80.97,'Personal Expense Paid by Business — Home Improvement: Construction Waste Disposal, Outdoor Covered Structure (Personal Residence)','AD Services and Solutions LLC — descarte de resíduo/entulho da obra da cobertura/área gourmet da casa (residência pessoal, Familia Guerra Holding LLC).');
+      if(changed5) saveAndSync();
+    })();
     // Moriah Best Services LLC (Familia Guerra Holding) — resolve direto as pendentes existentes, já que é deep clean recorrente confirmada
     (function(){
       const fgh4=DATA.entities.find(e=>(e.legalName||'').toUpperCase().includes('FAMILIA GUERRA HOLDING'));
