@@ -677,7 +677,7 @@ function syncFromFB(){
     let retro=false;
     DATA.transactions.forEach(t=>{
       if(t.status==='UNREVIEWED' && !t.category){
-        const guess=detectWireContributionFromBrazil(t.originalDescription)||detectMemberDistribution(t.originalDescription)||detectIntercompanyContribution(t.originalDescription)||detectPropertyPatterns(t.originalDescription)||detectSecurityFirstInsurance(t.originalDescription)||detectBofaMaintenanceFee(t.originalDescription,t.amount)||detectChkg7968InternalTransfer(t.originalDescription)||detectVixConstructionPayment(t.originalDescription,t.amount)||detectMarichellLandscaping(t.originalDescription)||detectTMobilePersonal(t.originalDescription)||detectSpectrumInternet(t.originalDescription)||detectOrangeCountyUtilities(t.originalDescription)||detectLakesOfWindermereHOA(t.originalDescription,t.amount)||detectPaschoalLandscaping(t.originalDescription)||detectMoriahBestServices(t.originalDescription)||detectBlessedBrave(t.originalDescription)||detectDecolumber(t.originalDescription)||detectInvestingIncomeSources(t.originalDescription)||detectLucianoLMagic(t.originalDescription)||detectCreditCardBillPayment(t.originalDescription);
+        const guess=detectWireContributionFromBrazil(t.originalDescription)||detectMemberDistribution(t.originalDescription)||detectIntercompanyContribution(t.originalDescription)||detectPropertyPatterns(t.originalDescription)||detectSecurityFirstInsurance(t.originalDescription)||detectBofaMaintenanceFee(t.originalDescription,t.amount)||detectChkg7968InternalTransfer(t.originalDescription)||detectVixConstructionPayment(t.originalDescription,t.amount)||detectMarichellLandscaping(t.originalDescription)||detectTMobilePersonal(t.originalDescription)||detectSpectrumInternet(t.originalDescription)||detectOrangeCountyUtilities(t.originalDescription)||detectLakesOfWindermereHOA(t.originalDescription,t.amount)||detectPaschoalLandscaping(t.originalDescription)||detectMoriahBestServices(t.originalDescription)||detectBlessedBrave(t.originalDescription)||detectCashBack(t.originalDescription)||detectDecolumber(t.originalDescription)||detectInvestingIncomeSources(t.originalDescription)||detectLucianoLMagic(t.originalDescription)||detectCreditCardBillPayment(t.originalDescription);
         if(guess){
           t.category=guess.category;
           t.cpaCategory=guess.cpaCategory;
@@ -688,7 +688,7 @@ function syncFromFB(){
       }
       // Recupera transações marcadas como CPA Review que na verdade batem com um padrão conhecido (ex: Duke Energy)
       if(t.status==='CPA_REVIEW'){
-        const guess2=detectPropertyPatterns(t.originalDescription)||detectSecurityFirstInsurance(t.originalDescription)||detectBofaMaintenanceFee(t.originalDescription,t.amount)||detectChkg7968InternalTransfer(t.originalDescription)||detectVixConstructionPayment(t.originalDescription,t.amount)||detectMarichellLandscaping(t.originalDescription)||detectTMobilePersonal(t.originalDescription)||detectSpectrumInternet(t.originalDescription)||detectOrangeCountyUtilities(t.originalDescription)||detectLakesOfWindermereHOA(t.originalDescription,t.amount)||detectPaschoalLandscaping(t.originalDescription)||detectMoriahBestServices(t.originalDescription)||detectBlessedBrave(t.originalDescription)||detectDecolumber(t.originalDescription)||detectInvestingIncomeSources(t.originalDescription)||detectLucianoLMagic(t.originalDescription)||detectCreditCardBillPayment(t.originalDescription);
+        const guess2=detectPropertyPatterns(t.originalDescription)||detectSecurityFirstInsurance(t.originalDescription)||detectBofaMaintenanceFee(t.originalDescription,t.amount)||detectChkg7968InternalTransfer(t.originalDescription)||detectVixConstructionPayment(t.originalDescription,t.amount)||detectMarichellLandscaping(t.originalDescription)||detectTMobilePersonal(t.originalDescription)||detectSpectrumInternet(t.originalDescription)||detectOrangeCountyUtilities(t.originalDescription)||detectLakesOfWindermereHOA(t.originalDescription,t.amount)||detectPaschoalLandscaping(t.originalDescription)||detectMoriahBestServices(t.originalDescription)||detectBlessedBrave(t.originalDescription)||detectCashBack(t.originalDescription)||detectDecolumber(t.originalDescription)||detectInvestingIncomeSources(t.originalDescription)||detectLucianoLMagic(t.originalDescription)||detectCreditCardBillPayment(t.originalDescription);
         if(guess2){
           t.category=guess2.category;
           t.cpaCategory=guess2.cpaCategory;
@@ -797,6 +797,14 @@ function syncFromFB(){
         t.cpaCategory=blessedGuess.cpaCategory;
         if(!t.userDescription || t.status!=='REVIEWED') t.userDescription=blessedGuess.userDescription;
         if(t.status!=='REVIEWED') t.status='AI_SUGGESTED';
+        bofaFix=true;
+      }
+      const cashBackGuess=detectCashBack(t.originalDescription);
+      if(cashBackGuess && t.cpaCategory!==cashBackGuess.cpaCategory && t.status!=='REVIEWED'){
+        t.category=cashBackGuess.category;
+        t.cpaCategory=cashBackGuess.cpaCategory;
+        t.userDescription=cashBackGuess.userDescription;
+        t.status='REVIEWED';
         bofaFix=true;
       }
       const decolumberGuess=detectDecolumber(t.originalDescription);
@@ -1076,6 +1084,23 @@ function syncFromFB(){
         txAcct.status='REVIEWED';
         saveAndSync();
       }
+    })();
+    // Cash Back do cartão de crédito — resolve direto qualquer pendente em qualquer empresa (não é receita de negócio)
+    (function(){
+      let changedCB=false;
+      DATA.transactions.forEach(t=>{
+        if(t.status!=='REVIEWED'){
+          const g=detectCashBack(t.originalDescription);
+          if(g){
+            t.category=g.category;
+            t.cpaCategory=g.cpaCategory;
+            t.userDescription=g.userDescription;
+            t.status='REVIEWED';
+            changedCB=true;
+          }
+        }
+      });
+      if(changedCB) saveAndSync();
     })();
     // Fontes de receita da Familia Guerra Investing LLC (One Vacation Home, The Outside Lounge, Import FL, One Prop, Projeto Alvin, Garcia Gusmão Alessandro) — resolve direto todas as pendentes existentes, classificação genérica (contrato a detalhar depois)
     (function(){
@@ -2443,6 +2468,18 @@ function detectBlessedBrave(desc){
   };
 }
 
+// ── DETECÇÃO AUTOMÁTICA: Cash Back do cartão de crédito — recompensa do banco, não é receita de negócio ──
+function detectCashBack(desc){
+  const d=(desc||'').toUpperCase();
+  const compact=d.replace(/[^A-Z]/g,'');
+  if(!compact.includes('CASHBACK') && !compact.includes('CASHREWARD')) return null;
+  return {
+    category:'Income',
+    cpaCategory:'Other Income — Credit Card Cash Back Reward',
+    userDescription:'Cash back do cartão de crédito — recompensa do banco, não é receita de negócio nem juros de investimento.'
+  };
+}
+
 // ── DETECÇÃO AUTOMÁTICA: Decolumber LLC — material de MDF para a obra da cobertura/área gourmet em casa ──
 function detectDecolumber(desc){
   const d=(desc||'').toUpperCase();
@@ -2658,11 +2695,12 @@ function processImportRows(rows){
     const paschoalGuess=(!rule && !wireGuess && !distGuess && !intercoGuess && !propGuess && !secGuess && !bofaGuess && !chkgGuess && !vixGuess && !marichellGuess && !tmobileGuess && !spectrumGuess && !orangeCoGuess && !hoaGuess)?detectPaschoalLandscaping(p.description):null;
     const moriahGuess=(!rule && !wireGuess && !distGuess && !intercoGuess && !propGuess && !secGuess && !bofaGuess && !chkgGuess && !vixGuess && !marichellGuess && !tmobileGuess && !spectrumGuess && !orangeCoGuess && !hoaGuess && !paschoalGuess)?detectMoriahBestServices(p.description):null;
     const blessedGuess=(!rule && !wireGuess && !distGuess && !intercoGuess && !propGuess && !secGuess && !bofaGuess && !chkgGuess && !vixGuess && !marichellGuess && !tmobileGuess && !spectrumGuess && !orangeCoGuess && !hoaGuess && !paschoalGuess && !moriahGuess)?detectBlessedBrave(p.description):null;
-    const decolumberGuess=(!rule && !wireGuess && !distGuess && !intercoGuess && !propGuess && !secGuess && !bofaGuess && !chkgGuess && !vixGuess && !marichellGuess && !tmobileGuess && !spectrumGuess && !orangeCoGuess && !hoaGuess && !paschoalGuess && !moriahGuess && !blessedGuess)?detectDecolumber(p.description):null;
+    const cashBackGuess=(!rule && !wireGuess && !distGuess && !intercoGuess && !propGuess && !secGuess && !bofaGuess && !chkgGuess && !vixGuess && !marichellGuess && !tmobileGuess && !spectrumGuess && !orangeCoGuess && !hoaGuess && !paschoalGuess && !moriahGuess && !blessedGuess)?detectCashBack(p.description):null;
+    const decolumberGuess=(!rule && !wireGuess && !distGuess && !intercoGuess && !propGuess && !secGuess && !bofaGuess && !chkgGuess && !vixGuess && !marichellGuess && !tmobileGuess && !spectrumGuess && !orangeCoGuess && !hoaGuess && !paschoalGuess && !moriahGuess && !blessedGuess && !cashBackGuess)?detectDecolumber(p.description):null;
     const investIncomeGuess=(!rule && !wireGuess && !distGuess && !intercoGuess && !propGuess && !secGuess && !bofaGuess && !chkgGuess && !vixGuess && !marichellGuess && !tmobileGuess && !spectrumGuess && !orangeCoGuess && !hoaGuess && !paschoalGuess && !moriahGuess && !blessedGuess && !decolumberGuess)?detectInvestingIncomeSources(p.description):null;
     const lucianoGuess=(!rule && !wireGuess && !distGuess && !intercoGuess && !propGuess && !secGuess && !bofaGuess && !chkgGuess && !vixGuess && !marichellGuess && !tmobileGuess && !spectrumGuess && !orangeCoGuess && !hoaGuess && !paschoalGuess && !moriahGuess && !blessedGuess && !decolumberGuess && !investIncomeGuess)?detectLucianoLMagic(p.description):null;
     const ccBillGuess=(!rule && !wireGuess && !distGuess && !intercoGuess && !propGuess && !secGuess && !bofaGuess && !chkgGuess && !vixGuess && !marichellGuess && !tmobileGuess && !spectrumGuess && !orangeCoGuess && !hoaGuess && !paschoalGuess && !moriahGuess && !blessedGuess && !decolumberGuess && !investIncomeGuess && !lucianoGuess)?detectCreditCardBillPayment(p.description):null;
-    const guess=wireGuess||distGuess||intercoGuess||propGuess||secGuess||bofaGuess||chkgGuess||vixGuess||marichellGuess||tmobileGuess||spectrumGuess||orangeCoGuess||hoaGuess||paschoalGuess||moriahGuess||blessedGuess||decolumberGuess||investIncomeGuess||lucianoGuess||ccBillGuess;
+    const guess=wireGuess||distGuess||intercoGuess||propGuess||secGuess||bofaGuess||chkgGuess||vixGuess||marichellGuess||tmobileGuess||spectrumGuess||orangeCoGuess||hoaGuess||paschoalGuess||moriahGuess||blessedGuess||cashBackGuess||decolumberGuess||investIncomeGuess||lucianoGuess||ccBillGuess;
     toAdd.push({
       id:uuid(),
       entityId:IMP.entityId,
